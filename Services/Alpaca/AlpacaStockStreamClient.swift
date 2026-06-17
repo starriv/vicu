@@ -27,7 +27,7 @@ final class AlpacaStockStreamClient: AlpacaStockStreaming, @unchecked Sendable {
     private var streamSessions: [AlpacaStockStreamSessionKey: SharedAlpacaStockStreamSession] = [:]
 
     init(
-        session: URLSession = URLSession(configuration: .vicuAPI),
+        session: URLSession = URLSession(configuration: .vicuWebSocket),
         baseURL: URL = URL(string: "wss://stream.data.alpaca.markets")!
     ) {
         self.session = session
@@ -131,6 +131,10 @@ private struct AlpacaStreamSubscriptionKey: Hashable {
 
 private final class SharedAlpacaStockStreamSession: @unchecked Sendable {
     private static let logger = Logger(subsystem: "com.starriv.vicu", category: "AlpacaStockStream")
+    private static let reconnectPolicy = NetworkRetryPolicy.realtimeStream
+    private static let keepaliveInterval: TimeInterval = 25
+    private static let connectionLimitInitialDelay: TimeInterval = 30
+    private static let connectionLimitMaxDelay: TimeInterval = 180
 
     private struct ObserverRegistration {
         let symbol: String
@@ -288,27 +292,43 @@ private final class SharedAlpacaStockStreamSession: @unchecked Sendable {
                 shouldBroadcastDisconnected = false
                 break
             } catch let error as AlpacaStreamRecoverableError {
+                guard !Task.isCancelled, hasObservers else {
+                    break
+                }
+
                 retryAttempt += 1
-                Self.logger.warning("stream recoverable feed=\(self.feed.rawValue, privacy: .public) attempt=\(retryAttempt, privacy: .public) message=\(error.localizedDescription, privacy: .public)")
-                broadcast(.connection(.reconnecting(error.localizedDescription)))
-                let delay = min(pow(2.0, Double(retryAttempt)), 30.0)
+                let isConnectionLimit = Self.isConnectionLimit(error)
+                let delay = Self.retryDelay(retryAttempt: retryAttempt, isConnectionLimit: isConnectionLimit)
+                let message = isConnectionLimit
+                    ? "Alpaca market data stream limit reached. Retrying after cooldown."
+                    : error.localizedDescription
+
+                Self.logger.warning("stream recoverable feed=\(self.feed.rawValue, privacy: .public) attempt=\(retryAttempt, privacy: .public) cooldownSeconds=\(Int(delay.rounded()), privacy: .public) message=\(message, privacy: .public)")
+                broadcast(.connection(.reconnecting(message)))
 
                 do {
-                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    try await Self.sleepBeforeRetry(retryAttempt: retryAttempt, isConnectionLimit: isConnectionLimit)
                 } catch {
                     break
                 }
             } catch is CancellationError {
                 break
             } catch {
+                guard !Task.isCancelled, hasObservers else {
+                    break
+                }
+
                 retryAttempt += 1
-                let message = error.localizedDescription
-                Self.logger.warning("stream interrupted feed=\(self.feed.rawValue, privacy: .public) attempt=\(retryAttempt, privacy: .public) message=\(message, privacy: .public)")
+                let message = Self.reconnectMessage(for: error)
+                if Self.isSocketClosure(error) {
+                    Self.logger.info("stream socket closed feed=\(self.feed.rawValue, privacy: .public) attempt=\(retryAttempt, privacy: .public) message=\(message, privacy: .public)")
+                } else {
+                    Self.logger.warning("stream interrupted feed=\(self.feed.rawValue, privacy: .public) attempt=\(retryAttempt, privacy: .public) message=\(message, privacy: .public)")
+                }
                 broadcast(.connection(.reconnecting(message)))
-                let delay = min(pow(2.0, Double(retryAttempt)), 30.0)
 
                 do {
-                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    try await Self.reconnectPolicy.sleepBeforeRetry(retryAttempt)
                 } catch {
                     break
                 }
@@ -328,8 +348,10 @@ private final class SharedAlpacaStockStreamSession: @unchecked Sendable {
         let webSocket = session.webSocketTask(with: url)
         setWebSocket(webSocket)
         webSocket.resume()
+        let keepaliveTask = startKeepalive(on: webSocket)
 
         defer {
+            keepaliveTask.cancel()
             clearWebSocket(webSocket)
             webSocket.cancel(with: .goingAway, reason: nil)
         }
@@ -397,8 +419,92 @@ private final class SharedAlpacaStockStreamSession: @unchecked Sendable {
                 markUnsubscribed(keys)
             }
         } catch {
-            currentWebSocket?.cancel(with: .goingAway, reason: nil)
+            webSocket.cancel(with: .goingAway, reason: nil)
         }
+    }
+
+    private static func reconnectMessage(for error: Error) -> String {
+        if isSocketClosure(error) {
+            return "Socket disconnected. Reconnecting."
+        }
+
+        return error.localizedDescription
+    }
+
+    private static func isSocketClosure(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain {
+            return [
+                URLError.cancelled.rawValue,
+                URLError.networkConnectionLost.rawValue,
+                URLError.notConnectedToInternet.rawValue,
+                URLError.cannotConnectToHost.rawValue,
+                URLError.timedOut.rawValue
+            ].contains(nsError.code)
+        }
+
+        if nsError.domain == NSPOSIXErrorDomain {
+            return [
+                Int(ENOTCONN),
+                Int(ECONNRESET),
+                Int(EPIPE),
+                Int(ETIMEDOUT)
+            ].contains(nsError.code)
+        }
+
+        return nsError.localizedDescription.localizedCaseInsensitiveContains("socket is not connected")
+    }
+
+    private static func isConnectionLimit(_ error: Error) -> Bool {
+        error.localizedDescription.localizedCaseInsensitiveContains("connection limit exceeded")
+    }
+
+    private static func retryDelay(retryAttempt: Int, isConnectionLimit: Bool) -> TimeInterval {
+        guard isConnectionLimit else {
+            return reconnectPolicy.delay(forRetryAttempt: retryAttempt)
+        }
+
+        let delay = connectionLimitInitialDelay * pow(2.0, Double(max(0, retryAttempt - 1)))
+        return min(connectionLimitMaxDelay, delay)
+    }
+
+    private static func sleepBeforeRetry(retryAttempt: Int, isConnectionLimit: Bool) async throws {
+        let delay = retryDelay(retryAttempt: retryAttempt, isConnectionLimit: isConnectionLimit)
+        guard delay > 0 else {
+            return
+        }
+
+        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+    }
+
+    private func startKeepalive(on webSocket: URLSessionWebSocketTask) -> Task<Void, Never> {
+        Task { [weak self] in
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(nanoseconds: UInt64(Self.keepaliveInterval * 1_000_000_000))
+                } catch {
+                    break
+                }
+
+                guard let self, !Task.isCancelled, self.isCurrentWebSocket(webSocket) else {
+                    break
+                }
+
+                webSocket.sendPing { error in
+                    if let error {
+                        Self.logger.info("stream ping failed feed=\(self.feed.rawValue, privacy: .public) message=\(error.localizedDescription, privacy: .public)")
+                        webSocket.cancel(with: .goingAway, reason: nil)
+                    }
+                }
+            }
+        }
+    }
+
+    private func isCurrentWebSocket(_ webSocket: URLSessionWebSocketTask) -> Bool {
+        lock.lock()
+        let isCurrent = self.webSocket === webSocket
+        lock.unlock()
+        return isCurrent
     }
 
     private func reconcileSubscriptions() async {
@@ -939,5 +1045,16 @@ private extension AssetRealtimeEvent {
         case .status:
             .statuses
         }
+    }
+}
+
+extension URLSessionConfiguration {
+    static var vicuWebSocket: URLSessionConfiguration {
+        let configuration = URLSessionConfiguration.default
+        configuration.waitsForConnectivity = true
+        configuration.timeoutIntervalForRequest = 60 * 60 * 24
+        configuration.timeoutIntervalForResource = 60 * 60 * 24
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return configuration
     }
 }

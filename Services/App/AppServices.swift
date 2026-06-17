@@ -11,7 +11,7 @@ struct AppServices: Sendable {
     init(
         alpaca: any AlpacaServicing,
         stockStream: any AlpacaStockStreaming = AlpacaStockStreamClient.shared,
-        activityStream: any AlpacaActivityStreaming = AlpacaActivityStreamClient.shared,
+        activityStream: any AlpacaActivityStreaming = NoopAlpacaActivityStreamClient(),
         tradeEventStream: any AlpacaTradeEventStreaming = AlpacaTradeEventStreamClient.shared,
         appNotifier: any AppNotifying = AppNotificationCenter.shared,
         credentialStore: any CredentialStore

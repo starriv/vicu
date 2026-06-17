@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 protocol AlpacaServicing: Sendable {
     func testConnection(credentials: AlpacaCredentials) async throws
@@ -116,7 +117,10 @@ protocol AlpacaServicing: Sendable {
 }
 
 struct AlpacaClient: AlpacaServicing {
+    private static let logger = Logger(subsystem: "com.starriv.vicu", category: "AlpacaClient")
     private static let marketDataBaseURL = URL(string: "https://data.alpaca.markets")!
+    private static let assetChartSessionContextCacheTTL: TimeInterval = 45
+    private static let assetChartSessionContextCache = AssetChartSessionContextCache()
     private static let indexProxies: [(title: String, symbol: String)] = [
         ("S&P 500", "SPY"),
         ("Nasdaq 100", "QQQ"),
@@ -330,33 +334,77 @@ struct AlpacaClient: AlpacaServicing {
         credentials: AlpacaCredentials
     ) async throws -> AssetDetailSnapshot {
         let normalizedSymbol = Self.normalizedSymbol(symbol)
-        async let assetRequest = fetchAsset(symbolOrAssetID: normalizedSymbol, credentials: credentials)
-        let chartContext = try await assetChartDataContext(range: range, feed: feed, credentials: credentials)
-        async let barsResultRequest = fetchStockBarsResult(
+        let loadStartedAt = Date()
+        Self.debugAssetDetailLatency(
+            "start",
             symbol: normalizedSymbol,
             range: range,
-            context: chartContext,
-            credentials: credentials
-        )
-        async let chartBaselineRequest = fetchChartBaselineClose(
-            symbol: normalizedSymbol,
-            range: range,
-            feed: chartContext.barsFeed,
-            credentials: credentials
-        )
-        async let snapshotRequest = fetchAssetDetailSnapshot(
-            symbol: normalizedSymbol,
-            feed: chartContext.feed,
-            credentials: credentials
-        )
-        async let latestBarRequest = try? fetchLatestStockBar(
-            symbol: normalizedSymbol,
-            feed: chartContext.feed,
-            credentials: credentials
+            feed: feed,
+            startedAt: loadStartedAt
         )
 
+        async let assetRequest = timedAssetDetailStage(
+            "asset",
+            symbol: normalizedSymbol,
+            range: range,
+            feed: feed
+        ) {
+            try await fetchAsset(symbolOrAssetID: normalizedSymbol, credentials: credentials)
+        }
+        let chartContext = try await timedAssetDetailStage(
+            "context",
+            symbol: normalizedSymbol,
+            range: range,
+            feed: feed
+        ) {
+            try await assetChartDataContext(
+                range: range,
+                feed: feed,
+                credentials: credentials,
+                debugSymbol: normalizedSymbol
+            )
+        }
+        async let barsResultRequest = timedAssetDetailStage(
+            "barsResult",
+            symbol: normalizedSymbol,
+            range: range,
+            feed: chartContext.barsFeed
+        ) {
+            try await fetchStockBarsResult(
+                symbol: normalizedSymbol,
+                range: range,
+                context: chartContext,
+                credentials: credentials
+            )
+        }
+        async let chartBaselineRequest = timedAssetDetailStage(
+            "chartBaseline",
+            symbol: normalizedSymbol,
+            range: range,
+            feed: chartContext.barsFeed
+        ) {
+            await fetchChartBaselineClose(
+                symbol: normalizedSymbol,
+                range: range,
+                feed: chartContext.barsFeed,
+                credentials: credentials
+            )
+        }
+        async let snapshotRequest = timedAssetDetailStage(
+            "snapshot",
+            symbol: normalizedSymbol,
+            range: range,
+            feed: chartContext.feed,
+        ) {
+            try await fetchAssetDetailSnapshot(
+                symbol: normalizedSymbol,
+                feed: chartContext.feed,
+                credentials: credentials
+            )
+        }
+
         let barsResult = try await barsResultRequest
-        return try await AssetDetailSnapshot(
+        let snapshot = try await AssetDetailSnapshot(
             asset: assetRequest,
             stockSnapshot: snapshotRequest,
             bars: barsResult.bars,
@@ -364,8 +412,17 @@ struct AlpacaClient: AlpacaServicing {
             range: range,
             feed: chartContext.feed,
             sessionProgress: barsResult.context.sessionProgress,
-            latestBar: latestBarRequest
+            latestBar: nil
         )
+        Self.debugAssetDetailLatency(
+            "complete",
+            symbol: normalizedSymbol,
+            range: range,
+            feed: chartContext.feed,
+            startedAt: loadStartedAt,
+            extra: "bars=\(snapshot.bars.count)"
+        )
+        return snapshot
     }
 
     func fetchStockSnapshot(symbol: String, feed: AlpacaMarketDataFeed = .iex, credentials: AlpacaCredentials) async throws -> AlpacaStockSnapshot? {
@@ -764,32 +821,86 @@ struct AlpacaClient: AlpacaServicing {
         context: AssetChartDataContext,
         credentials: AlpacaCredentials
     ) async throws -> (bars: [AlpacaMarketBar], context: AssetChartDataContext) {
-        let bars = try await fetchStockBars(
-            symbol: symbol,
-            range: range,
-            feed: context.barsFeed,
-            interval: context.interval,
-            credentials: credentials
-        )
-        if range == .oneDay,
-           bars.count < 2,
-           let fallbackInterval = context.emptyBarsFallbackInterval {
-            do {
-                let fallbackBars = try await fetchStockBars(
+        if range == .oneDay, let fallbackInterval = context.emptyBarsFallbackInterval {
+            let fallbackBarsTask = Task {
+                await fetchStockBarsIfAvailable(
+                    stage: "fallbackBars",
                     symbol: symbol,
                     range: range,
                     feed: context.barsFeed,
                     interval: fallbackInterval,
                     credentials: credentials
                 )
-                if !fallbackBars.isEmpty {
-                    return (fallbackBars + bars, context)
-                }
-            } catch {
+            }
+            let bars = try await timedAssetDetailStage(
+                "primaryBars",
+                symbol: symbol,
+                range: range,
+                feed: context.barsFeed
+            ) {
+                try await fetchStockBars(
+                    symbol: symbol,
+                    range: range,
+                    feed: context.barsFeed,
+                    interval: context.interval,
+                    credentials: credentials
+                )
+            }
+            guard bars.count < 2 else {
+                fallbackBarsTask.cancel()
                 return (bars, context)
             }
+
+            let fallbackBars = await fallbackBarsTask.value ?? []
+            guard !fallbackBars.isEmpty else {
+                return (bars, context)
+            }
+            return (fallbackBars + bars, context)
+        }
+
+        let bars = try await timedAssetDetailStage(
+            "bars",
+            symbol: symbol,
+            range: range,
+            feed: context.barsFeed
+        ) {
+            try await fetchStockBars(
+                symbol: symbol,
+                range: range,
+                feed: context.barsFeed,
+                interval: context.interval,
+                credentials: credentials
+            )
         }
         return (bars, context)
+    }
+
+    private func fetchStockBarsIfAvailable(
+        stage: String,
+        symbol: String,
+        range: AssetChartRange,
+        feed: AlpacaMarketDataFeed,
+        interval: StockDataInterval,
+        credentials: AlpacaCredentials
+    ) async -> [AlpacaMarketBar]? {
+        do {
+            return try await timedAssetDetailStage(
+                stage,
+                symbol: symbol,
+                range: range,
+                feed: feed
+            ) {
+                try await fetchStockBars(
+                    symbol: symbol,
+                    range: range,
+                    feed: feed,
+                    interval: interval,
+                    credentials: credentials
+                )
+            }
+        } catch {
+            return nil
+        }
     }
 
     private func fetchStockBars(
@@ -944,6 +1055,7 @@ struct AlpacaClient: AlpacaServicing {
                 method: endpoint.method,
                 queryItems: endpoint.queryItems,
                 body: body,
+                retryPolicy: endpoint.method == .get && body == nil ? .alpacaGET : .none,
                 requestInterceptors: [
                     AlpacaAuthenticationInterceptor(credentials: credentials)
                 ],
@@ -981,6 +1093,7 @@ struct AlpacaClient: AlpacaServicing {
                 path: endpoint.path,
                 method: .get,
                 queryItems: endpoint.queryItems,
+                retryPolicy: .marketDataGET,
                 requestInterceptors: [
                     AlpacaAuthenticationInterceptor(credentials: credentials)
                 ],
@@ -1078,7 +1191,8 @@ struct AlpacaClient: AlpacaServicing {
         range: AssetChartRange,
         feed: AlpacaMarketDataFeed,
         credentials: AlpacaCredentials,
-        allowsActiveSession: Bool = true
+        allowsActiveSession: Bool = true,
+        debugSymbol: String? = nil
     ) async throws -> AssetChartDataContext {
         let defaultFeed = Self.defaultMarketHoursFeed(from: feed)
         guard range == .oneDay else {
@@ -1091,37 +1205,24 @@ struct AlpacaClient: AlpacaServicing {
             )
         }
 
-        let clockResponse: AlpacaMarketClockResponse = try await request(.marketClock, credentials: credentials)
-        let clock = try clockResponse.clock(market: "NYSE")
-        let referenceDate = AlpacaDateParser.date(clock.timestamp) ?? Date()
-        let calendarStart = Self.marketCalendarDateString(daysAfter: -14, from: clock.timestamp)
-        let calendarEnd = Self.marketCalendarDateString(daysAfter: 7, from: clock.timestamp)
-        let calendarResponse: AlpacaMarketCalendarResponse = try await request(
-            .marketCalendar(
-                market: "NYSE",
-                start: calendarStart,
-                end: calendarEnd
-            ),
-            credentials: credentials
+        let sessionContext = try await assetChartSessionContext(
+            credentials: credentials,
+            debugSymbol: debugSymbol ?? "session"
         )
-        let overnightCalendar = await fetchOvernightMarketCalendar(
-            start: calendarStart,
-            end: calendarEnd,
-            credentials: credentials
-        )
+        let referenceDate = sessionContext.referenceDate
         let formatter = AlpacaMarketDataEndpoint.makeStockDataDateFormatter()
 
         if allowsActiveSession,
            let activeInterval = MarketSessionSchedule.activeInterval(
             at: referenceDate,
-            in: calendarResponse.calendar,
-            overnightDays: overnightCalendar
+            in: sessionContext.calendar,
+            overnightDays: sessionContext.overnightCalendar
            ) {
             if activeInterval.session == .overnight {
                 guard let latestSession = MarketSessionSchedule.latestRegularInterval(
                     before: referenceDate,
-                    in: calendarResponse.calendar,
-                    overnightDays: overnightCalendar
+                    in: sessionContext.calendar,
+                    overnightDays: sessionContext.overnightCalendar
                 ) else {
                     throw APIClientError.invalidResponse
                 }
@@ -1136,8 +1237,8 @@ struct AlpacaClient: AlpacaServicing {
                     emptyBarsFallbackInterval: nil,
                     sessionProgress: MarketSessionSchedule.progress(
                         for: activeInterval,
-                        in: calendarResponse.calendar,
-                        overnightDays: overnightCalendar,
+                        in: sessionContext.calendar,
+                        overnightDays: sessionContext.overnightCalendar,
                         at: referenceDate
                     )
                 )
@@ -1147,8 +1248,8 @@ struct AlpacaClient: AlpacaServicing {
             if activeInterval.session == .preMarket,
                let latestSession = MarketSessionSchedule.latestRegularInterval(
                 before: referenceDate,
-                in: calendarResponse.calendar,
-                overnightDays: overnightCalendar
+                in: sessionContext.calendar,
+                overnightDays: sessionContext.overnightCalendar
                ) {
                 emptyBarsFallbackInterval = StockDataInterval(
                     start: formatter.string(from: latestSession.start),
@@ -1168,8 +1269,8 @@ struct AlpacaClient: AlpacaServicing {
                 emptyBarsFallbackInterval: emptyBarsFallbackInterval,
                 sessionProgress: MarketSessionSchedule.progress(
                     for: activeInterval,
-                    in: calendarResponse.calendar,
-                    overnightDays: overnightCalendar,
+                    in: sessionContext.calendar,
+                    overnightDays: sessionContext.overnightCalendar,
                     at: referenceDate
                 )
             )
@@ -1177,8 +1278,8 @@ struct AlpacaClient: AlpacaServicing {
 
         guard let latestSession = MarketSessionSchedule.latestRegularInterval(
             before: referenceDate,
-            in: calendarResponse.calendar,
-            overnightDays: overnightCalendar
+            in: sessionContext.calendar,
+            overnightDays: sessionContext.overnightCalendar
         ) else {
             throw APIClientError.invalidResponse
         }
@@ -1200,29 +1301,15 @@ struct AlpacaClient: AlpacaServicing {
         credentials: AlpacaCredentials
     ) async throws -> CurrentStockDataContext {
         let defaultFeed = Self.defaultMarketHoursFeed(from: feed)
-        let clockResponse: AlpacaMarketClockResponse = try await request(.marketClock, credentials: credentials)
-        let clock = try clockResponse.clock(market: "NYSE")
-        let referenceDate = AlpacaDateParser.date(clock.timestamp) ?? Date()
-        let calendarStart = Self.marketCalendarDateString(daysAfter: -14, from: clock.timestamp)
-        let calendarEnd = Self.marketCalendarDateString(daysAfter: 7, from: clock.timestamp)
-        let calendarResponse: AlpacaMarketCalendarResponse = try await request(
-            .marketCalendar(
-                market: "NYSE",
-                start: calendarStart,
-                end: calendarEnd
-            ),
-            credentials: credentials
-        )
-        let overnightCalendar = await fetchOvernightMarketCalendar(
-            start: calendarStart,
-            end: calendarEnd,
-            credentials: credentials
+        let sessionContext = try await assetChartSessionContext(
+            credentials: credentials,
+            debugSymbol: "current"
         )
 
         guard let activeInterval = MarketSessionSchedule.activeInterval(
-            at: referenceDate,
-            in: calendarResponse.calendar,
-            overnightDays: overnightCalendar
+            at: sessionContext.referenceDate,
+            in: sessionContext.calendar,
+            overnightDays: sessionContext.overnightCalendar
         ) else {
             return CurrentStockDataContext(feed: defaultFeed, activeSession: nil)
         }
@@ -1231,6 +1318,141 @@ struct AlpacaClient: AlpacaServicing {
             feed: activeInterval.session == .overnight ? .overnight : defaultFeed,
             activeSession: activeInterval.session
         )
+    }
+
+    private func assetChartSessionContext(
+        credentials: AlpacaCredentials,
+        debugSymbol: String
+    ) async throws -> AssetChartSessionContext {
+        let cacheKey = AssetChartSessionContextCacheKey(environment: credentials.environment.rawValue)
+        if let cachedContext = await Self.assetChartSessionContextCache.value(
+            for: cacheKey,
+            maxAge: Self.assetChartSessionContextCacheTTL
+        ) {
+            Self.debugAssetDetailLatency(
+                "sessionContext.cacheHit",
+                symbol: debugSymbol,
+                range: .oneDay,
+                feed: .iex,
+                startedAt: cachedContext.cachedAt
+            )
+            return cachedContext.context
+        }
+
+        let clockResponse: AlpacaMarketClockResponse = try await timedAssetDetailStage(
+            "clock",
+            symbol: debugSymbol,
+            range: .oneDay,
+            feed: .iex
+        ) {
+            try await request(.marketClock, credentials: credentials)
+        }
+        let clock = try clockResponse.clock(market: "NYSE")
+        let referenceDate = AlpacaDateParser.date(clock.timestamp) ?? Date()
+        let calendarStart = Self.marketCalendarDateString(daysAfter: -14, from: clock.timestamp)
+        let calendarEnd = Self.marketCalendarDateString(daysAfter: 7, from: clock.timestamp)
+
+        async let calendarResponseRequest: AlpacaMarketCalendarResponse = timedAssetDetailStage(
+            "calendar",
+            symbol: debugSymbol,
+            range: .oneDay,
+            feed: .iex
+        ) {
+            try await request(
+                .marketCalendar(
+                    market: "NYSE",
+                    start: calendarStart,
+                    end: calendarEnd
+                ),
+                credentials: credentials
+            )
+        }
+        async let overnightCalendarRequest = timedAssetDetailStage(
+            "overnightCalendar",
+            symbol: debugSymbol,
+            range: .oneDay,
+            feed: .overnight
+        ) {
+            await fetchOvernightMarketCalendar(
+                start: calendarStart,
+                end: calendarEnd,
+                credentials: credentials
+            )
+        }
+
+        let calendarResponse = try await calendarResponseRequest
+        let sessionContext = AssetChartSessionContext(
+            referenceDate: referenceDate,
+            calendar: calendarResponse.calendar,
+            overnightCalendar: await overnightCalendarRequest
+        )
+        await Self.assetChartSessionContextCache.store(sessionContext, for: cacheKey)
+        return sessionContext
+    }
+
+    private func timedAssetDetailStage<Value: Sendable>(
+        _ stage: String,
+        symbol: String,
+        range: AssetChartRange,
+        feed: AlpacaMarketDataFeed,
+        operation: () async throws -> Value
+    ) async throws -> Value {
+        let startedAt = Date()
+        do {
+            let value = try await operation()
+            Self.debugAssetDetailLatency(
+                stage,
+                symbol: symbol,
+                range: range,
+                feed: feed,
+                startedAt: startedAt
+            )
+            return value
+        } catch {
+            Self.debugAssetDetailLatency(
+                "\(stage).failed",
+                symbol: symbol,
+                range: range,
+                feed: feed,
+                startedAt: startedAt,
+                extra: error.localizedDescription
+            )
+            throw error
+        }
+    }
+
+    private func timedAssetDetailStage<Value: Sendable>(
+        _ stage: String,
+        symbol: String,
+        range: AssetChartRange,
+        feed: AlpacaMarketDataFeed,
+        operation: () async -> Value
+    ) async -> Value {
+        let startedAt = Date()
+        let value = await operation()
+        Self.debugAssetDetailLatency(
+            stage,
+            symbol: symbol,
+            range: range,
+            feed: feed,
+            startedAt: startedAt
+        )
+        return value
+    }
+
+    private static func debugAssetDetailLatency(
+        _ stage: String,
+        symbol: String,
+        range: AssetChartRange,
+        feed: AlpacaMarketDataFeed,
+        startedAt: Date,
+        extra: String? = nil
+    ) {
+        #if DEBUG
+        let elapsedMilliseconds = Int(Date().timeIntervalSince(startedAt) * 1000)
+        let suffix = extra.map { " \($0)" } ?? ""
+        logger.debug("asset detail load symbol=\(symbol, privacy: .public) range=\(range.title, privacy: .public) feed=\(feed.rawValue, privacy: .public) stage=\(stage, privacy: .public) elapsedMs=\(elapsedMilliseconds, privacy: .public)\(suffix, privacy: .public)")
+        #endif
     }
 
     private static func defaultMarketHoursFeed(from feed: AlpacaMarketDataFeed) -> AlpacaMarketDataFeed {
@@ -1713,6 +1935,45 @@ private struct AssetChartDataContext: Sendable {
 private struct CurrentStockDataContext: Sendable {
     let feed: AlpacaMarketDataFeed
     let activeSession: MarketSessionKind?
+}
+
+private struct AssetChartSessionContext: Sendable {
+    let referenceDate: Date
+    let calendar: [AlpacaCalendarDay]
+    let overnightCalendar: [AlpacaCalendarDay]
+}
+
+private struct AssetChartSessionContextCacheKey: Hashable, Sendable {
+    let environment: String
+}
+
+private struct AssetChartSessionContextCacheEntry: Sendable {
+    let context: AssetChartSessionContext
+    let cachedAt: Date
+}
+
+private actor AssetChartSessionContextCache {
+    private var entries: [AssetChartSessionContextCacheKey: AssetChartSessionContextCacheEntry] = [:]
+
+    func value(
+        for key: AssetChartSessionContextCacheKey,
+        maxAge: TimeInterval
+    ) -> AssetChartSessionContextCacheEntry? {
+        guard let entry = entries[key] else {
+            return nil
+        }
+
+        guard Date().timeIntervalSince(entry.cachedAt) <= maxAge else {
+            entries.removeValue(forKey: key)
+            return nil
+        }
+
+        return entry
+    }
+
+    func store(_ context: AssetChartSessionContext, for key: AssetChartSessionContextCacheKey) {
+        entries[key] = AssetChartSessionContextCacheEntry(context: context, cachedAt: Date())
+    }
 }
 
 private struct AlpacaAuthenticationInterceptor: APIRequestInterceptor {

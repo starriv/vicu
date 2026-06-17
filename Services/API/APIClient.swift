@@ -47,10 +47,29 @@ struct URLSessionAPIClient: APIClient {
     }
 
     func send<Response: Decodable & Sendable>(_ request: APIRequest<Response>) async throws -> Response {
+        var retryAttempt = 0
+
         do {
-            return try await perform(request)
-        } catch {
-            throw configuration.errorHandler.map(error)
+            while true {
+                do {
+                    return try await perform(request)
+                } catch {
+                    let apiError = configuration.errorHandler.map(error)
+                    retryAttempt += 1
+
+                    guard request.retryPolicy.shouldRetry(
+                        apiError,
+                        method: request.method,
+                        retryAttempt: retryAttempt
+                    ) else {
+                        throw apiError
+                    }
+
+                    try await request.retryPolicy.sleepBeforeRetry(retryAttempt)
+                }
+            }
+        } catch is CancellationError {
+            throw APIClientError.cancelled
         }
     }
 
@@ -178,7 +197,7 @@ enum APIClientError: LocalizedError, Equatable {
 }
 
 enum APIErrorDisplayMessage {
-    static func message(for error: Error, locale: Locale = .current) -> String {
+    static func message(for error: Error, locale: Locale = AppLocale.current) -> String {
         if let apiError = error as? APIClientError {
             return message(for: apiError, locale: locale)
         }
@@ -191,7 +210,7 @@ enum APIErrorDisplayMessage {
             ?? L10n.API.unexpected(locale: locale)
     }
 
-    static func message(for apiError: APIClientError, locale: Locale = .current) -> String {
+    static func message(for apiError: APIClientError, locale: Locale = AppLocale.current) -> String {
         switch apiError {
         case .invalidURL:
             L10n.API.invalidURLText(locale: locale)

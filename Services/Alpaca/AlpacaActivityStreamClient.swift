@@ -20,6 +20,7 @@ final class AlpacaActivityStreamClient: AlpacaActivityStreaming, @unchecked Send
     static let shared = AlpacaActivityStreamClient()
 
     private static let logger = Logger(subsystem: "com.starriv.vicu", category: "AlpacaActivityStream")
+    private static let reconnectPolicy = NetworkRetryPolicy.realtimeStream
 
     private let session: URLSession
     private let activityPath: String
@@ -56,14 +57,26 @@ final class AlpacaActivityStreamClient: AlpacaActivityStreaming, @unchecked Send
                     } catch let error as APIClientError where error.statusCode == 401 || error.statusCode == 403 {
                         sink.onError(error)
                         return
+                    } catch let error as APIClientError where error.statusCode == 404 {
+                        let message = error.localizedDescription
+                        let endpoint = self.endpointURL(credentials: credentials)
+
+                        if Self.hasCursor(nextSinceID) {
+                            Self.logger.info("activity stream cursor rejected environment=\(credentials.environment.rawValue, privacy: .public) endpoint=\(endpoint, privacy: .public) message=\(message, privacy: .public); retrying without since_id")
+                            nextSinceID = nil
+                            retryAttempt = 0
+                            continue
+                        }
+
+                        Self.logger.warning("activity stream unavailable environment=\(credentials.environment.rawValue, privacy: .public) endpoint=\(endpoint, privacy: .public) message=\(message, privacy: .public)")
+                        break
                     } catch {
                         retryAttempt += 1
                         let message = error.localizedDescription
                         Self.logger.warning("activity stream interrupted environment=\(credentials.environment.rawValue, privacy: .public) attempt=\(retryAttempt, privacy: .public) message=\(message, privacy: .public)")
-                        let delay = min(pow(2.0, Double(retryAttempt)), 30.0)
 
                         do {
-                            try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                            try await Self.reconnectPolicy.sleepBeforeRetry(retryAttempt)
                         } catch {
                             break
                         }
@@ -85,7 +98,8 @@ final class AlpacaActivityStreamClient: AlpacaActivityStreaming, @unchecked Send
         onEvent: (AlpacaActivityEvent) -> Void
     ) async throws {
         let request = try makeRequest(credentials: credentials, sinceID: sinceID)
-        Self.logger.info("activity stream connect environment=\(credentials.environment.rawValue, privacy: .public) sinceID=\(sinceID ?? "none", privacy: .public)")
+        let requestURL = request.url?.absoluteString ?? "<invalid-url>"
+        Self.logger.info("activity stream connect environment=\(credentials.environment.rawValue, privacy: .public) sinceID=\(sinceID ?? "none", privacy: .public) url=\(requestURL, privacy: .public)")
 
         let (bytes, response) = try await session.bytes(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -151,6 +165,18 @@ final class AlpacaActivityStreamClient: AlpacaActivityStreaming, @unchecked Send
         return request
     }
 
+    private func endpointURL(credentials: AlpacaCredentials) -> String {
+        credentials.environment.baseURL.appendingPathComponent(activityPath).absoluteString
+    }
+
+    private static func hasCursor(_ sinceID: String?) -> Bool {
+        guard let sinceID else {
+            return false
+        }
+
+        return !sinceID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     private func decodeEvent(from message: ServerSentEventMessage) throws -> AlpacaActivityEvent {
         guard let data = message.data.data(using: .utf8) else {
             throw APIClientError.invalidResponse
@@ -173,6 +199,7 @@ final class AlpacaTradeEventStreamClient: AlpacaTradeEventStreaming, @unchecked 
     static let shared = AlpacaTradeEventStreamClient()
 
     private static let logger = Logger(subsystem: "com.starriv.vicu", category: "AlpacaTradeEventStream")
+    private static let reconnectPolicy = NetworkRetryPolicy.realtimeStream
 
     private let session: URLSession
     private let tradeEventPath: String
@@ -209,14 +236,26 @@ final class AlpacaTradeEventStreamClient: AlpacaTradeEventStreaming, @unchecked 
                     } catch let error as APIClientError where error.statusCode == 401 || error.statusCode == 403 {
                         sink.onError(error)
                         return
+                    } catch let error as APIClientError where error.statusCode == 404 {
+                        let message = error.localizedDescription
+                        let endpoint = self.endpointURL(credentials: credentials)
+
+                        if Self.hasCursor(nextSinceID) {
+                            Self.logger.info("trade event stream cursor rejected environment=\(credentials.environment.rawValue, privacy: .public) endpoint=\(endpoint, privacy: .public) message=\(message, privacy: .public); retrying without since_id")
+                            nextSinceID = nil
+                            retryAttempt = 0
+                            continue
+                        }
+
+                        Self.logger.warning("trade event stream unavailable environment=\(credentials.environment.rawValue, privacy: .public) endpoint=\(endpoint, privacy: .public) message=\(message, privacy: .public)")
+                        break
                     } catch {
                         retryAttempt += 1
                         let message = error.localizedDescription
                         Self.logger.warning("trade event stream interrupted environment=\(credentials.environment.rawValue, privacy: .public) attempt=\(retryAttempt, privacy: .public) message=\(message, privacy: .public)")
-                        let delay = min(pow(2.0, Double(retryAttempt)), 30.0)
 
                         do {
-                            try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                            try await Self.reconnectPolicy.sleepBeforeRetry(retryAttempt)
                         } catch {
                             break
                         }
@@ -238,7 +277,8 @@ final class AlpacaTradeEventStreamClient: AlpacaTradeEventStreaming, @unchecked 
         onEvent: (AlpacaTradeEvent) -> Void
     ) async throws {
         let request = try makeRequest(credentials: credentials, sinceID: sinceID)
-        Self.logger.info("trade event stream connect environment=\(credentials.environment.rawValue, privacy: .public) sinceID=\(sinceID ?? "none", privacy: .public)")
+        let requestURL = request.url?.absoluteString ?? "<invalid-url>"
+        Self.logger.info("trade event stream connect environment=\(credentials.environment.rawValue, privacy: .public) sinceID=\(sinceID ?? "none", privacy: .public) url=\(requestURL, privacy: .public)")
 
         let (bytes, response) = try await session.bytes(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -302,6 +342,18 @@ final class AlpacaTradeEventStreamClient: AlpacaTradeEventStreaming, @unchecked 
         request.setValue(credentials.keyID, forHTTPHeaderField: "APCA-API-KEY-ID")
         request.setValue(credentials.secretKey, forHTTPHeaderField: "APCA-API-SECRET-KEY")
         return request
+    }
+
+    private func endpointURL(credentials: AlpacaCredentials) -> String {
+        credentials.environment.baseURL.appendingPathComponent(tradeEventPath).absoluteString
+    }
+
+    private static func hasCursor(_ sinceID: String?) -> Bool {
+        guard let sinceID else {
+            return false
+        }
+
+        return !sinceID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func decodeEvent(from message: ServerSentEventMessage) throws -> AlpacaTradeEvent {

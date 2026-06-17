@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 struct APIResponseContext {
     let request: URLRequest
@@ -24,7 +25,7 @@ struct DefaultHeadersInterceptor: APIRequestInterceptor {
     func adapt(_ request: URLRequest) async throws -> URLRequest {
         var request = request
         request.setValueIfMissing("application/json", forHTTPHeaderField: "Accept")
-        request.setValueIfMissing(Locale.preferredLanguages.first ?? "en", forHTTPHeaderField: "Accept-Language")
+        request.setValueIfMissing(AppLocale.acceptLanguageHeader(), forHTTPHeaderField: "Accept-Language")
 
         if request.httpBody != nil {
             request.setValueIfMissing("application/json", forHTTPHeaderField: "Content-Type")
@@ -79,11 +80,13 @@ enum APIErrorMessageSanitizer {
 }
 
 struct APIDebugLoggingInterceptor: APIRequestInterceptor, APIResponseInterceptor {
+    private static let logger = Logger(subsystem: "com.starriv.vicu", category: "API")
+
     func adapt(_ request: URLRequest) async throws -> URLRequest {
         #if DEBUG
         let method = request.httpMethod ?? "GET"
         let url = request.url?.absoluteString ?? "<invalid-url>"
-        print("[API] -> \(method) \(url)")
+        Self.logger.debug("request method=\(method, privacy: .public) url=\(url, privacy: .public)")
         #endif
         return request
     }
@@ -92,7 +95,7 @@ struct APIDebugLoggingInterceptor: APIRequestInterceptor, APIResponseInterceptor
         #if DEBUG
         let method = context.request.httpMethod ?? "GET"
         let url = context.request.url?.absoluteString ?? "<invalid-url>"
-        print("[API] <- \(context.response.statusCode) \(method) \(url)")
+        Self.logger.debug("response status=\(context.response.statusCode, privacy: .public) method=\(method, privacy: .public) url=\(url, privacy: .public)")
         #endif
         return context
     }
