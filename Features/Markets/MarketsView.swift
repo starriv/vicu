@@ -1,5 +1,6 @@
 import RxSwift
 import SwiftUI
+import UIKit
 
 struct MarketsView: View {
     @Environment(AppModel.self) private var app
@@ -544,17 +545,16 @@ struct MarketSearchView: View {
                 .foregroundStyle(searchIconColor)
                 .frame(width: 24, height: 24)
 
-            TextField("", text: queryBinding, prompt: Text(searchPlaceholderSymbol).foregroundStyle(searchPlaceholderColor))
-                .focused($isSearchFocused)
-                .keyboardType(.asciiCapable)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .foregroundStyle(searchTextColor)
-                .tint(AppTheme.ColorToken.brand)
-                .submitLabel(.search)
-                .onSubmit {
-                    submitSearch()
-                }
+            MarketSearchTextField(
+                text: queryBinding,
+                placeholder: searchPlaceholderSymbol,
+                placeholderColor: UIColor(searchPlaceholderColor),
+                textColor: UIColor(searchTextColor),
+                tintColor: UIColor(AppTheme.ColorToken.brand),
+                isFocused: isSearchFocused,
+                onFocusChange: { isSearchFocused = $0 },
+                onSubmit: submitSearch
+            )
         }
         .font(.title2.weight(.medium))
         .padding(.horizontal, 14)
@@ -755,6 +755,104 @@ private struct MarketSearchAssetDestination: Identifiable, Hashable {
     let symbol: String
 
     var id: String { symbol }
+}
+
+private struct MarketSearchTextField: UIViewRepresentable {
+    @Binding var text: String
+    let placeholder: String
+    let placeholderColor: UIColor
+    let textColor: UIColor
+    let tintColor: UIColor
+    let isFocused: Bool
+    let onFocusChange: (Bool) -> Void
+    let onSubmit: () -> Void
+
+    func makeUIView(context: Context) -> UITextField {
+        let textField = UITextField(frame: .zero)
+        textField.delegate = context.coordinator
+        textField.borderStyle = .none
+        textField.backgroundColor = .clear
+        textField.clearButtonMode = .never
+        textField.keyboardType = .asciiCapable
+        textField.returnKeyType = .search
+        textField.enablesReturnKeyAutomatically = false
+        textField.autocapitalizationType = .none
+        textField.autocorrectionType = .no
+        textField.smartDashesType = .no
+        textField.smartQuotesType = .no
+        textField.spellCheckingType = .no
+        textField.adjustsFontForContentSizeCategory = true
+        textField.addTarget(
+            context.coordinator,
+            action: #selector(Coordinator.textDidChange(_:)),
+            for: .editingChanged
+        )
+        return textField
+    }
+
+    func updateUIView(_ textField: UITextField, context: Context) {
+        context.coordinator.parent = self
+
+        if textField.text != text {
+            textField.text = text
+        }
+
+        textField.textColor = textColor
+        textField.tintColor = tintColor
+        textField.font = Self.preferredFont
+        textField.attributedPlaceholder = NSAttributedString(
+            string: placeholder,
+            attributes: [
+                .foregroundColor: placeholderColor,
+                .font: Self.preferredFont
+            ]
+        )
+
+        if isFocused, !textField.isFirstResponder {
+            DispatchQueue.main.async {
+                textField.becomeFirstResponder()
+            }
+        } else if !isFocused, textField.isFirstResponder {
+            DispatchQueue.main.async {
+                textField.resignFirstResponder()
+            }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    private static var preferredFont: UIFont {
+        let baseFont = UIFont.systemFont(ofSize: 22, weight: .medium)
+        return UIFontMetrics(forTextStyle: .title2).scaledFont(for: baseFont)
+    }
+
+    final class Coordinator: NSObject, UITextFieldDelegate {
+        var parent: MarketSearchTextField
+
+        init(parent: MarketSearchTextField) {
+            self.parent = parent
+        }
+
+        @objc
+        func textDidChange(_ textField: UITextField) {
+            parent.text = textField.text ?? ""
+        }
+
+        func textFieldDidBeginEditing(_ textField: UITextField) {
+            parent.onFocusChange(true)
+        }
+
+        func textFieldDidEndEditing(_ textField: UITextField) {
+            parent.onFocusChange(false)
+        }
+
+        func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+            parent.onSubmit()
+            return false
+        }
+    }
 }
 
 @MainActor

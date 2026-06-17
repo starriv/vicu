@@ -33,7 +33,9 @@ struct AssetPositionShareSheet: View {
                 .padding(.horizontal, 12)
                 .padding(.top, 12)
                 .padding(.bottom, 26)
+                .background(Color.clear)
             }
+            .background(Color.clear)
             .scrollContentBackground(.hidden)
             .task(id: "\(payload.id)-\(locale.identifier)-\(colorScheme)") {
                 renderShareImage()
@@ -83,7 +85,6 @@ struct AssetPositionShareSheet: View {
                     RoundedRectangle(cornerRadius: 28, style: .continuous)
                         .strokeBorder(Color(.separator).opacity(0.16))
                 }
-                .shadow(color: .black.opacity(0.18), radius: 22, y: 12)
                 .frame(maxWidth: 370)
                 .accessibilityLabel(L10n.AssetPositionShare.previewAccessibility)
         } else {
