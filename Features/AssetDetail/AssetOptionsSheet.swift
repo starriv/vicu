@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AssetOptionsSheet: View {
     @Environment(AppModel.self) private var app
+    @Environment(AppToastCenter.self) private var toastCenter
     @Environment(\.dismiss) private var dismiss
 
     @State private var store: AssetOptionsStore
@@ -37,9 +38,26 @@ struct AssetOptionsSheet: View {
         .task {
             store.start(app: app)
         }
+        .onChange(of: store.expirationErrorMessage) { _, message in
+            showErrorMessage(message)
+        }
+        .onChange(of: store.errorMessage) { _, message in
+            showErrorMessage(message)
+        }
+        .onChange(of: store.loadMoreErrorMessage) { _, message in
+            showErrorMessage(message)
+        }
         .onDisappear {
             store.stop()
         }
+    }
+
+    private func showErrorMessage(_ message: String?) {
+        guard let message else {
+            return
+        }
+
+        toastCenter.showErrorMessage(message)
     }
 }
 
@@ -154,15 +172,6 @@ private struct AssetOptionsFilterBar: View {
                     .buttonStyle(.plain)
                 }
 
-                if let expirationErrorMessage = store.expirationErrorMessage {
-                    Text(expirationErrorMessage)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(AppTheme.ColorToken.negative)
-                        .lineLimit(1)
-                        .padding(.horizontal, 12)
-                        .frame(height: 32)
-                        .background(AppTheme.ColorToken.negative.opacity(0.10), in: Capsule())
-                }
             }
             .padding(.vertical, 1)
         }
@@ -204,11 +213,7 @@ private struct AssetOptionsContent: View {
                 store.loadMoreIfNeeded()
             }
         ) {
-            if let errorMessage = store.errorMessage, store.rows.isEmpty {
-                AssetOptionsErrorBanner(message: errorMessage) {
-                    store.reloadOptions(forceReload: true)
-                }
-            } else if store.rows.isEmpty {
+            if store.rows.isEmpty {
                 ContentUnavailableView(
                     "No options",
                     systemImage: AppIcon.Position.option,
@@ -236,12 +241,6 @@ private struct AssetOptionsContent: View {
                     }
                 }
 
-                if let loadMoreErrorMessage = store.loadMoreErrorMessage {
-                    AssetOptionsErrorBanner(message: loadMoreErrorMessage) {
-                        store.loadMoreIfNeeded(force: true)
-                    }
-                    .padding(.top, 12)
-                }
             }
         }
         .refreshable {
@@ -361,26 +360,5 @@ private struct AssetOptionMetric: View {
 private struct AssetOptionsLoadingView: View {
     var body: some View {
         OptionsChainSkeleton(rowCount: 6)
-    }
-}
-
-private struct AssetOptionsErrorBanner: View {
-    let message: String
-    let retry: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(message, systemImage: "exclamationmark.triangle")
-                .font(AppTypography.detail)
-                .foregroundStyle(AppTheme.ColorToken.negative)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Button("Retry", action: retry)
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(AppTheme.ColorToken.negative.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }

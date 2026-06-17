@@ -29,6 +29,7 @@ final class AssetOptionsStore {
     @ObservationIgnored private var loadMoreDisposeBag = DisposeBag()
     @ObservationIgnored private var expirationDisposeBag = DisposeBag()
     @ObservationIgnored private var isStarted = false
+    @ObservationIgnored private weak var app: AppModel?
     @ObservationIgnored private var rowIDs = Set<String>()
     @ObservationIgnored private var activeResetRequestKey: AssetOptionsRequestKey?
 
@@ -61,6 +62,7 @@ final class AssetOptionsStore {
         }
 
         isStarted = true
+        self.app = app
         bindExpirationPipeline(app: app)
         bindChainPipeline(app: app)
         bindLoadMorePipeline(app: app)
@@ -72,6 +74,7 @@ final class AssetOptionsStore {
         loadMoreDisposeBag = DisposeBag()
         expirationDisposeBag = DisposeBag()
         isStarted = false
+        app = nil
         activeResetRequestKey = nil
         isLoading = false
         isLoadingMore = false
@@ -245,12 +248,12 @@ final class AssetOptionsStore {
 
             expirationErrorMessage = nil
             setExpirationOptions(expirations.compactMap(AssetOptionExpiration.init(apiDate:)))
-        case .failure(let request, let error):
+        case .failure(let request, _):
             guard request.symbol == symbol else {
                 return
             }
 
-            expirationErrorMessage = error.localizedDescription.isEmpty ? "Expirations unavailable" : "Expirations unavailable"
+            expirationErrorMessage = "Expirations unavailable"
         }
     }
 
@@ -285,14 +288,18 @@ final class AssetOptionsStore {
                 rows = []
                 rowIDs = []
                 nextPageToken = nil
-                errorMessage = error.localizedDescription
+                errorMessage = displayErrorMessage(for: error)
                 activeResetRequestKey = nil
                 isLoading = false
             } else {
-                loadMoreErrorMessage = error.localizedDescription
+                loadMoreErrorMessage = displayErrorMessage(for: error)
                 isLoadingMore = false
             }
         }
+    }
+
+    private func displayErrorMessage(for error: Error) -> String {
+        APIErrorDisplayMessage.message(for: error, locale: app?.appLanguage.locale ?? AppLocale.current)
     }
 
     private func isCurrentRequest(_ request: AssetOptionsChainRequest) -> Bool {

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct AssetNewsSheet: View {
     @Environment(AppModel.self) private var app
+    @Environment(AppToastCenter.self) private var toastCenter
     @Environment(\.dismiss) private var dismiss
 
     let symbol: String
@@ -14,8 +15,7 @@ struct AssetNewsSheet: View {
     @State private var nextPageToken: String?
     @State private var isLoading = false
     @State private var isLoadingMore = false
-    @State private var errorMessage: String?
-    @State private var loadMoreErrorMessage: String?
+    @State private var hasLoadMoreError = false
     @State private var selectedWebPage: AssetNewsWebPage?
 
     init(symbol: String, displayName: String) {
@@ -78,18 +78,14 @@ struct AssetNewsSheet: View {
                 bottom: AppTheme.Spacing.pageBottom,
                 trailing: AppTheme.Spacing.pageHorizontal
             ),
-            canLoadMore: nextPageToken != nil && loadMoreErrorMessage == nil,
+            canLoadMore: nextPageToken != nil && !hasLoadMoreError,
             isLoadingMore: isLoadingMore,
             loadMoreTrigger: AssetNewsLoadMoreTrigger(pageToken: nextPageToken, count: rows.count),
             loadMore: {
                 await loadMoreIfNeeded()
             }
         ) {
-            if let errorMessage, rows.isEmpty {
-                AssetNewsErrorBanner(message: errorMessage) {
-                    Task { await loadNews(reset: true, forceReload: true) }
-                }
-            } else if rows.isEmpty {
+            if rows.isEmpty {
                 ContentUnavailableView(
                     "No news",
                     systemImage: "newspaper",
@@ -109,12 +105,6 @@ struct AssetNewsSheet: View {
                     }
                 }
 
-                if let loadMoreErrorMessage {
-                    AssetNewsErrorBanner(message: loadMoreErrorMessage) {
-                        Task { await loadMoreIfNeeded(force: true) }
-                    }
-                    .padding(.top, 12)
-                }
             }
         }
         .refreshable {
@@ -127,8 +117,7 @@ struct AssetNewsSheet: View {
         guard app.hasCredentials else {
             rows = []
             nextPageToken = nil
-            errorMessage = nil
-            loadMoreErrorMessage = nil
+            hasLoadMoreError = false
             isLoading = false
             isLoadingMore = false
             return
@@ -140,8 +129,7 @@ struct AssetNewsSheet: View {
             }
 
             isLoading = true
-            errorMessage = nil
-            loadMoreErrorMessage = nil
+            hasLoadMoreError = false
             nextPageToken = nil
         } else {
             guard !isLoading, !isLoadingMore, nextPageToken != nil else {
@@ -149,7 +137,7 @@ struct AssetNewsSheet: View {
             }
 
             isLoadingMore = true
-            loadMoreErrorMessage = nil
+            hasLoadMoreError = false
         }
 
         defer {
@@ -188,10 +176,10 @@ struct AssetNewsSheet: View {
             if reset {
                 rows = []
                 nextPageToken = nil
-                errorMessage = error.localizedDescription
             } else {
-                loadMoreErrorMessage = error.localizedDescription
+                hasLoadMoreError = true
             }
+            toastCenter.showError(error, locale: app.appLanguage.locale)
         }
     }
 
@@ -201,7 +189,7 @@ struct AssetNewsSheet: View {
             return
         }
 
-        if loadMoreErrorMessage != nil, !force {
+        if hasLoadMoreError, !force {
             return
         }
 
@@ -541,27 +529,5 @@ private final class AssetNewsSafariHostViewController: UIViewController {
         view.isUserInteractionEnabled = false
         view.backgroundColor = .clear
         self.view = view
-    }
-}
-
-private struct AssetNewsErrorBanner: View {
-    let message: String
-    let retry: () -> Void
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(AppTheme.ColorToken.warning)
-
-            Text(message)
-                .font(AppTypography.detail)
-                .foregroundStyle(.primary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            Button("Retry", action: retry)
-                .font(AppTypography.control)
-        }
-        .padding(14)
-        .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }

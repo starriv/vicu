@@ -132,7 +132,7 @@ struct OrdersView: View {
             )
             return true
         } catch {
-            toastCenter.show(error.localizedDescription, systemImage: "exclamationmark.circle.fill", tone: .error)
+            toastCenter.showError(error, locale: locale)
             await OrderActivityManager.endCancellation(
                 for: order,
                 phase: .failed,
@@ -597,7 +597,7 @@ private struct OrderPriceReplacementSheet: View {
             toastCenter.show(L10n.Orders.priceReplacedToast(symbol: draft.order.symbol, locale: locale))
             dismiss()
         } catch {
-            toastCenter.show(error.localizedDescription, systemImage: "exclamationmark.circle.fill", tone: .error)
+            toastCenter.showError(error, locale: locale)
         }
     }
 

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct OrderDetailView: View {
     @Environment(AppModel.self) private var app
+    @Environment(AppToastCenter.self) private var toastCenter
     @State private var order: AlpacaOrder
     @State private var loadState: LoadState<AlpacaOrder>
     @State private var isAdditionalExpanded = false
@@ -14,12 +15,6 @@ struct OrderDetailView: View {
     var body: some View {
         BasicLayout(L10n.Orders.Detail.navigationTitle, style: .scroll(spacing: 26)) {
             VStack(alignment: .leading, spacing: 26) {
-                if let errorMessage {
-                    OrderDetailErrorBanner(message: errorMessage) {
-                        Task { await loadOrder() }
-                    }
-                }
-
                 OrderDetailSection(title: L10n.Orders.Detail.title) {
                     OrderDetailRows(fields: primaryFields)
                 }
@@ -150,14 +145,6 @@ struct OrderDetailView: View {
         return false
     }
 
-    private var errorMessage: String? {
-        if case .failed(let message) = loadState {
-            return message
-        }
-
-        return nil
-    }
-
     private var legsField: OrderDetailField? {
         guard let legs = order.legs, !legs.isEmpty else {
             return nil
@@ -254,7 +241,8 @@ struct OrderDetailView: View {
         } catch where error.isOrderDetailCancellation {
             return
         } catch {
-            loadState = .failed(error.localizedDescription)
+            loadState = .loaded(order)
+            toastCenter.showError(error, locale: app.appLanguage.locale)
         }
     }
 }
@@ -398,56 +386,6 @@ private struct OrderDetailRow: View {
                     .lineLimit(2)
                     .minimumScaleFactor(0.84)
             }
-        }
-    }
-}
-
-private struct OrderDetailErrorBanner: View {
-    let message: String
-    let retry: () -> Void
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.body.weight(.semibold))
-                .foregroundStyle(AppTheme.ColorToken.warning)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(L10n.Orders.Detail.errorTitle)
-                    .font(.body.weight(.semibold))
-                Text(message)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-
-            Spacer(minLength: 8)
-
-            OrderRetryButton(action: retry)
-        }
-        .padding(14)
-        .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-}
-
-private struct OrderRetryButton: View {
-    let action: () -> Void
-
-    var body: some View {
-        if #available(iOS 26.0, *) {
-            Button(action: action) {
-                Image(systemName: "arrow.clockwise")
-                    .frame(width: 32, height: 32)
-            }
-            .buttonStyle(.glass)
-            .accessibilityLabel(L10n.Orders.Detail.retry)
-        } else {
-            Button(action: action) {
-                Image(systemName: "arrow.clockwise")
-                    .frame(width: 32, height: 32)
-            }
-            .buttonStyle(.bordered)
-            .accessibilityLabel(L10n.Orders.Detail.retry)
         }
     }
 }
@@ -753,5 +691,6 @@ private extension Error {
             )
         )
         .environment(AppModel())
+        .environment(AppToastCenter())
     }
 }

@@ -344,7 +344,7 @@ final class OptionDetailStore {
             snapshotErrorMessage = nil
             lastUpdatedAt = Date()
         case .failure(let error):
-            snapshotErrorMessage = error.localizedDescription
+            snapshotErrorMessage = displayErrorMessage(for: error)
         }
     }
 
@@ -369,7 +369,7 @@ final class OptionDetailStore {
             }
 
             activeChartRequest = nil
-            chartErrorMessage = error.localizedDescription
+            chartErrorMessage = displayErrorMessage(for: error)
             isLoadingChart = false
         }
     }
@@ -406,14 +406,18 @@ final class OptionDetailStore {
                 tradeRows = []
                 tradeIDs = []
                 nextTradePageToken = nil
-                tradesErrorMessage = error.localizedDescription
+                tradesErrorMessage = displayErrorMessage(for: error)
                 activeTradeRequest = nil
                 isLoadingTrades = false
             } else {
-                tradeLoadMoreErrorMessage = error.localizedDescription
+                tradeLoadMoreErrorMessage = displayErrorMessage(for: error)
                 isLoadingMoreTrades = false
             }
         }
+    }
+
+    private func displayErrorMessage(for error: Error) -> String {
+        APIErrorDisplayMessage.message(for: error, locale: app?.appLanguage.locale ?? AppLocale.current)
     }
 
     private func isCurrentTradesRequest(_ request: OptionDetailTradesRequest) -> Bool {

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TradeView: View {
     @Environment(AppModel.self) private var app
+    @Environment(AppToastCenter.self) private var toastCenter
     @Environment(\.dismiss) private var dismiss
 
     @State private var store: TradeStore
@@ -37,6 +38,15 @@ struct TradeView: View {
         }
         .onChange(of: store.draft.timeInForce) { _, timeInForce in
             store.normalizeForTimeInForce(timeInForce)
+        }
+        .onChange(of: store.contextErrorMessage) { _, message in
+            showErrorMessage(message)
+        }
+        .onAppear {
+            store.updateLocale(app.appLanguage.locale)
+        }
+        .onChange(of: app.appLanguage) { _, language in
+            store.updateLocale(language.locale)
         }
         .onDisappear {
             store.stopPolling()
@@ -85,6 +95,13 @@ struct TradeView: View {
         submittedOrder = TradeSubmittedOrderDestination(order: order)
     }
 
+    private func showErrorMessage(_ message: String?) {
+        guard let message else {
+            return
+        }
+
+        toastCenter.showErrorMessage(message)
+    }
 }
 
 private struct TradeSubmittedOrderDestination: Identifiable, Hashable {
@@ -1611,5 +1628,6 @@ private enum TradeInputFormat {
     NavigationStack {
         TradeView()
             .environment(AppModel())
+            .environment(AppToastCenter())
     }
 }

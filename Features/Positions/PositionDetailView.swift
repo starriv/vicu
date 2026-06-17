@@ -2,9 +2,9 @@ import SwiftUI
 
 struct PositionDetailView: View {
     @Environment(AppModel.self) private var app
+    @Environment(AppToastCenter.self) private var toastCenter
     @State private var position: AlpacaPosition?
     @State private var isLoading = false
-    @State private var errorMessage: String?
     @State private var positionSharePayload: AssetPositionSharePayload?
 
     private let symbol: String
@@ -79,12 +79,6 @@ struct PositionDetailView: View {
         } else if let position {
             PositionOverviewPanel(position: position, title: L10n.PositionDetail.overview)
 
-            if let errorMessage {
-                PositionErrorBanner(message: errorMessage) {
-                    Task { await loadPosition() }
-                }
-            }
-
             ForEach(PositionDetailSectionModel.sections(for: position, locale: app.appLanguage.locale)) { section in
                 PositionDetailSection(section: section)
             }
@@ -92,7 +86,7 @@ struct PositionDetailView: View {
             ContentUnavailableView(
                 L10n.PositionDetail.notFound,
                 systemImage: AppIcon.Position.empty,
-                description: Text(errorMessage ?? L10n.PositionDetail.notFoundDescription(locale: app.appLanguage.locale))
+                description: Text(L10n.PositionDetail.notFoundDescription(locale: app.appLanguage.locale))
             )
             .frame(maxWidth: .infinity, minHeight: 320)
         }
@@ -120,13 +114,12 @@ struct PositionDetailView: View {
 
     private func loadPosition() async {
         guard app.hasCredentials else {
-            errorMessage = L10n.Credentials.apiKeyRequired(locale: app.appLanguage.locale)
+            toastCenter.showErrorMessage(L10n.Credentials.apiKeyRequired(locale: app.appLanguage.locale))
             return
         }
 
         guard !symbol.isEmpty else {
             position = nil
-            errorMessage = L10n.PositionDetail.notFoundDescription(locale: app.appLanguage.locale)
             return
         }
 
@@ -137,13 +130,10 @@ struct PositionDetailView: View {
             let fetchedPosition = try await app.fetchOpenPosition(symbol: symbol)
             try Task.checkCancellation()
             position = fetchedPosition
-            errorMessage = fetchedPosition == nil
-                ? L10n.PositionDetail.notFoundDescription(locale: app.appLanguage.locale)
-                : nil
         } catch where error.isPositionDetailCancellation {
             return
         } catch {
-            errorMessage = error.localizedDescription
+            toastCenter.showError(error, locale: app.appLanguage.locale)
         }
     }
 }
@@ -819,6 +809,7 @@ private extension Error {
     NavigationStack {
         PositionDetailView(position: .positionDetailPreview)
             .environment(AppModel())
+            .environment(AppToastCenter())
     }
 }
 

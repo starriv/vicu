@@ -3,6 +3,7 @@ import SwiftUI
 
 struct AssetQuoteHistorySheet: View {
     @Environment(AppModel.self) private var app
+    @Environment(AppToastCenter.self) private var toastCenter
     @Environment(\.dismiss) private var dismiss
 
     let symbol: String
@@ -113,6 +114,8 @@ struct AssetQuoteHistorySheet: View {
             }
 
             spreadPoints = QuoteHistorySpreadPoint.makePoints(from: rows)
+        } catch where error.isRequestCancellation {
+            return
         } catch {
             guard !Task.isCancelled else {
                 return
@@ -123,6 +126,7 @@ struct AssetQuoteHistorySheet: View {
                 spreadPoints = []
             }
             hasLoadError = true
+            toastCenter.showError(error, locale: app.appLanguage.locale)
         }
     }
 

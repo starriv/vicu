@@ -1,7 +1,9 @@
 import SwiftUI
+import UIKit
 
 struct AssetDetailView: View {
     @Environment(AppModel.self) private var app
+    @Environment(AppToastCenter.self) private var toastCenter
     @Environment(\.dismiss) private var dismiss
     @State private var store: AssetDetailStore
     @State private var showsHeaderTitle = false
@@ -29,11 +31,10 @@ struct AssetDetailView: View {
 
                     AssetIdentityHeader(store: store)
 
-                    if let errorMessage = store.errorMessage, store.asset == nil {
+                    if store.errorMessage != nil, store.asset == nil {
                         ContentUnavailableView(
                             "Asset data unavailable",
-                            systemImage: "chart.line.uptrend.xyaxis",
-                            description: Text(errorMessage)
+                            systemImage: "chart.line.uptrend.xyaxis"
                         )
                         .frame(maxWidth: .infinity, minHeight: 320)
                     } else {
@@ -76,8 +77,10 @@ struct AssetDetailView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
+        .restoreInteractivePopGesture()
         .safeAreaInset(edge: .top, spacing: 0) {
             AssetDetailFixedHeader(
                 symbol: store.symbol,
@@ -117,6 +120,9 @@ struct AssetDetailView: View {
         }
         .task {
             store.start(app: app)
+        }
+        .onChange(of: store.errorMessage) { _, message in
+            showErrorMessage(message)
         }
         .refreshable {
             store.reload(app: app)
@@ -191,16 +197,131 @@ struct AssetDetailView: View {
         submittedOrderDestination = AssetSubmittedOrderDestination(order: pendingSubmittedOrder)
     }
 
+    private func showErrorMessage(_ message: String?) {
+        guard let message else {
+            return
+        }
+
+        toastCenter.showErrorMessage(message)
+    }
+
     private var headerConnectionStatus: AssetRealtimeConnectionStatus? {
-        switch store.connectionStatus {
-        case .failed where store.hasMarketData:
-            nil
-        case .reconnecting where store.hasRecentMarketData:
-            nil
-        case .failed, .reconnecting:
-            store.connectionStatus
-        default:
-            nil
+        store.headerConnectionStatus
+    }
+}
+
+private extension View {
+    func restoreInteractivePopGesture() -> some View {
+        background {
+            InteractivePopGestureRestorer()
+                .frame(width: 0, height: 0)
+        }
+    }
+}
+
+private struct InteractivePopGestureRestorer: UIViewControllerRepresentable {
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeUIViewController(context: Context) -> RestorerViewController {
+        let controller = RestorerViewController()
+        controller.coordinator = context.coordinator
+        return controller
+    }
+
+    func updateUIViewController(_ controller: RestorerViewController, context: Context) {
+        controller.coordinator = context.coordinator
+        controller.restoreInteractivePopGesture()
+    }
+
+    static func dismantleUIViewController(_ controller: RestorerViewController, coordinator: Coordinator) {
+        coordinator.detach(from: controller.navigationController)
+    }
+
+    final class RestorerViewController: UIViewController {
+        weak var coordinator: Coordinator?
+
+        override func viewDidLoad() {
+            super.viewDidLoad()
+            view.backgroundColor = .clear
+            view.isUserInteractionEnabled = false
+        }
+
+        override func viewWillAppear(_ animated: Bool) {
+            super.viewWillAppear(animated)
+            restoreInteractivePopGesture()
+        }
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            restoreInteractivePopGesture()
+        }
+
+        func restoreInteractivePopGesture() {
+            DispatchQueue.main.async { [weak self] in
+                self?.coordinator?.attach(to: self?.navigationController)
+            }
+        }
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        private weak var navigationController: UINavigationController?
+        private weak var originalDelegate: UIGestureRecognizerDelegate?
+        private var originalIsEnabled: Bool?
+
+        func attach(to navigationController: UINavigationController?) {
+            guard let navigationController,
+                  let gesture = navigationController.interactivePopGestureRecognizer else {
+                return
+            }
+
+            if self.navigationController !== navigationController {
+                detach(from: self.navigationController)
+                self.navigationController = navigationController
+                originalDelegate = gesture.delegate
+                originalIsEnabled = gesture.isEnabled
+            }
+
+            gesture.delegate = self
+            gesture.isEnabled = navigationController.viewControllers.count > 1
+        }
+
+        func detach(from navigationController: UINavigationController?) {
+            guard let navigationController,
+                  let gesture = navigationController.interactivePopGestureRecognizer else {
+                clear()
+                return
+            }
+
+            if gesture.delegate === self {
+                gesture.delegate = originalDelegate
+            }
+
+            if let originalIsEnabled {
+                gesture.isEnabled = originalIsEnabled
+            }
+
+            clear()
+        }
+
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard let navigationController,
+                  navigationController.viewControllers.count > 1 else {
+                return false
+            }
+
+            if navigationController.transitionCoordinator?.isAnimated == true {
+                return false
+            }
+
+            return true
+        }
+
+        private func clear() {
+            navigationController = nil
+            originalDelegate = nil
+            originalIsEnabled = nil
         }
     }
 }

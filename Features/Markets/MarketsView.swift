@@ -3,9 +3,10 @@ import SwiftUI
 
 struct MarketsView: View {
     @Environment(AppModel.self) private var app
+    @Environment(AppToastCenter.self) private var toastCenter
     @State private var overview: MarketOverview?
     @State private var isLoading = false
-    @State private var errorMessage: String?
+    @State private var hasLoadError = false
     @State private var selectedMarketList: MarketListMode = .favorites
 
     var body: some View {
@@ -20,21 +21,10 @@ struct MarketsView: View {
                     systemImage: AppIcon.More.alpaca
                 )
             } else if let overview = overview ?? app.cachedMarketOverview {
-                if let errorMessage {
-                    ErrorBanner(message: errorMessage) {
-                        Task { await loadMarketData() }
-                    }
-                }
-
                 MarketStatusCard(overview: overview)
                 MarketListModePicker(selection: $selectedMarketList)
-                if selectedMarketList == .favorites, let favoritesError = app.favoriteMarketSymbolsError {
-                    ErrorBanner(message: favoritesError) {
-                        Task { await app.refreshFavoriteMarketSymbols() }
-                    }
-                }
                 MarketSymbolSection(mode: selectedMarketList, overview: overview)
-            } else if isLoading || errorMessage == nil {
+            } else if isLoading || !hasLoadError {
                 MarketOverviewSkeleton()
             } else {
                 AppEmptyStateView(
@@ -53,6 +43,9 @@ struct MarketsView: View {
         .refreshable {
             await loadMarketData()
             await app.refreshFavoriteMarketSymbols()
+        }
+        .onChange(of: app.favoriteMarketSymbolsError) { _, message in
+            showErrorMessage(message)
         }
     }
 
@@ -80,7 +73,7 @@ struct MarketsView: View {
         }
 
         isLoading = true
-        errorMessage = nil
+        hasLoadError = false
         defer { isLoading = false }
 
         do {
@@ -89,7 +82,8 @@ struct MarketsView: View {
         } catch where error.isRequestCancellation {
             return
         } catch {
-            errorMessage = error.localizedDescription
+            hasLoadError = true
+            toastCenter.showError(error, locale: app.appLanguage.locale)
         }
     }
 
@@ -121,6 +115,16 @@ struct MarketsView: View {
         }
 
         await loadMarketData()
+    }
+}
+
+private extension MarketsView {
+    func showErrorMessage(_ message: String?) {
+        guard let message else {
+            return
+        }
+
+        toastCenter.showErrorMessage(message)
     }
 }
 
@@ -329,21 +333,24 @@ enum MarketSearchPresentation {
 
 struct MarketSearchView: View {
     @Environment(AppModel.self) private var app
+    @Environment(AppToastCenter.self) private var toastCenter
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismissSearch) private var dismissSearch
     @Binding private var externalQuery: String
     private let usesExternalQuery: Bool
     private let presentation: MarketSearchPresentation
+    private let submitID: Int
+    private let openAssetOverride: ((String) -> Void)?
     @State private var localQuery = ""
     @State private var results: [MarketSearchResult] = []
     @State private var popularSymbols: [MarketActiveSymbol] = []
     @State private var popularSort: MarketMostActiveSort = .trades
     @State private var isSearching = false
     @State private var isLoadingPopularSymbols = false
-    @State private var errorMessage: String?
-    @State private var popularSymbolsErrorMessage: String?
     @State private var searchPlaceholderSymbol = AppModel.searchPlaceholderFallbackSymbol
     @State private var searchPipeline = MarketSearchPipeline()
+    @State private var assetDestination: MarketSearchAssetDestination?
     @FocusState private var isSearchFocused: Bool
 
     private var query: String {
@@ -363,11 +370,15 @@ struct MarketSearchView: View {
 
     init(
         query: Binding<String>? = nil,
-        presentation: MarketSearchPresentation = .marketNavigation
+        presentation: MarketSearchPresentation = .marketNavigation,
+        submitID: Int = 0,
+        openAsset: ((String) -> Void)? = nil
     ) {
         _externalQuery = query ?? .constant("")
         usesExternalQuery = query != nil
         self.presentation = presentation
+        self.submitID = submitID
+        openAssetOverride = openAsset
     }
 
     var body: some View {
@@ -387,6 +398,9 @@ struct MarketSearchView: View {
                 }
             }
         }
+        .navigationDestination(item: $assetDestination) { destination in
+            AssetDetailView(symbol: destination.symbol)
+        }
         .task {
             if !presentation.usesSystemSearchField {
                 isSearchFocused = true
@@ -399,6 +413,9 @@ struct MarketSearchView: View {
         }
         .onChange(of: normalizedQuery) { _, newValue in
             searchPipeline.accept(newValue)
+        }
+        .onChange(of: submitID) { _, _ in
+            submitSearch()
         }
         .onDisappear {
             searchPipeline.cancel()
@@ -447,6 +464,42 @@ struct MarketSearchView: View {
         }
     }
 
+    private func openAssetDetail(_ symbol: String) {
+        let normalizedSymbol = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !normalizedSymbol.isEmpty else {
+            return
+        }
+
+        isSearchFocused = false
+        dismissSearch()
+
+        if let openAssetOverride {
+            Task { @MainActor in
+                if presentation.usesSystemSearchField {
+                    try? await Task.sleep(nanoseconds: 320_000_000)
+                } else {
+                    await Task.yield()
+                }
+
+                openAssetOverride(normalizedSymbol)
+            }
+        } else {
+            assetDestination = MarketSearchAssetDestination(symbol: normalizedSymbol)
+        }
+    }
+
+    private func submitSearch() {
+        let submittedQuery = normalizedQuery.isEmpty ? searchPlaceholderSymbol : normalizedQuery
+        guard !submittedQuery.isEmpty else {
+            return
+        }
+
+        if submittedQuery != query {
+            updateQuery(submittedQuery)
+        }
+        searchPipeline.submit(submittedQuery)
+    }
+
     private var bottomSearchField: some View {
         Group {
             if #available(iOS 26.0, *) {
@@ -493,13 +546,14 @@ struct MarketSearchView: View {
 
             TextField("", text: queryBinding, prompt: Text(searchPlaceholderSymbol).foregroundStyle(searchPlaceholderColor))
                 .focused($isSearchFocused)
+                .keyboardType(.asciiCapable)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .foregroundStyle(searchTextColor)
                 .tint(AppTheme.ColorToken.brand)
                 .submitLabel(.search)
                 .onSubmit {
-                    searchPipeline.submit(normalizedQuery)
+                    submitSearch()
                 }
         }
         .font(.title2.weight(.medium))
@@ -613,14 +667,8 @@ struct MarketSearchView: View {
                 symbols: popularSymbols,
                 sort: popularSort,
                 isLoading: isLoadingPopularSymbols,
-                errorMessage: popularSymbolsErrorMessage
-            ) {
-                Task { await loadPopularSymbols(forceReload: true) }
-            }
-        } else if let errorMessage {
-            ErrorBanner(message: errorMessage) {
-                searchPipeline.submit(normalizedQuery)
-            }
+                openAsset: openAssetDetail(_:)
+            )
         } else if isSearching && results.isEmpty {
             MarketSearchResultsSkeleton(rowCount: 7)
         } else if results.isEmpty {
@@ -631,7 +679,7 @@ struct MarketSearchView: View {
         } else {
             MarketSearchPlainList {
                 ForEach(Array(results.enumerated()), id: \.element.id) { index, result in
-                    MarketSearchResultRow(result: result)
+                    MarketSearchResultRow(result: result, openAsset: openAssetDetail(_:))
 
                     if index < results.count - 1 {
                         MarketSearchDivider()
@@ -645,7 +693,6 @@ struct MarketSearchView: View {
     private func loadPopularSymbols(forceReload: Bool = false) async {
         guard app.hasCredentials else {
             popularSymbols = []
-            popularSymbolsErrorMessage = nil
             isLoadingPopularSymbols = false
             return
         }
@@ -655,7 +702,6 @@ struct MarketSearchView: View {
         }
 
         isLoadingPopularSymbols = true
-        popularSymbolsErrorMessage = nil
         defer { isLoadingPopularSymbols = false }
 
         do {
@@ -664,7 +710,7 @@ struct MarketSearchView: View {
         } catch where error.isRequestCancellation {
             return
         } catch {
-            popularSymbolsErrorMessage = error.localizedDescription
+            toastCenter.showError(error, locale: app.appLanguage.locale)
         }
     }
 
@@ -683,10 +729,8 @@ struct MarketSearchView: View {
         switch state {
         case .idle:
             results = []
-            errorMessage = nil
             isSearching = false
         case .searching(_):
-            errorMessage = nil
             isSearching = true
         case .success(let query, let searchResults):
             guard query == normalizedQuery else {
@@ -694,18 +738,23 @@ struct MarketSearchView: View {
             }
 
             results = searchResults
-            errorMessage = nil
             isSearching = false
-        case .failure(let query, let message):
+        case .failure(let query, let error):
             guard query == normalizedQuery else {
                 return
             }
 
             results = []
-            errorMessage = message
             isSearching = false
+            toastCenter.showError(error, locale: app.appLanguage.locale)
         }
     }
+}
+
+private struct MarketSearchAssetDestination: Identifiable, Hashable {
+    let symbol: String
+
+    var id: String { symbol }
 }
 
 @MainActor
@@ -714,7 +763,7 @@ private final class MarketSearchPipeline {
         case idle
         case searching(String)
         case success(String, [MarketSearchResult])
-        case failure(String, String)
+        case failure(String, Error)
     }
 
     private struct SearchEvent {
@@ -825,7 +874,7 @@ private final class MarketSearchPipeline {
                 if self.activeQuery == query {
                     self.activeQuery = nil
                 }
-                apply(.failure(query, error.localizedDescription))
+                apply(.failure(query, error))
             }
         }
     }
@@ -847,8 +896,7 @@ private struct MarketSearchPopularView: View {
     let symbols: [MarketActiveSymbol]
     let sort: MarketMostActiveSort
     let isLoading: Bool
-    let errorMessage: String?
-    let retry: () -> Void
+    let openAsset: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -872,16 +920,12 @@ private struct MarketSearchPopularView: View {
 
             if isLoading && symbols.isEmpty {
                 MarketSearchResultsSkeleton(rowCount: 7)
-            } else if symbols.isEmpty, let errorMessage {
-                ErrorBanner(message: errorMessage) {
-                    retry()
-                }
             } else if symbols.isEmpty {
                 EmptyMarketRow(text: L10n.Markets.searchPopularUnavailable)
             } else {
                 MarketSearchPlainList {
                     ForEach(Array(symbols.enumerated()), id: \.element.id) { index, symbol in
-                        MarketSearchPopularRow(symbol: symbol)
+                        MarketSearchPopularRow(symbol: symbol, openAsset: openAsset)
 
                         if index < symbols.count - 1 {
                             MarketSearchDivider()
@@ -916,12 +960,13 @@ private struct MarketSearchDivider: View {
 
 private struct MarketSearchPopularRow: View {
     let symbol: MarketActiveSymbol
+    let openAsset: (String) -> Void
     @Environment(AppModel.self) private var app
 
     var body: some View {
         HStack(spacing: 14) {
-            NavigationLink {
-                AssetDetailView(symbol: symbol.symbol)
+            Button {
+                openAsset(symbol.symbol)
             } label: {
                 HStack(spacing: 14) {
                     VStack(alignment: .leading, spacing: 5) {
@@ -971,12 +1016,13 @@ private struct MarketSearchPopularRow: View {
 
 private struct MarketSearchResultRow: View {
     let result: MarketSearchResult
+    let openAsset: (String) -> Void
     @Environment(AppModel.self) private var app
 
     var body: some View {
         HStack(spacing: 14) {
-            NavigationLink {
-                AssetDetailView(symbol: result.symbol)
+            Button {
+                openAsset(result.symbol)
             } label: {
                 HStack(spacing: 14) {
                     VStack(alignment: .leading, spacing: 5) {
@@ -1930,30 +1976,6 @@ private struct EmptyFavoriteView: View {
     }
 }
 
-private struct ErrorBanner: View {
-    let message: String
-    let retry: () -> Void
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(AppTheme.ColorToken.warning)
-
-            Text(message)
-                .font(AppTypography.detail)
-                .foregroundStyle(.primary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            Button(action: retry) {
-                Text(L10n.Markets.retry)
-            }
-            .font(AppTypography.control)
-        }
-        .padding(14)
-        .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-}
-
 private enum MarketDateFormatter {
     static func date(_ text: String?) -> Date? {
         AlpacaDateParser.date(text)
@@ -1981,5 +2003,6 @@ private enum MarketDateFormatter {
     NavigationStack {
         MarketsView()
             .environment(AppModel())
+            .environment(AppToastCenter())
     }
 }

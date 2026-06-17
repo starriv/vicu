@@ -2,9 +2,9 @@ import SwiftUI
 
 struct PositionsView: View {
     @Environment(AppModel.self) private var app
+    @Environment(AppToastCenter.self) private var toastCenter
     @State private var selectedCategory: PositionAssetCategory?
     @State private var hasLoaded = false
-    @State private var errorMessage: String?
 
     var body: some View {
         let snapshot = PositionCategorySnapshot(
@@ -53,12 +53,6 @@ struct PositionsView: View {
                 account: app.portfolio.account
             )
 
-            if let errorMessage {
-                PositionErrorBanner(message: errorMessage) {
-                    Task { await refreshPositions() }
-                }
-            }
-
             if let selectedCategory = snapshot.selectedCategory {
                 PositionCategoryFilter(
                     selection: Binding(
@@ -92,9 +86,10 @@ struct PositionsView: View {
     private func refreshPositions() async {
         do {
             try await app.refreshPositions()
-            errorMessage = nil
+        } catch where error.isRequestCancellation {
+            return
         } catch {
-            errorMessage = error.localizedDescription
+            toastCenter.showError(error, locale: locale)
         }
 
         hasLoaded = true
@@ -392,5 +387,6 @@ private extension AlpacaPosition {
     NavigationStack {
         PositionsView()
             .environment(AppModel())
+            .environment(AppToastCenter())
     }
 }

@@ -2,9 +2,9 @@ import SwiftUI
 
 struct AccountView: View {
     @Environment(AppModel.self) private var app
+    @Environment(AppToastCenter.self) private var toastCenter
     @State private var account: AlpacaAccount?
     @State private var isLoading = false
-    @State private var errorMessage: String?
 
     var body: some View {
         BasicLayout(L10n.AccountDetail.title, style: .scroll(spacing: 18)) {
@@ -27,12 +27,6 @@ struct AccountView: View {
             AccountHeader(account: account)
             AccountActivityLink()
 
-            if let errorMessage {
-                AccountErrorBanner(message: errorMessage) {
-                    Task { await loadAccount() }
-                }
-            }
-
             ForEach(AccountSectionModel.sections(for: account)) { section in
                 AccountInfoSection(section: section)
             }
@@ -40,7 +34,7 @@ struct AccountView: View {
             ContentUnavailableView(
                 LocalizedStringKey("credentials.not_connected"),
                 systemImage: AppIcon.Account.profile,
-                description: Text(errorMessage ?? L10n.Credentials.notConnectedDescription(locale: app.appLanguage.locale))
+                description: Text(L10n.Credentials.notConnectedDescription(locale: app.appLanguage.locale))
             )
             .frame(maxWidth: .infinity, minHeight: 320)
         }
@@ -56,12 +50,11 @@ struct AccountView: View {
 
     private func loadAccount() async {
         guard app.hasCredentials else {
-            errorMessage = L10n.Credentials.apiKeyRequired(locale: app.appLanguage.locale)
+            toastCenter.showErrorMessage(L10n.Credentials.apiKeyRequired(locale: app.appLanguage.locale))
             return
         }
 
         isLoading = true
-        errorMessage = nil
         defer { isLoading = false }
 
         do {
@@ -69,7 +62,7 @@ struct AccountView: View {
         } catch where error.isRequestCancellation {
             return
         } catch {
-            errorMessage = error.localizedDescription
+            toastCenter.showError(error, locale: app.appLanguage.locale)
         }
     }
 }
@@ -213,32 +206,6 @@ private struct AccountInfoRow: View {
                 .minimumScaleFactor(0.78)
         }
         .padding(.vertical, 12)
-    }
-}
-
-private struct AccountErrorBanner: View {
-    let message: String
-    let retry: () -> Void
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(AppTheme.ColorToken.warning)
-
-            Text(message)
-                .font(AppTypography.caption)
-                .foregroundStyle(.primary)
-                .lineLimit(2)
-
-            Spacer(minLength: 8)
-
-            Button(L10n.Common.retry, action: retry)
-                .font(AppTypography.caption.weight(.semibold))
-                .buttonStyle(.plain)
-                .foregroundStyle(AppTheme.ColorToken.brand)
-        }
-        .padding(14)
-        .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
@@ -394,5 +361,6 @@ private enum AccountDetailFormatter {
     NavigationStack {
         AccountView()
             .environment(AppModel())
+            .environment(AppToastCenter())
     }
 }

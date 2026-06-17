@@ -78,7 +78,7 @@ private struct TradeContextRequest: Equatable {
 
 private enum TradeContextLoadEvent {
     case success(symbol: String, context: TradeContext)
-    case failure(symbol: String, message: String)
+    case failure(symbol: String, error: Error)
 }
 
 @MainActor
@@ -104,7 +104,9 @@ final class TradeStore {
     }
     var isSubmitting = false
     var message: String?
+    private(set) var contextErrorMessage: String?
     var submittedOrder: AlpacaOrder?
+    private var locale = AppLocale.current
     private var estimatedNotionalSnapshot: Decimal?
     private var estimatedExecutionPriceSnapshot: Decimal?
     private var validationSnapshot: TradeValidationResult = .empty
@@ -132,6 +134,16 @@ final class TradeStore {
         draft.orderType = orderType
         self.draft = draft
         self.sizingMode = sizingMode ?? (draft.notionalText.isEmpty ? .shares : .notional)
+        refreshDerivedState()
+    }
+
+    func updateLocale(_ locale: Locale) {
+        let resolvedLocale = AppLocale.resolvedLocale(for: locale)
+        guard self.locale.identifier != resolvedLocale.identifier else {
+            return
+        }
+
+        self.locale = resolvedLocale
         refreshDerivedState()
     }
 
@@ -320,7 +332,7 @@ final class TradeStore {
         } catch let error as OrderDraftError {
             issues.append(TradeValidationIssue(
                 kind: error.tradeValidationIssueKind,
-                message: error.errorDescription ?? error.localizedDescription
+                message: error.errorDescription(locale: locale)
             ))
         } catch {
             issues.append(.generic(error.localizedDescription))
@@ -328,39 +340,39 @@ final class TradeStore {
 
         guard let context else {
             if !isLoadingContext {
-                issues.append(.generic(L10n.Trade.contextNotLoaded(locale: .current)))
+                issues.append(.generic(L10n.Trade.contextNotLoaded(locale: locale)))
             }
             return TradeValidationResult(issues: Self.unique(issues), warnings: Self.unique(warnings))
         }
 
         if context.account.tradingBlocked == true || context.account.accountBlocked == true || context.account.tradeSuspendedByUser == true {
-            issues.append(.generic(L10n.Trade.accountTradingBlocked(locale: .current)))
+            issues.append(.generic(L10n.Trade.accountTradingBlocked(locale: locale)))
         }
 
         if context.asset.tradable != true || context.asset.status?.lowercased() != "active" {
-            issues.append(.generic(L10n.Trade.assetNotTradable(locale: .current)))
+            issues.append(.generic(L10n.Trade.assetNotTradable(locale: locale)))
         }
 
         let requestedQuantity = requestedQuantity(estimatedExecutionPrice: estimatedExecutionPrice)
         let usesFractionalQuantity = (requestedQuantity ?? Self.positiveSizeDecimal(from: draft.quantityText) ?? 0).isFractional
         let usesNotional = Self.positiveSizeDecimal(from: draft.notionalText) != nil
         if (usesFractionalQuantity || usesNotional), context.asset.fractionable != true {
-            issues.append(.generic(L10n.Trade.assetNotFractionable(locale: .current)))
+            issues.append(.generic(L10n.Trade.assetNotFractionable(locale: locale)))
         }
 
         if usesFractionalQuantity, draft.timeInForce != .day {
-            issues.append(.generic(L10n.Trade.fractionalRequiresDay(locale: .current)))
+            issues.append(.generic(L10n.Trade.fractionalRequiresDay(locale: locale)))
         }
 
         if usesNotional, draft.timeInForce != .day {
-            issues.append(.generic(L10n.Trade.notionalRequiresDay(locale: .current)))
+            issues.append(.generic(L10n.Trade.notionalRequiresDay(locale: locale)))
         }
 
         if draft.side == .buy {
             if let estimatedNotional, let buyingPower, estimatedNotional > buyingPower {
                 issues.append(TradeValidationIssue(
                     kind: .buyExceedsBuyingPower,
-                    message: L10n.Trade.buyExceedsBuyingPower(locale: .current)
+                    message: L10n.Trade.buyExceedsBuyingPower(locale: locale)
                 ))
             }
         } else if let requestedQuantity, requestedQuantity > positionQuantity {
@@ -369,29 +381,29 @@ final class TradeStore {
             if context.account.shortingEnabled != true || context.asset.shortable != true {
                 issues.append(TradeValidationIssue(
                     kind: .sellExceedsPosition,
-                    message: L10n.Trade.sellExceedsPosition(locale: .current)
+                    message: L10n.Trade.sellExceedsPosition(locale: locale)
                 ))
             } else if usesFractionalQuantity || usesNotional || shortQuantity.isFractional {
                 issues.append(TradeValidationIssue(
                     kind: .fractionalShortSaleUnsupported,
-                    message: L10n.Trade.fractionalShortUnsupported(locale: .current)
+                    message: L10n.Trade.fractionalShortUnsupported(locale: locale)
                 ))
             } else if let shortOrderValue = estimatedShortOrderValue(shortQuantity: shortQuantity),
                       let buyingPower,
                       shortOrderValue > buyingPower {
                 issues.append(TradeValidationIssue(
                     kind: .shortExceedsBuyingPower,
-                    message: L10n.Trade.shortExceedsBuyingPower(locale: .current)
+                    message: L10n.Trade.shortExceedsBuyingPower(locale: locale)
                 ))
             }
         }
 
         if draft.orderType == .market, draft.extendedHours {
-            issues.append(.generic(L10n.Trade.marketExtendedHoursUnsupported(locale: .current)))
+            issues.append(.generic(L10n.Trade.marketExtendedHoursUnsupported(locale: locale)))
         }
 
         if estimatedExecutionPrice == nil {
-            warnings.append(L10n.Trade.executionPriceUnavailable(locale: .current))
+            warnings.append(L10n.Trade.executionPriceUnavailable(locale: locale))
         }
 
         return TradeValidationResult(issues: Self.unique(issues), warnings: Self.unique(warnings))
@@ -438,6 +450,8 @@ final class TradeStore {
     }
 
     func loadContext(app: AppModel, force: Bool = false) {
+        updateLocale(app.appLanguage.locale)
+
         guard !normalizedSymbol.isEmpty else {
             context = nil
             stopPolling()
@@ -452,6 +466,7 @@ final class TradeStore {
         }
 
         message = nil
+        contextErrorMessage = nil
 
         let symbol = normalizedSymbol
         contextSymbol = symbol
@@ -525,12 +540,14 @@ final class TradeStore {
             fillDefaultLimitPriceIfNeeded()
             isLoadingContext = false
             message = nil
-        case .failure(let symbol, let message):
+            contextErrorMessage = nil
+        case .failure(let symbol, let error):
             guard normalizedSymbol == symbol else {
                 return
             }
 
-            self.message = message
+            self.message = nil
+            contextErrorMessage = APIErrorDisplayMessage.message(for: error, locale: app.appLanguage.locale)
             isLoadingContext = false
         }
     }
@@ -720,8 +737,10 @@ final class TradeStore {
     }
 
     func submit(_ orderDraft: OrderDraft, clientOrderID: String?, app: AppModel) async -> TradeSubmitResult {
+        updateLocale(app.appLanguage.locale)
+
         guard !isSubmitting else {
-            return .failure(L10n.Trade.simpleSubmitting(locale: .current))
+            return .failure(L10n.Trade.simpleSubmitting(locale: locale))
         }
 
         if draft != orderDraft {
@@ -730,7 +749,7 @@ final class TradeStore {
 
         let currentValidation = validation
         guard currentValidation.canSubmit else {
-            let errorMessage = currentValidation.errors.first ?? L10n.Trade.simpleOrderUnavailable(locale: .current)
+            let errorMessage = currentValidation.errors.first ?? L10n.Trade.simpleOrderUnavailable(locale: locale)
             message = errorMessage
             return .failure(errorMessage)
         }
@@ -742,11 +761,10 @@ final class TradeStore {
         switch result {
         case .success(let order):
             submittedOrder = order
-            message = L10n.Trade.orderSubmitted(locale: .current)
+            message = L10n.Trade.orderSubmitted(locale: locale)
             loadContext(app: app, force: true)
             return .success(order)
         case .failure(let errorMessage):
-            message = errorMessage
             return .failure(errorMessage)
         }
     }
@@ -814,7 +832,7 @@ private func tradeContextLoadEvents(
                     return
                 }
 
-                observerBox.onNext(.failure(symbol: request.symbol, message: error.localizedDescription))
+                observerBox.onNext(.failure(symbol: request.symbol, error: error))
             }
         }
 

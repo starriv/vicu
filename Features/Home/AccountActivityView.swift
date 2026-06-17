@@ -2,13 +2,13 @@ import SwiftUI
 
 struct AccountActivityView: View {
     @Environment(AppModel.self) private var app
+    @Environment(AppToastCenter.self) private var toastCenter
     @Environment(\.locale) private var locale
     @State private var activityRows: [AccountActivityRowModel] = []
     @State private var nextPageToken: String?
     @State private var hasLoaded = false
     @State private var isLoading = false
     @State private var isLoadingMore = false
-    @State private var errorMessage: String?
 
     private let pageSize = 100
 
@@ -41,12 +41,6 @@ struct AccountActivityView: View {
         } else if activityRows.isEmpty {
             emptyState
         } else {
-            if let errorMessage {
-                AccountActivityErrorBanner(message: errorMessage) {
-                    Task { await loadActivities(reset: activityRows.isEmpty) }
-                }
-            }
-
             AccountActivityList(
                 rows: activityRows
             )
@@ -55,19 +49,11 @@ struct AccountActivityView: View {
 
     private var emptyState: some View {
         ContentUnavailableView(
-            errorMessage == nil ? L10n.AccountActivity.emptyTitle : L10n.AccountActivity.errorTitle,
-            systemImage: errorMessage == nil ? AppIcon.Account.activity : AppIcon.Account.activityFailure,
-            description: emptyDescription
+            L10n.AccountActivity.emptyTitle,
+            systemImage: AppIcon.Account.activity,
+            description: Text(L10n.AccountActivity.emptyDescription)
         )
         .frame(maxWidth: .infinity, minHeight: 320)
-    }
-
-    private var emptyDescription: Text {
-        guard let errorMessage else {
-            return Text(L10n.AccountActivity.emptyDescription)
-        }
-
-        return Text(errorMessage)
     }
 
     private func loadIfNeeded() async {
@@ -93,7 +79,6 @@ struct AccountActivityView: View {
         } else {
             isLoadingMore = true
         }
-        errorMessage = nil
         defer {
             isLoading = false
             isLoadingMore = false
@@ -118,7 +103,7 @@ struct AccountActivityView: View {
         } catch where error.isRequestCancellation {
             return
         } catch {
-            errorMessage = error.localizedDescription
+            toastCenter.showError(error, locale: locale)
         }
     }
 
@@ -306,32 +291,6 @@ private struct AccountActivityRow: View, Equatable {
     }
 }
 
-private struct AccountActivityErrorBanner: View {
-    let message: String
-    let retry: () -> Void
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: AppIcon.Account.activityFailure)
-                .foregroundStyle(AppTheme.ColorToken.warning)
-
-            Text(message)
-                .font(AppTypography.caption)
-                .foregroundStyle(.primary)
-                .lineLimit(2)
-
-            Spacer(minLength: 8)
-
-            Button(L10n.Common.retry, action: retry)
-                .font(AppTypography.caption.weight(.semibold))
-                .buttonStyle(.plain)
-                .foregroundStyle(AppTheme.ColorToken.brand)
-        }
-        .padding(14)
-        .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-}
-
 private enum AccountActivityKind: Equatable {
     case fill
     case transfer
@@ -416,5 +375,6 @@ private enum AccountActivityKind: Equatable {
     NavigationStack {
         AccountActivityView()
             .environment(AppModel())
+            .environment(AppToastCenter())
     }
 }

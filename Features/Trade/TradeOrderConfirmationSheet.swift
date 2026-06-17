@@ -62,6 +62,7 @@ struct TradeOrderConfirmationSnapshot: Identifiable {
 }
 
 struct TradeOrderConfirmationSheet: View {
+    @Environment(AppToastCenter.self) private var toastCenter
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
 
@@ -70,7 +71,6 @@ struct TradeOrderConfirmationSheet: View {
     let onSubmitted: (AlpacaOrder) -> Void
 
     @State private var isSubmitting = false
-    @State private var submitError: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -99,16 +99,6 @@ struct TradeOrderConfirmationSheet: View {
                     Section {
                         TradeOrderConfirmationWarningRow(
                             warning: L10n.Trade.confirmShortSellWarning(locale: locale)
-                        )
-                    }
-                }
-
-                if let submitError {
-                    Section {
-                        TradeOrderConfirmationWarningRow(
-                            warning: submitError,
-                            systemImage: "exclamationmark.triangle.fill",
-                            tint: AppTheme.ColorToken.negative
                         )
                     }
                 }
@@ -266,7 +256,6 @@ struct TradeOrderConfirmationSheet: View {
         }
 
         isSubmitting = true
-        submitError = nil
         let result = await onSubmit()
         isSubmitting = false
 
@@ -275,7 +264,7 @@ struct TradeOrderConfirmationSheet: View {
             dismiss()
             onSubmitted(submittedOrder)
         case .failure(let message):
-            submitError = message
+            toastCenter.showErrorMessage(message)
         }
     }
 }

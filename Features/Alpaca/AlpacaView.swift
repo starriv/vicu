@@ -4,8 +4,6 @@ struct AlpacaView: View {
     var body: some View {
         BasicLayout(L10n.Alpaca.title, style: .form) {
             AlpacaCredentialConfigurationView(mode: .settings)
-
-            AlpacaLastMessageSection()
         }
         .scrollDismissesKeyboard(.interactively)
         .tint(AppTheme.ColorToken.brand)
@@ -286,7 +284,7 @@ private struct AlpacaCredentialConfigurationView: View {
                 isCurrentCredentialInputVerified = false
                 toastCenter.show(connectedToastMessage(environment: app.environment))
             } else if let message = app.credentialMessage {
-                toastCenter.show(message, systemImage: "exclamationmark.circle.fill", tone: .error)
+                toastCenter.showErrorMessage(message)
             }
         }
     }
@@ -308,7 +306,7 @@ private struct AlpacaCredentialConfigurationView: View {
                 isCurrentCredentialInputVerified = false
                 toastCenter.show(connectedToastMessage(environment: environment))
             case .failure(let message):
-                toastCenter.show(message, systemImage: "exclamationmark.circle.fill", tone: .error)
+                toastCenter.showErrorMessage(message)
             case .cancelled:
                 break
             }
@@ -326,12 +324,18 @@ private struct AlpacaCredentialConfigurationView: View {
                 keyID: keyID,
                 secretKey: secretKey
             )
+            if !isCurrentCredentialInputVerified, let message = app.credentialMessage {
+                toastCenter.showErrorMessage(message)
+            }
         }
     }
 
     private func testSavedConnection() {
         Task {
             await app.testSavedConnection()
+            if let message = app.credentialMessage {
+                toastCenter.showErrorMessage(message)
+            }
         }
     }
 
@@ -341,6 +345,9 @@ private struct AlpacaCredentialConfigurationView: View {
             keyID = ""
             secretKey = ""
             isCurrentCredentialInputVerified = false
+            if let message = app.credentialMessage {
+                toastCenter.showErrorMessage(message)
+            }
         }
     }
 
@@ -480,23 +487,6 @@ private struct RotatingConnectionIndicator: View {
             .onDisappear {
                 isRotating = false
             }
-    }
-}
-
-private struct AlpacaLastMessageSection: View {
-    @Environment(AppModel.self) private var app
-
-    var body: some View {
-        if let message = app.credentialMessage {
-            Section {
-                Text(message)
-                    .font(AppTypography.detail)
-                    .foregroundStyle(.secondary)
-                    .lineSpacing(AppTypography.secondaryLineSpacing)
-            } header: {
-                Text(L10n.Alpaca.lastMessage)
-            }
-        }
     }
 }
 

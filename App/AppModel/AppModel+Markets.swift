@@ -24,7 +24,7 @@ extension AppModel {
             favoriteMarketSymbolsError = nil
             return
         } catch {
-            favoriteMarketSymbolsError = error.localizedDescription
+            favoriteMarketSymbolsError = APIErrorDisplayMessage.message(for: error, locale: appLanguage.locale)
         }
     }
 
@@ -72,8 +72,9 @@ extension AppModel {
             favoriteMarketSymbols = previousSymbols
             favoriteMarketAssetBySymbol = previousAssetsBySymbol
             favoriteMarketQuotesBySymbol = previousQuotesBySymbol
-            favoriteMarketSymbolsError = error.localizedDescription
-            lastError = error.localizedDescription
+            let message = APIErrorDisplayMessage.message(for: error, locale: appLanguage.locale)
+            favoriteMarketSymbolsError = message
+            lastError = message
         }
     }
 

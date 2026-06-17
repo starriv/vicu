@@ -13,7 +13,10 @@ struct AssetPositionSharePayload: Identifiable {
 }
 
 struct AssetPositionShareSheet: View {
+    @Environment(AppToastCenter.self) private var toastCenter
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.locale) private var locale
     let payload: AssetPositionSharePayload
     @State private var renderedImage: UIImage?
     @State private var isSavingImage = false
@@ -25,25 +28,14 @@ struct AssetPositionShareSheet: View {
             ScrollView {
                 VStack(spacing: 22) {
                     preview
+                    shareActions
                 }
                 .padding(.horizontal, 12)
                 .padding(.top, 12)
-                .padding(.bottom, 18)
+                .padding(.bottom, 26)
             }
-            .background(Color(.systemGroupedBackground).ignoresSafeArea())
-            .navigationTitle("Share position")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                shareActionBar
-            }
-            .task(id: payload.id) {
+            .scrollContentBackground(.hidden)
+            .task(id: "\(payload.id)-\(locale.identifier)-\(colorScheme)") {
                 renderShareImage()
             }
             .alert(item: $saveAlert) { alert in
@@ -51,7 +43,7 @@ struct AssetPositionShareSheet: View {
                     Alert(
                         title: Text(alert.title),
                         message: Text(alert.message),
-                        primaryButton: .default(Text("Open Settings")) {
+                        primaryButton: .default(Text(L10n.AssetPositionShare.openSettings(locale: locale))) {
                             openAppSettings()
                         },
                         secondaryButton: .cancel()
@@ -60,10 +52,23 @@ struct AssetPositionShareSheet: View {
                     Alert(
                         title: Text(alert.title),
                         message: Text(alert.message),
-                        dismissButton: .default(Text("OK"))
+                        dismissButton: .default(Text(L10n.AssetPositionShare.ok(locale: locale)))
                     )
                 }
             }
+            .navigationTitle(L10n.AssetPositionShare.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text(L10n.AssetPositionShare.done)
+                    }
+                }
+            }
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .presentationBackground(.thinMaterial)
         }
     }
 
@@ -80,7 +85,7 @@ struct AssetPositionShareSheet: View {
                 }
                 .shadow(color: .black.opacity(0.18), radius: 22, y: 12)
                 .frame(maxWidth: 370)
-                .accessibilityLabel("Position share preview")
+                .accessibilityLabel(L10n.AssetPositionShare.previewAccessibility)
         } else {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(Color(.secondarySystemGroupedBackground))
@@ -93,18 +98,15 @@ struct AssetPositionShareSheet: View {
     }
 
     @ViewBuilder
-    private var shareActionBar: some View {
-        VStack(spacing: 0) {
-            Divider()
-                .opacity(0.4)
-
+    private var shareActions: some View {
+        Group {
             if let renderedImage, let shareItem = AssetPositionShareImage(image: renderedImage) {
                 HStack(spacing: 12) {
                     Button {
                         saveImage(renderedImage)
                     } label: {
                         AssetPositionShareButtonLabel(
-                            title: isSavingImage ? "Saving" : didSaveImage ? "Saved" : "Save",
+                            title: saveButtonTitle,
                             systemImage: didSaveImage ? "checkmark" : "square.and.arrow.down",
                             isEnabled: !isSavingImage
                         )
@@ -115,12 +117,12 @@ struct AssetPositionShareSheet: View {
                     ShareLink(
                         item: shareItem,
                         preview: SharePreview(
-                            "\(payload.symbol) position",
+                            L10n.AssetPositionShare.sharePreviewTitle(symbol: payload.symbol, locale: locale),
                             image: Image(uiImage: renderedImage)
                         )
                     ) {
                         AssetPositionShareButtonLabel(
-                            title: "Share",
+                            title: L10n.AssetPositionShare.share(locale: locale),
                             systemImage: "square.and.arrow.up",
                             isEnabled: true
                         )
@@ -129,22 +131,21 @@ struct AssetPositionShareSheet: View {
                 }
             } else {
                 AssetPositionShareButtonLabel(
-                    title: "Preparing image",
+                    title: L10n.AssetPositionShare.preparingImage(locale: locale),
                     systemImage: "photo",
                     isEnabled: false
                 )
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 10)
-        .padding(.bottom, 12)
-        .background(.thinMaterial)
+        .frame(maxWidth: 370)
     }
 
     @MainActor
     private func renderShareImage() {
-        let content = AssetPositionShareCard(payload: payload)
+        let content = AssetPositionShareCard(payload: payload, locale: locale)
             .frame(width: 540, height: 675)
+            .environment(\.colorScheme, colorScheme)
+            .environment(\.locale, locale)
 
         let renderer = ImageRenderer(content: content)
         renderer.proposedSize = ProposedViewSize(width: 540, height: 675)
@@ -169,17 +170,13 @@ struct AssetPositionShareSheet: View {
         defer { isSavingImage = false }
 
         guard let imageData = image.pngData() else {
-            saveAlert = AssetPositionShareSaveAlert(
-                title: "Save failed",
-                message: "The image could not be prepared for Photos.",
-                showsSettingsButton: false
-            )
+            toastCenter.showErrorMessage(L10n.AssetPositionShare.prepareFailed(locale: locale))
             return
         }
 
         let authorizationStatus = await AssetPositionPhotoLibraryWriter.requestAddAuthorization()
         guard authorizationStatus == .authorized || authorizationStatus == .limited else {
-            saveAlert = .photoAuthorization(status: authorizationStatus)
+            saveAlert = .photoAuthorization(status: authorizationStatus, locale: locale)
             return
         }
 
@@ -187,12 +184,20 @@ struct AssetPositionShareSheet: View {
             try await AssetPositionPhotoLibraryWriter.writePNGData(imageData)
             didSaveImage = true
         } catch {
-            saveAlert = AssetPositionShareSaveAlert(
-                title: "Save failed",
-                message: error.localizedDescription,
-                showsSettingsButton: false
-            )
+            toastCenter.showErrorMessage(L10n.AssetPositionShare.saveFailed(locale: locale))
         }
+    }
+
+    private var saveButtonTitle: String {
+        if isSavingImage {
+            return L10n.AssetPositionShare.saving(locale: locale)
+        }
+
+        if didSaveImage {
+            return L10n.AssetPositionShare.saved(locale: locale)
+        }
+
+        return L10n.AssetPositionShare.save(locale: locale)
     }
 
     private func openAppSettings() {
@@ -249,24 +254,24 @@ private struct AssetPositionShareSaveAlert: Identifiable {
     let message: String
     let showsSettingsButton: Bool
 
-    static func photoAuthorization(status: PHAuthorizationStatus) -> AssetPositionShareSaveAlert {
+    static func photoAuthorization(status: PHAuthorizationStatus, locale: Locale) -> AssetPositionShareSaveAlert {
         switch status {
         case .denied:
             AssetPositionShareSaveAlert(
-                title: "Photo access is off",
-                message: "Open Settings and allow vicu to add images to Photos, then try saving again.",
+                title: L10n.AssetPositionShare.photoAccessOffTitle(locale: locale),
+                message: L10n.AssetPositionShare.photoAccessOffMessage(locale: locale),
                 showsSettingsButton: true
             )
         case .restricted:
             AssetPositionShareSaveAlert(
-                title: "Photo access restricted",
-                message: "This device does not allow vicu to add images to Photos.",
+                title: L10n.AssetPositionShare.photoAccessRestrictedTitle(locale: locale),
+                message: L10n.AssetPositionShare.photoAccessRestrictedMessage(locale: locale),
                 showsSettingsButton: false
             )
         default:
             AssetPositionShareSaveAlert(
-                title: "Photo access needed",
-                message: "Allow vicu to add images to Photos, then try saving again.",
+                title: L10n.AssetPositionShare.photoAccessNeededTitle(locale: locale),
+                message: L10n.AssetPositionShare.photoAccessNeededMessage(locale: locale),
                 showsSettingsButton: false
             )
         }
@@ -277,7 +282,7 @@ private enum AssetPositionShareSaveError: LocalizedError {
     case failed
 
     var errorDescription: String? {
-        "The image could not be saved to Photos."
+        L10n.AssetPositionShare.saveFailed(locale: AppLocale.current)
     }
 }
 
@@ -320,6 +325,7 @@ private struct AssetPositionShareButtonLabel: View {
 }
 
 private struct AssetPositionShareGlassButton: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
     let isEnabled: Bool
 
     func body(content: Content) -> some View {
@@ -342,15 +348,21 @@ private struct AssetPositionShareGlassButton: ViewModifier {
                 .background(.ultraThinMaterial, in: Capsule())
                 .overlay {
                     Capsule()
-                        .strokeBorder(Color.white.opacity(0.16))
+                        .strokeBorder(fallbackStrokeColor)
                 }
                 .shadow(color: .black.opacity(0.08), radius: 12, y: 5)
         }
     }
+
+    private var fallbackStrokeColor: Color {
+        colorScheme == .light ? Color.black.opacity(0.10) : Color.white.opacity(0.16)
+    }
 }
 
 private struct AssetPositionShareCard: View {
+    @Environment(\.colorScheme) private var colorScheme
     let payload: AssetPositionSharePayload
+    let locale: Locale
 
     private var intradayPerformance: AssetPositionSharePerformance {
         AssetPositionSharePerformance.intraday(position: payload.position)
@@ -364,20 +376,26 @@ private struct AssetPositionShareCard: View {
         isPositive ? AppTheme.ColorToken.positive : AppTheme.ColorToken.negative
     }
 
+    private var style: AssetPositionShareCardStyle {
+        AssetPositionShareCardStyle(colorScheme: colorScheme)
+    }
+
     var body: some View {
         ZStack {
             LinearGradient(
-                colors: [
-                    Color.black,
-                    Color(red: 0.055, green: 0.055, blue: 0.065),
-                    Color.black
-                ],
+                colors: style.backgroundColors,
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
 
-            AssetPositionShareTrendBackground(isPositive: isPositive, tint: tint)
-                .opacity(0.56)
+            AssetPositionShareTrendBackground(
+                isPositive: isPositive,
+                tint: tint,
+                highlight: style.trendHighlight,
+                strokeOpacity: style.trendStrokeOpacity,
+                highlightOpacity: style.trendHighlightOpacity
+            )
+                .opacity(style.trendLayerOpacity)
                 .padding(34)
 
             VStack(alignment: .leading, spacing: 0) {
@@ -385,13 +403,13 @@ private struct AssetPositionShareCard: View {
                     Text(payload.symbol)
                         .font(.system(size: 48, weight: .black, design: .rounded))
                         .monospaced()
-                        .foregroundStyle(.white)
+                        .foregroundStyle(style.primaryText)
                         .lineLimit(1)
 
                     if payload.exchange != AppFormatter.placeholder {
                         Text(payload.exchange)
                             .font(.system(size: 18, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.62))
+                            .foregroundStyle(style.secondaryText)
                             .lineLimit(1)
                     }
 
@@ -400,7 +418,7 @@ private struct AssetPositionShareCard: View {
 
                 Text(payload.displayName)
                     .font(.system(size: 22, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.82))
+                    .foregroundStyle(style.secondaryText)
                     .lineLimit(2)
                     .padding(.top, 8)
 
@@ -409,7 +427,7 @@ private struct AssetPositionShareCard: View {
                 Text(AppFormatter.signedPercent(intradayPerformance.percent, fractionLength: 2))
                     .font(.system(size: 86, weight: .black, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(.white)
+                    .foregroundStyle(style.primaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.55)
 
@@ -430,13 +448,15 @@ private struct AssetPositionShareCard: View {
 
                 HStack(spacing: 12) {
                     AssetPositionSharePriceMetric(
-                        title: "Entry price",
-                        value: AppFormatter.money(payload.position.averageEntryPrice)
+                        title: L10n.AssetPositionShare.entryPrice(locale: locale),
+                        value: AppFormatter.money(payload.position.averageEntryPrice),
+                        style: style
                     )
 
                     AssetPositionSharePriceMetric(
-                        title: "Latest price",
-                        value: AppFormatter.money(payload.position.currentPrice)
+                        title: L10n.AssetPositionShare.latestPrice(locale: locale),
+                        value: AppFormatter.money(payload.position.currentPrice),
+                        style: style
                     )
                 }
 
@@ -447,14 +467,97 @@ private struct AssetPositionShareCard: View {
 
                     Spacer()
 
-                    Text(Date.now.formatted(date: .abbreviated, time: .shortened))
+                    Text(Date.now.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(locale)))
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.46))
+                        .foregroundStyle(style.tertiaryText)
                 }
                 .padding(.top, 28)
             }
             .padding(42)
         }
+    }
+}
+
+private struct AssetPositionShareCardStyle {
+    let backgroundColors: [Color]
+    let primaryText: Color
+    let secondaryText: Color
+    let tertiaryText: Color
+    let metricTitleText: Color
+    let metricBackground: Color
+    let metricBorder: Color
+    let trendHighlight: Color
+    let trendStrokeOpacity: Double
+    let trendHighlightOpacity: Double
+    let trendLayerOpacity: Double
+
+    init(colorScheme: ColorScheme) {
+        switch colorScheme {
+        case .light:
+            self.init(
+                backgroundColors: [
+                    Color(red: 0.992, green: 0.992, blue: 0.980),
+                    Color(red: 0.942, green: 0.965, blue: 0.952),
+                    Color(red: 0.984, green: 0.972, blue: 0.918)
+                ],
+                primaryText: Color(red: 0.055, green: 0.060, blue: 0.064),
+                secondaryText: Color(red: 0.260, green: 0.278, blue: 0.286),
+                tertiaryText: Color(red: 0.415, green: 0.426, blue: 0.440),
+                metricTitleText: Color(red: 0.405, green: 0.420, blue: 0.430),
+                metricBackground: Color.white.opacity(0.72),
+                metricBorder: Color.black.opacity(0.08),
+                trendHighlight: Color.white,
+                trendStrokeOpacity: 0.30,
+                trendHighlightOpacity: 0.46,
+                trendLayerOpacity: 0.48
+            )
+        case .dark:
+            self.init(
+                backgroundColors: [
+                    Color.black,
+                    Color(red: 0.055, green: 0.055, blue: 0.065),
+                    Color.black
+                ],
+                primaryText: .white,
+                secondaryText: .white.opacity(0.82),
+                tertiaryText: .white.opacity(0.46),
+                metricTitleText: .white.opacity(0.54),
+                metricBackground: .white.opacity(0.10),
+                metricBorder: .white.opacity(0),
+                trendHighlight: .white,
+                trendStrokeOpacity: 0.38,
+                trendHighlightOpacity: 0.14,
+                trendLayerOpacity: 0.56
+            )
+        @unknown default:
+            self.init(colorScheme: .dark)
+        }
+    }
+
+    private init(
+        backgroundColors: [Color],
+        primaryText: Color,
+        secondaryText: Color,
+        tertiaryText: Color,
+        metricTitleText: Color,
+        metricBackground: Color,
+        metricBorder: Color,
+        trendHighlight: Color,
+        trendStrokeOpacity: Double,
+        trendHighlightOpacity: Double,
+        trendLayerOpacity: Double
+    ) {
+        self.backgroundColors = backgroundColors
+        self.primaryText = primaryText
+        self.secondaryText = secondaryText
+        self.tertiaryText = tertiaryText
+        self.metricTitleText = metricTitleText
+        self.metricBackground = metricBackground
+        self.metricBorder = metricBorder
+        self.trendHighlight = trendHighlight
+        self.trendStrokeOpacity = trendStrokeOpacity
+        self.trendHighlightOpacity = trendHighlightOpacity
+        self.trendLayerOpacity = trendLayerOpacity
     }
 }
 
@@ -519,32 +622,40 @@ private struct AssetPositionSharePerformance {
 private struct AssetPositionSharePriceMetric: View {
     let title: String
     let value: String
+    let style: AssetPositionShareCardStyle
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.system(size: 14, weight: .bold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.54))
+                .foregroundStyle(style.metricTitleText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
 
             Text(value)
                 .font(.system(size: 27, weight: .black, design: .rounded))
                 .monospacedDigit()
-                .foregroundStyle(.white)
+                .foregroundStyle(style.primaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.64)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 16)
         .padding(.horizontal, 16)
-        .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(style.metricBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(style.metricBorder)
+        }
     }
 }
 
 private struct AssetPositionShareTrendBackground: View {
     let isPositive: Bool
     let tint: Color
+    let highlight: Color
+    let strokeOpacity: Double
+    let highlightOpacity: Double
 
     var body: some View {
         Canvas { context, size in
@@ -559,13 +670,13 @@ private struct AssetPositionShareTrendBackground: View {
 
             context.stroke(
                 trendPath,
-                with: .color(tint.opacity(0.38)),
+                with: .color(tint.opacity(strokeOpacity)),
                 style: StrokeStyle(lineWidth: 18, lineCap: .round, lineJoin: .round)
             )
 
             context.stroke(
                 trendPath,
-                with: .color(.white.opacity(0.14)),
+                with: .color(highlight.opacity(highlightOpacity)),
                 style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round)
             )
 
@@ -592,7 +703,7 @@ private struct AssetPositionShareTrendBackground: View {
 
             context.stroke(
                 arrowHead,
-                with: .color(tint.opacity(0.52)),
+                with: .color(tint.opacity(strokeOpacity + 0.14)),
                 style: StrokeStyle(lineWidth: 18, lineCap: .round, lineJoin: .round)
             )
         }

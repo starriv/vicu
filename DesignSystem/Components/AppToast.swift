@@ -17,6 +17,9 @@ struct AppToastMessage: Identifiable, Equatable {
 @MainActor
 @Observable
 final class AppToastCenter {
+    static let errorSystemImage = "exclamationmark.circle.fill"
+    static let errorDuration: Duration = .seconds(2.8)
+
     var toast: AppToastMessage?
     @ObservationIgnored private var dismissTask: Task<Void, Never>?
 
@@ -36,6 +39,27 @@ final class AppToastCenter {
             }
             toast = nil
         }
+    }
+
+    func showError(
+        _ error: Error,
+        locale: Locale = AppLocale.current,
+        duration: Duration = errorDuration
+    ) {
+        showErrorMessage(APIErrorDisplayMessage.message(for: error, locale: locale), duration: duration)
+    }
+
+    func showErrorMessage(
+        _ message: String,
+        duration: Duration = errorDuration
+    ) {
+        let displayMessage = APIErrorMessageSanitizer.displayMessage(message) ?? L10n.API.unexpected(locale: AppLocale.current)
+        show(
+            displayMessage,
+            systemImage: Self.errorSystemImage,
+            tone: .error,
+            duration: duration
+        )
     }
 }
 

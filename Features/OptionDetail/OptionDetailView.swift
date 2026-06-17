@@ -2,6 +2,7 @@ import SwiftUI
 
 struct OptionDetailView: View {
     @Environment(AppModel.self) private var app
+    @Environment(AppToastCenter.self) private var toastCenter
     @State private var store: OptionDetailStore
     @State private var chartSelection: AssetChartSelection?
     @State private var isChartScrubbing = false
@@ -45,9 +46,29 @@ struct OptionDetailView: View {
         .refreshable {
             store.reloadAll(forceReload: true)
         }
+        .onChange(of: store.snapshotErrorMessage) { _, message in
+            showErrorMessage(message)
+        }
+        .onChange(of: store.chartErrorMessage) { _, message in
+            showErrorMessage(message)
+        }
+        .onChange(of: store.tradesErrorMessage) { _, message in
+            showErrorMessage(message)
+        }
+        .onChange(of: store.tradeLoadMoreErrorMessage) { _, message in
+            showErrorMessage(message)
+        }
         .onDisappear {
             store.stop()
         }
+    }
+
+    private func showErrorMessage(_ message: String?) {
+        guard let message else {
+            return
+        }
+
+        toastCenter.showErrorMessage(message)
     }
 }
 
@@ -59,12 +80,6 @@ private struct OptionDetailContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             OptionDetailHeader(model: store.snapshotModel)
-
-            if let snapshotErrorMessage = store.snapshotErrorMessage {
-                OptionDetailErrorBanner(message: snapshotErrorMessage) {
-                    store.reloadAll(forceReload: true)
-                }
-            }
 
             OptionPriceHeroSection(store: store, chartSelection: $chartSelection)
             OptionChartSection(
@@ -214,9 +229,6 @@ private struct OptionChartSection: View {
                 }
             }
 
-            if let chartErrorMessage = store.chartErrorMessage {
-                OptionDetailInlineError(message: chartErrorMessage)
-            }
         }
     }
 }
@@ -273,10 +285,6 @@ private struct OptionTradesSection: View {
             VStack(spacing: 0) {
                 if store.isLoadingTrades && store.tradeRows.isEmpty {
                     OptionTradesSkeleton(rowCount: 5)
-                } else if let tradesErrorMessage = store.tradesErrorMessage, store.tradeRows.isEmpty {
-                    OptionDetailErrorBanner(message: tradesErrorMessage) {
-                        store.reloadAll(forceReload: true)
-                    }
                 } else if store.tradeRows.isEmpty {
                     ContentUnavailableView(
                         "No trades",
@@ -297,12 +305,6 @@ private struct OptionTradesSection: View {
                         }
                     }
 
-                    if let tradeLoadMoreErrorMessage = store.tradeLoadMoreErrorMessage {
-                        OptionDetailErrorBanner(message: tradeLoadMoreErrorMessage) {
-                            store.loadMoreTradesIfNeeded(force: true)
-                        }
-                        .padding(.top, 12)
-                    }
                 }
             }
             .padding(.horizontal, 14)
@@ -340,46 +342,6 @@ private struct OptionTradeRow: Equatable, View {
         }
         .padding(.vertical, 12)
         .contentShape(Rectangle())
-    }
-}
-
-private struct OptionDetailErrorBanner: View {
-    let message: String
-    let retry: () -> Void
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(AppTheme.ColorToken.negative)
-
-            Text(message)
-                .font(AppTypography.caption.weight(.semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(2)
-
-            Spacer(minLength: 8)
-
-            Button("Retry", action: retry)
-                .font(AppTypography.caption.weight(.semibold))
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-        }
-        .padding(12)
-        .background(AppTheme.ColorToken.negative.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-}
-
-private struct OptionDetailInlineError: View {
-    let message: String
-
-    var body: some View {
-        Label(message, systemImage: "exclamationmark.triangle")
-            .font(AppTypography.caption.weight(.semibold))
-            .foregroundStyle(AppTheme.ColorToken.negative)
-            .lineLimit(2)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(AppTheme.ColorToken.negative.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 

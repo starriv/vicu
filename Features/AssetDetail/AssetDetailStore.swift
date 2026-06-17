@@ -10,6 +10,7 @@ final class AssetDetailStore {
     private static let supplementalSnapshotQuietThreshold: TimeInterval = 20
     private static let latestBarRefreshInterval: UInt64 = 5_000_000_000
     private static let oneDayChartSlotDuration: TimeInterval = 5 * 60
+    private static let optimisticConnectionFreshnessThreshold: TimeInterval = 5 * 60
 
     var selectedRange: AssetChartRange = .oneDay
     var chartMode: AssetChartMode = .line
@@ -208,6 +209,31 @@ final class AssetDetailStore {
         }
 
         return Date().timeIntervalSince(lastEventDate) < 90
+    }
+
+    private var hasRecentLocalMarketDataRefresh: Bool {
+        guard hasMarketData, let lastUpdatedAt else {
+            return false
+        }
+
+        return Date().timeIntervalSince(lastUpdatedAt) < Self.optimisticConnectionFreshnessThreshold
+    }
+
+    private var hasOptimisticMarketDataCoverage: Bool {
+        hasRecentMarketData || hasRecentLocalMarketDataRefresh
+    }
+
+    var headerConnectionStatus: AssetRealtimeConnectionStatus? {
+        guard !isLoading || hasMarketData else {
+            return nil
+        }
+
+        switch connectionStatus {
+        case .failed, .reconnecting:
+            return hasOptimisticMarketDataCoverage ? nil : connectionStatus
+        default:
+            return nil
+        }
     }
 
     var isTradable: Bool {
@@ -449,10 +475,21 @@ final class AssetDetailStore {
             bindStream(app: app)
         }
         lastUpdatedAt = Date()
+        refreshLatestBarSoon()
     }
 
     private func apply(_ result: AssetDetailSnapshotLoadResult) {
         switch result {
+        case .marketData(let snapshot, let request):
+            guard selectedRange == request.range, isLoading else {
+                return
+            }
+
+            apply(snapshot)
+            if hasMarketData {
+                isLoading = false
+                lastUpdatedAt = Date()
+            }
         case .success(let snapshot):
             apply(snapshot)
             isLoading = false
@@ -689,13 +726,29 @@ final class AssetDetailStore {
         selectedRange == .oneDay && sessionProgress != nil
     }
 
+    private func refreshLatestBarSoon() {
+        guard selectedRange == .oneDay,
+              sessionProgress != nil,
+              let app else {
+            return
+        }
+
+        Task { @MainActor [weak self, weak app] in
+            guard let self, let app else {
+                return
+            }
+
+            await self.refreshLatestBarIfNeeded(app: app)
+        }
+    }
+
     private func applyBlockingSnapshotFailure(_ error: Error) {
-        guard asset == nil, !hasMarketData else {
+        guard asset == nil else {
             errorMessage = nil
             return
         }
 
-        errorMessage = error.localizedDescription
+        errorMessage = displayErrorMessage(for: error)
     }
 
     private func applySupplementalSnapshotFailure(_ error: Error) {
@@ -704,7 +757,11 @@ final class AssetDetailStore {
             return
         }
 
-        errorMessage = error.localizedDescription
+        errorMessage = displayErrorMessage(for: error)
+    }
+
+    private func displayErrorMessage(for error: Error) -> String {
+        APIErrorDisplayMessage.message(for: error, locale: app?.appLanguage.locale ?? AppLocale.current)
     }
 
     private func applyLatestBar(_ bar: AlpacaMarketBar?, feed requestedFeed: AlpacaMarketDataFeed) {
@@ -1690,6 +1747,7 @@ private struct AssetDetailSnapshotRequest: Sendable {
 }
 
 private enum AssetDetailSnapshotLoadResult {
+    case marketData(AlpacaStockSnapshot, request: AssetDetailSnapshotRequest)
     case success(AssetDetailSnapshot)
     case failure(Error, request: AssetDetailSnapshotRequest)
 }
@@ -1743,6 +1801,23 @@ private func assetDetailSnapshotLoad(
 ) -> Observable<AssetDetailSnapshotLoadResult> {
     Observable.create { observer in
         let observerBox = AssetDetailSnapshotLoadObserverBox(observer)
+        let earlySnapshotTask: Task<Void, Never>? = request.showsBlockingLoading
+            ? Task { @MainActor [app, request, observerBox] in
+                do {
+                    guard let snapshot = try await app.fetchAssetSnapshot(
+                        symbol: request.symbol,
+                        feed: request.feed
+                    ) else {
+                        return
+                    }
+
+                    try Task.checkCancellation()
+                    observerBox.onNext(.marketData(snapshot, request: request))
+                } catch {
+                    return
+                }
+            }
+            : nil
         let task = Task { @MainActor [app, request, observerBox] in
             do {
                 let snapshot = try await app.fetchAssetDetailSnapshot(
@@ -1764,6 +1839,7 @@ private func assetDetailSnapshotLoad(
         }
 
         return Disposables.create {
+            earlySnapshotTask?.cancel()
             task.cancel()
         }
     }

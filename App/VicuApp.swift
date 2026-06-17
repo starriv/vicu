@@ -21,6 +21,8 @@ private struct RootView: View {
     @Environment(AppModel.self) private var app
     @State private var searchText = ""
     @State private var searchPlaceholderSymbol = AppModel.searchPlaceholderFallbackSymbol
+    @State private var searchNavigationPath: [SearchRoute] = []
+    @State private var searchSubmitID = 0
 
     var body: some View {
         @Bindable var app = app
@@ -71,10 +73,28 @@ private struct RootView: View {
             }
 
             Tab(L10n.Tab.search, systemImage: AppIcon.Tab.search, value: AppTab.search, role: .search) {
-                NavigationStack {
-                    MarketSearchView(query: $searchText, presentation: .globalTab)
+                NavigationStack(path: $searchNavigationPath) {
+                    MarketSearchView(
+                        query: $searchText,
+                        presentation: .globalTab,
+                        submitID: searchSubmitID,
+                        openAsset: openSearchAssetDetail(_:)
+                    )
+                    .navigationDestination(for: SearchRoute.self) { route in
+                        switch route {
+                        case .asset(let symbol):
+                            AssetDetailView(symbol: symbol)
+                        }
+                    }
                 }
                 .searchable(text: $searchText, prompt: Text(searchPlaceholderSymbol))
+                .keyboardType(.asciiCapable)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+                .onSubmit(of: .search) {
+                    submitSearch()
+                }
             }
         }
         .tabBarMinimizeOnScrollIfAvailable()
@@ -95,6 +115,32 @@ private struct RootView: View {
     private func refreshSearchPlaceholderSymbol() async {
         searchPlaceholderSymbol = await app.fetchSearchPlaceholderSymbol()
     }
+
+    private func submitSearch() {
+        let normalizedSearchText = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let submittedQuery = normalizedSearchText.isEmpty ? searchPlaceholderSymbol : normalizedSearchText
+        guard !submittedQuery.isEmpty else {
+            return
+        }
+
+        if searchText != submittedQuery {
+            searchText = submittedQuery
+        }
+        searchSubmitID += 1
+    }
+
+    private func openSearchAssetDetail(_ symbol: String) {
+        let normalizedSymbol = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !normalizedSymbol.isEmpty else {
+            return
+        }
+
+        searchNavigationPath.append(.asset(normalizedSymbol))
+    }
+}
+
+private enum SearchRoute: Hashable {
+    case asset(String)
 }
 
 private extension View {

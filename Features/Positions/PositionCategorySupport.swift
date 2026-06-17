@@ -73,38 +73,3 @@ struct PositionCategoryFilter: View {
         }
     }
 }
-
-struct PositionErrorBanner: View {
-    let message: String
-    let retry: () -> Void
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.body.weight(.semibold))
-                .foregroundStyle(AppTheme.ColorToken.warning)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(L10n.PositionDetail.errorTitle)
-                    .font(.body.weight(.semibold))
-                Text(message)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-
-            Spacer(minLength: 8)
-
-            Button {
-                retry()
-            } label: {
-                Image(systemName: "arrow.clockwise")
-                    .frame(width: 32, height: 32)
-            }
-            .buttonStyle(.bordered)
-            .accessibilityLabel(L10n.Common.retry)
-        }
-        .padding(14)
-        .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-}
