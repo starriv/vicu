@@ -22,6 +22,7 @@ private struct RootView: View {
     @State private var searchText = ""
     @State private var searchPlaceholderSymbol = AppModel.searchPlaceholderFallbackSymbol
     @State private var searchNavigationPath: [SearchRoute] = []
+    @State private var ordersNavigationPath: [OrdersRoute] = []
     @State private var searchSubmitID = 0
 
     var body: some View {
@@ -61,8 +62,14 @@ private struct RootView: View {
             }
 
             Tab(L10n.Tab.orders, systemImage: AppIcon.Tab.orders, value: AppTab.orders) {
-                NavigationStack {
+                NavigationStack(path: $ordersNavigationPath) {
                     OrdersView()
+                        .navigationDestination(for: OrdersRoute.self) { route in
+                            switch route {
+                            case .orderDetail(let request):
+                                OrderDetailView(orderID: request.orderID, symbol: request.symbol)
+                            }
+                        }
                 }
             }
 
@@ -100,6 +107,10 @@ private struct RootView: View {
         .tabBarMinimizeOnScrollIfAvailable()
         .task {
             await refreshSearchPlaceholderSymbol()
+            openPendingOrderDetail(app.pendingOrderDetailRequest)
+        }
+        .onChange(of: app.pendingOrderDetailRequest) { _, request in
+            openPendingOrderDetail(request)
         }
         .onChange(of: app.selectedTab) { _, selectedTab in
             guard selectedTab == .search else {
@@ -110,6 +121,18 @@ private struct RootView: View {
                 await refreshSearchPlaceholderSymbol()
             }
         }
+    }
+
+    private func openPendingOrderDetail(_ request: OrderDetailNavigationRequest?) {
+        guard let request else {
+            return
+        }
+
+        if app.selectedTab != .orders {
+            app.selectedTab = .orders
+        }
+        ordersNavigationPath = [.orderDetail(request)]
+        app.consumeOrderDetailRequest(request)
     }
 
     private func refreshSearchPlaceholderSymbol() async {
@@ -141,6 +164,10 @@ private struct RootView: View {
 
 private enum SearchRoute: Hashable {
     case asset(String)
+}
+
+private enum OrdersRoute: Hashable {
+    case orderDetail(OrderDetailNavigationRequest)
 }
 
 private extension View {

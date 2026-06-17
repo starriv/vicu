@@ -454,6 +454,56 @@ enum AlpacaOrderPriceField: String, Identifiable, Sendable {
 }
 
 extension AlpacaOrder {
+    static func navigationPlaceholder(id: String, symbol: String?) -> AlpacaOrder {
+        let normalizedSymbol = symbol?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased()
+        let displaySymbol: String
+        if let normalizedSymbol, !normalizedSymbol.isEmpty {
+            displaySymbol = normalizedSymbol
+        } else {
+            displaySymbol = "--"
+        }
+        return AlpacaOrder(
+            id: id,
+            clientOrderID: nil,
+            createdAt: nil,
+            updatedAt: nil,
+            submittedAt: nil,
+            filledAt: nil,
+            expiredAt: nil,
+            canceledAt: nil,
+            failedAt: nil,
+            replacedAt: nil,
+            replacedBy: nil,
+            replaces: nil,
+            assetID: nil,
+            symbol: displaySymbol,
+            assetClass: nil,
+            quantity: nil,
+            filledQuantity: nil,
+            filledAveragePrice: nil,
+            notional: nil,
+            orderClass: nil,
+            orderType: nil,
+            side: nil,
+            type: nil,
+            positionIntent: nil,
+            timeInForce: nil,
+            limitPrice: nil,
+            stopPrice: nil,
+            status: nil,
+            extendedHours: nil,
+            legs: nil,
+            trailPercent: nil,
+            trailPrice: nil,
+            highWaterMark: nil,
+            subtag: nil,
+            source: nil,
+            expiresAt: nil
+        )
+    }
+
     var supportsCancellation: Bool {
         guard let status = normalizedStatus else {
             return false

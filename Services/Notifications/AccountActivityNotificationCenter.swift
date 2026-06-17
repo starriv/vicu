@@ -7,6 +7,56 @@ enum AppNotificationKind: Sendable {
     case tradeOrderStatus
 }
 
+enum AppNotificationRoute: Equatable, Sendable {
+    case orderDetail(orderID: String, symbol: String?)
+
+    static func route(
+        categoryIdentifier: String,
+        userInfo: [AnyHashable: Any]
+    ) -> AppNotificationRoute? {
+        guard let orderID = stringValue(for: "order_id", in: userInfo) else {
+            return nil
+        }
+
+        let symbol = stringValue(for: "symbol", in: userInfo)
+
+        switch categoryIdentifier {
+        case AppNotificationTemplates.CategoryIdentifier.tradeOrderSubmitted,
+             AppNotificationTemplates.CategoryIdentifier.tradeOrderStatus:
+            return .orderDetail(orderID: orderID, symbol: symbol)
+        case AppNotificationTemplates.CategoryIdentifier.accountActivityEvent:
+            guard stringValue(for: "activity_type", in: userInfo)?.uppercased() == "TRD" else {
+                return nil
+            }
+
+            return .orderDetail(orderID: orderID, symbol: symbol)
+        default:
+            return nil
+        }
+    }
+
+    private static func stringValue(for key: String, in userInfo: [AnyHashable: Any]) -> String? {
+        let value = userInfo[key] ?? userInfo[AnyHashable(key)]
+        let string: String?
+
+        switch value {
+        case let value as String:
+            string = value
+        case let value as CustomStringConvertible:
+            string = value.description
+        default:
+            string = nil
+        }
+
+        guard let string = string?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !string.isEmpty else {
+            return nil
+        }
+
+        return string
+    }
+}
+
 struct AppNotificationPreferences: Codable, Equatable, Sendable {
     static let storageKey = "appNotificationPreferences"
     static let `default` = AppNotificationPreferences()
@@ -117,10 +167,22 @@ final class AppNotificationCenter: NSObject, AppNotifying, UNUserNotificationCen
 
     private let center: UNUserNotificationCenter
     private var hasPrepared = false
+    private var responseHandler: (@MainActor (AppNotificationRoute) -> Void)?
 
     init(center: UNUserNotificationCenter = .current()) {
         self.center = center
         super.init()
+    }
+
+    @MainActor
+    func installDelegate() {
+        center.delegate = self
+    }
+
+    @MainActor
+    func setResponseHandler(_ handler: (@MainActor (AppNotificationRoute) -> Void)?) {
+        responseHandler = handler
+        installDelegate()
     }
 
     func prepare() async {
@@ -172,12 +234,19 @@ final class AppNotificationCenter: NSObject, AppNotifying, UNUserNotificationCen
         content.sound = .default
         content.categoryIdentifier = template.categoryIdentifier
         content.threadIdentifier = template.threadIdentifier
-        content.userInfo = [
+        var userInfo: [AnyHashable: Any] = [
             "event_id": event.eventID,
             "ref_id": event.refID,
             "activity_type": event.activityType,
             "account_id": event.accountID
         ]
+        if let orderID = event.orderID {
+            userInfo["order_id"] = orderID
+        }
+        if let symbol = event.symbol {
+            userInfo["symbol"] = symbol
+        }
+        content.userInfo = userInfo
 
         let request = UNNotificationRequest(
             identifier: "alpaca-activity-\(event.eventID)",
@@ -265,6 +334,26 @@ final class AppNotificationCenter: NSObject, AppNotifying, UNUserNotificationCen
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         completionHandler([.banner, .list, .sound])
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier,
+              let route = AppNotificationRoute.route(
+                categoryIdentifier: response.notification.request.content.categoryIdentifier,
+                userInfo: response.notification.request.content.userInfo
+              ) else {
+            completionHandler()
+            return
+        }
+
+        Task { @MainActor in
+            responseHandler?(route)
+        }
+        completionHandler()
     }
 
     private func canPresentNotifications() async -> Bool {

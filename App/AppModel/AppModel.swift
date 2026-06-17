@@ -9,6 +9,7 @@ final class AppModel {
 
     var selectedTab: AppTab = .home
     var pendingOrdersListRequest: OrdersListRequest?
+    var pendingOrderDetailRequest: OrderDetailNavigationRequest?
     var environment: TradeEnvironment = .paper {
         didSet {
             UserDefaults.standard.set(environment.rawValue, forKey: TradeEnvironment.storageKey)
@@ -114,6 +115,12 @@ final class AppModel {
         self.logoDevAPIKey = UserDefaults.standard.string(forKey: Self.logoDevAPIKeyStorageKey) ?? ""
         self.isLogoDevEnabled = UserDefaults.standard.bool(forKey: Self.logoDevEnabledStorageKey)
         self.notificationPreferences = AppNotificationPreferences.load()
+
+        if let notificationCenter = services.appNotifier as? AppNotificationCenter {
+            notificationCenter.setResponseHandler { [weak self] route in
+                self?.handleNotificationRoute(route)
+            }
+        }
     }
 
     var canUseAlpacaAPI: Bool {

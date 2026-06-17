@@ -12,6 +12,12 @@ struct OrderDetailView: View {
         _loadState = State(initialValue: .loaded(order))
     }
 
+    init(orderID: String, symbol: String? = nil) {
+        let placeholder = AlpacaOrder.navigationPlaceholder(id: orderID, symbol: symbol)
+        _order = State(initialValue: placeholder)
+        _loadState = State(initialValue: .loading)
+    }
+
     var body: some View {
         BasicLayout(L10n.Orders.Detail.navigationTitle, style: .scroll(spacing: 26)) {
             VStack(alignment: .leading, spacing: 26) {
