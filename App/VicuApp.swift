@@ -24,6 +24,7 @@ private struct RootView: View {
     @State private var searchNavigationPath: [SearchRoute] = []
     @State private var ordersNavigationPath: [OrdersRoute] = []
     @State private var searchSubmitID = 0
+    @State private var isSearchPresented = false
 
     var body: some View {
         @Bindable var app = app
@@ -94,7 +95,7 @@ private struct RootView: View {
                         }
                     }
                 }
-                .searchable(text: $searchText, prompt: Text(searchPlaceholderSymbol))
+                .searchable(text: $searchText, isPresented: $isSearchPresented, prompt: Text(searchPlaceholderSymbol))
                 .keyboardType(.asciiCapable)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -106,7 +107,10 @@ private struct RootView: View {
         }
         .tabBarMinimizeOnScrollIfAvailable()
         .task {
-            await refreshSearchPlaceholderSymbol()
+            let symbol = await refreshSearchPlaceholderSymbol()
+            if app.selectedTab == .search {
+                activateSearchTab(defaultSymbol: symbol)
+            }
             openPendingOrderDetail(app.pendingOrderDetailRequest)
         }
         .onChange(of: app.pendingOrderDetailRequest) { _, request in
@@ -114,11 +118,13 @@ private struct RootView: View {
         }
         .onChange(of: app.selectedTab) { _, selectedTab in
             guard selectedTab == .search else {
+                isSearchPresented = false
                 return
             }
 
             Task {
-                await refreshSearchPlaceholderSymbol()
+                let symbol = await refreshSearchPlaceholderSymbol()
+                activateSearchTab(defaultSymbol: symbol)
             }
         }
     }
@@ -135,8 +141,20 @@ private struct RootView: View {
         app.consumeOrderDetailRequest(request)
     }
 
-    private func refreshSearchPlaceholderSymbol() async {
-        searchPlaceholderSymbol = await app.fetchSearchPlaceholderSymbol()
+    private func refreshSearchPlaceholderSymbol() async -> String {
+        let symbol = await app.fetchSearchPlaceholderSymbol()
+        searchPlaceholderSymbol = symbol
+        return symbol
+    }
+
+    private func activateSearchTab(defaultSymbol: String) {
+        let normalizedDefaultSymbol = defaultSymbol.trimmingCharacters(in: .whitespacesAndNewlines)
+        if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           !normalizedDefaultSymbol.isEmpty {
+            searchText = normalizedDefaultSymbol
+        }
+
+        isSearchPresented = true
     }
 
     private func submitSearch() {

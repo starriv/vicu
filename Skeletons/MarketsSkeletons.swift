@@ -145,7 +145,18 @@ private extension MarketOverview {
             phase: "overnight",
             phaseUntil: "2026-06-15T04:00:00-04:00"
         ),
-        calendar: [],
+        calendar: [
+            AlpacaCalendarDay(
+                date: "2026-06-15",
+                coreStart: "2026-06-15T09:30:00-04:00",
+                coreEnd: "2026-06-15T16:00:00-04:00",
+                preStart: "2026-06-15T04:00:00-04:00",
+                preEnd: "2026-06-15T09:30:00-04:00",
+                postStart: "2026-06-15T16:00:00-04:00",
+                postEnd: "2026-06-15T20:00:00-04:00",
+                settlementDate: nil
+            )
+        ],
         overnightCalendar: [],
         indexQuotes: [
             MarketIndexQuote(id: "SPY", title: "S&P 500", symbol: "SPY", price: 741.67, change: 4.02, percentChange: 0.0054),

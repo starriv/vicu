@@ -349,9 +349,13 @@ struct MarketSearchView: View {
     @State private var popularSort: MarketMostActiveSort = .trades
     @State private var isSearching = false
     @State private var isLoadingPopularSymbols = false
-    @State private var searchPlaceholderSymbol = AppModel.searchPlaceholderFallbackSymbol
+    @State private var defaultSearchSymbol = AppModel.searchPlaceholderFallbackSymbol
     @State private var searchPipeline = MarketSearchPipeline()
     @State private var assetDestination: MarketSearchAssetDestination?
+    @State private var seededDefaultSearchQuery: String?
+    @State private var hasUserEditedSearchQuery = false
+    @State private var suppressedAutomaticSearchQuery: String?
+    @State private var searchTextSelectionTrigger = 0
     @FocusState private var isSearchFocused: Bool
 
     private var query: String {
@@ -367,6 +371,14 @@ struct MarketSearchView: View {
 
     private var normalizedQuery: String {
         query.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var isShowingSeededDefaultSearchQuery: Bool {
+        guard let seededDefaultSearchQuery else {
+            return false
+        }
+
+        return !hasUserEditedSearchQuery && !normalizedQuery.isEmpty && normalizedQuery == seededDefaultSearchQuery
     }
 
     init(
@@ -403,17 +415,15 @@ struct MarketSearchView: View {
             AssetDetailView(symbol: destination.symbol)
         }
         .task {
-            if !presentation.usesSystemSearchField {
-                isSearchFocused = true
-            }
             bindSearchPipelineIfNeeded()
+            applyInitialDefaultSearchQueryIfNeeded()
             await app.refreshFavoriteMarketSymbols()
         }
         .task(id: popularSort) {
             await loadPopularSymbols()
         }
         .onChange(of: normalizedQuery) { _, newValue in
-            searchPipeline.accept(newValue)
+            acceptSearchInputChange(newValue)
         }
         .onChange(of: submitID) { _, _ in
             submitSearch()
@@ -457,7 +467,13 @@ struct MarketSearchView: View {
         MarketSearchSortMenu(selection: $popularSort)
     }
 
-    private func updateQuery(_ newValue: String) {
+    private func updateQuery(_ newValue: String, isUserEdit: Bool = true) {
+        if isUserEdit {
+            hasUserEditedSearchQuery = true
+            seededDefaultSearchQuery = nil
+            suppressedAutomaticSearchQuery = nil
+        }
+
         if usesExternalQuery {
             externalQuery = newValue
         } else {
@@ -490,15 +506,69 @@ struct MarketSearchView: View {
     }
 
     private func submitSearch() {
-        let submittedQuery = normalizedQuery.isEmpty ? searchPlaceholderSymbol : normalizedQuery
+        let submittedQuery = normalizedQuery.isEmpty ? defaultSearchSymbol : normalizedQuery
         guard !submittedQuery.isEmpty else {
             return
         }
 
         if submittedQuery != query {
-            updateQuery(submittedQuery)
+            updateQuery(submittedQuery, isUserEdit: false)
         }
+        seededDefaultSearchQuery = nil
+        suppressedAutomaticSearchQuery = nil
         searchPipeline.submit(submittedQuery)
+    }
+
+    private func applyInitialDefaultSearchQueryIfNeeded() {
+        applyDefaultSearchQuery(defaultSearchSymbol, replacingExistingSeed: false)
+    }
+
+    private func applyDefaultSearchQuery(_ symbol: String, replacingExistingSeed: Bool) {
+        let defaultQuery = symbol.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !presentation.usesSystemSearchField, !defaultQuery.isEmpty else {
+            return
+        }
+
+        let shouldFillEmptyQuery = normalizedQuery.isEmpty && !hasUserEditedSearchQuery
+        let shouldReplaceSeededQuery = replacingExistingSeed
+            && !hasUserEditedSearchQuery
+            && normalizedQuery == seededDefaultSearchQuery
+        guard shouldFillEmptyQuery || shouldReplaceSeededQuery else {
+            return
+        }
+
+        updateQuery(defaultQuery, isUserEdit: false)
+        seededDefaultSearchQuery = defaultQuery
+        suppressedAutomaticSearchQuery = defaultQuery
+        focusSearchField(selectAll: true)
+    }
+
+    private func acceptSearchInputChange(_ newValue: String) {
+        let normalizedValue = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !presentation.usesSystemSearchField else {
+            return
+        }
+
+        guard normalizedValue != suppressedAutomaticSearchQuery, !isShowingSeededDefaultSearchQuery else {
+            return
+        }
+
+        searchPipeline.accept(normalizedValue)
+    }
+
+    private func focusSearchField(selectAll: Bool) {
+        isSearchFocused = true
+        if selectAll {
+            searchTextSelectionTrigger += 1
+        }
+
+        Task { @MainActor in
+            await Task.yield()
+            isSearchFocused = true
+            if selectAll {
+                searchTextSelectionTrigger += 1
+            }
+        }
     }
 
     private var bottomSearchField: some View {
@@ -512,6 +582,9 @@ struct MarketSearchView: View {
         .padding(.horizontal, AppTheme.Spacing.pageHorizontal)
         .padding(.top, 8)
         .padding(.bottom, 8)
+        .onAppear {
+            applyInitialDefaultSearchQueryIfNeeded()
+        }
     }
 
     @available(iOS 26.0, *)
@@ -547,11 +620,10 @@ struct MarketSearchView: View {
 
             MarketSearchTextField(
                 text: queryBinding,
-                placeholder: searchPlaceholderSymbol,
-                placeholderColor: UIColor(searchPlaceholderColor),
                 textColor: UIColor(searchTextColor),
                 tintColor: UIColor(AppTheme.ColorToken.brand),
                 isFocused: isSearchFocused,
+                selectAllTrigger: searchTextSelectionTrigger,
                 onFocusChange: { isSearchFocused = $0 },
                 onSubmit: submitSearch
             )
@@ -637,10 +709,6 @@ struct MarketSearchView: View {
         colorScheme == .light ? Color(.secondaryLabel) : Color(.label)
     }
 
-    private var searchPlaceholderColor: Color {
-        colorScheme == .light ? Color(.secondaryLabel) : Color(.tertiaryLabel)
-    }
-
     private var searchTextColor: Color {
         Color(.label)
     }
@@ -655,14 +723,16 @@ struct MarketSearchView: View {
 
     @ViewBuilder
     private var searchContent: some View {
+        let showsPopularContent = normalizedQuery.isEmpty || isShowingSeededDefaultSearchQuery
+
         if !app.hasCredentials {
             AppEmptyStateView(
                 title: L10n.Common.noData,
                 systemImage: AppIcon.More.alpaca
             )
-        } else if normalizedQuery.isEmpty && isLoadingPopularSymbols && popularSymbols.isEmpty {
+        } else if showsPopularContent && isLoadingPopularSymbols && popularSymbols.isEmpty {
             MarketSearchPopularSkeleton(rowCount: 7)
-        } else if normalizedQuery.isEmpty {
+        } else if showsPopularContent {
             MarketSearchPopularView(
                 symbols: popularSymbols,
                 sort: popularSort,
@@ -706,7 +776,8 @@ struct MarketSearchView: View {
 
         do {
             popularSymbols = try await app.fetchSearchPopularMarketSymbols(limit: 12, sort: popularSort)
-            searchPlaceholderSymbol = AppModel.searchPlaceholderSymbol(from: popularSymbols)
+            defaultSearchSymbol = AppModel.searchPlaceholderSymbol(from: popularSymbols)
+            applyDefaultSearchQuery(defaultSearchSymbol, replacingExistingSeed: true)
         } catch where error.isRequestCancellation {
             return
         } catch {
@@ -722,7 +793,7 @@ struct MarketSearchView: View {
             },
             apply: applySearchState
         )
-        searchPipeline.accept(normalizedQuery)
+        acceptSearchInputChange(normalizedQuery)
     }
 
     private func applySearchState(_ state: MarketSearchPipeline.State) {
@@ -759,11 +830,10 @@ private struct MarketSearchAssetDestination: Identifiable, Hashable {
 
 private struct MarketSearchTextField: UIViewRepresentable {
     @Binding var text: String
-    let placeholder: String
-    let placeholderColor: UIColor
     let textColor: UIColor
     let tintColor: UIColor
     let isFocused: Bool
+    let selectAllTrigger: Int
     let onFocusChange: (Bool) -> Void
     let onSubmit: () -> Void
 
@@ -782,11 +852,20 @@ private struct MarketSearchTextField: UIViewRepresentable {
         textField.smartQuotesType = .no
         textField.spellCheckingType = .no
         textField.adjustsFontForContentSizeCategory = true
+        textField.text = text
         textField.addTarget(
             context.coordinator,
             action: #selector(Coordinator.textDidChange(_:)),
             for: .editingChanged
         )
+        if isFocused {
+            DispatchQueue.main.async {
+                textField.enablesReturnKeyAutomatically = false
+                textField.becomeFirstResponder()
+                textField.reloadInputViews()
+                context.coordinator.selectAllIfNeeded(in: textField)
+            }
+        }
         return textField
     }
 
@@ -797,25 +876,27 @@ private struct MarketSearchTextField: UIViewRepresentable {
             textField.text = text
         }
 
+        textField.keyboardType = .asciiCapable
+        textField.returnKeyType = .search
+        textField.enablesReturnKeyAutomatically = false
         textField.textColor = textColor
         textField.tintColor = tintColor
         textField.font = Self.preferredFont
-        textField.attributedPlaceholder = NSAttributedString(
-            string: placeholder,
-            attributes: [
-                .foregroundColor: placeholderColor,
-                .font: Self.preferredFont
-            ]
-        )
+        textField.attributedPlaceholder = nil
 
         if isFocused, !textField.isFirstResponder {
             DispatchQueue.main.async {
+                textField.enablesReturnKeyAutomatically = false
                 textField.becomeFirstResponder()
+                textField.reloadInputViews()
+                context.coordinator.selectAllIfNeeded(in: textField)
             }
         } else if !isFocused, textField.isFirstResponder {
             DispatchQueue.main.async {
                 textField.resignFirstResponder()
             }
+        } else if isFocused {
+            context.coordinator.selectAllIfNeeded(in: textField)
         }
     }
 
@@ -830,6 +911,7 @@ private struct MarketSearchTextField: UIViewRepresentable {
 
     final class Coordinator: NSObject, UITextFieldDelegate {
         var parent: MarketSearchTextField
+        private var handledSelectAllTrigger = 0
 
         init(parent: MarketSearchTextField) {
             self.parent = parent
@@ -851,6 +933,21 @@ private struct MarketSearchTextField: UIViewRepresentable {
         func textFieldShouldReturn(_ textField: UITextField) -> Bool {
             parent.onSubmit()
             return false
+        }
+
+        func selectAllIfNeeded(in textField: UITextField) {
+            guard parent.selectAllTrigger != handledSelectAllTrigger else {
+                return
+            }
+
+            handledSelectAllTrigger = parent.selectAllTrigger
+            DispatchQueue.main.async {
+                guard textField.isFirstResponder else {
+                    return
+                }
+
+                textField.selectAll(nil)
+            }
         }
     }
 }
@@ -1836,36 +1933,48 @@ private struct IndexProxyRow: Equatable, View {
     let quote: MarketIndexQuote
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(quote.title)
+        NavigationLink {
+            AssetDetailView(symbol: quote.symbol)
+        } label: {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(quote.title)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+
+                        Text(verbatim: quote.symbol)
+                            .font(.caption2.monospaced().weight(.bold))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
+                    HStack(alignment: .lastTextBaseline, spacing: 8) {
+                        AppPriceText(
+                            quote.price,
+                            font: .system(size: 22, weight: .semibold, design: .rounded),
+                            minimumScaleFactor: 0.78,
+                            isAnimated: true
+                        )
+
+                        Text(AppFormatter.signedPercent(quote.percentChange))
+                            .font(.caption.monospacedDigit().weight(.bold))
+                            .foregroundStyle(percentTint)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-
-                Text(verbatim: quote.symbol)
-                    .font(.caption2.monospaced().weight(.bold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .foregroundStyle(.tertiary)
             }
-
-            HStack(alignment: .lastTextBaseline, spacing: 8) {
-                AppPriceText(
-                    quote.price,
-                    font: .system(size: 22, weight: .semibold, design: .rounded),
-                    minimumScaleFactor: 0.78,
-                    isAnimated: true
-                )
-
-                Text(AppFormatter.signedPercent(quote.percentChange))
-                    .font(.caption.monospacedDigit().weight(.bold))
-                    .foregroundStyle(percentTint)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
+            .contentShape(Rectangle())
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .buttonStyle(.plain)
         .padding(.vertical, 7)
     }
 
