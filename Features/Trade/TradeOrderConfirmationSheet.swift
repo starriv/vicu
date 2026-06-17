@@ -356,16 +356,18 @@ private struct TradeOrderConfirmationActionButton: View {
     }
 
     private var label: some View {
-        HStack(spacing: 9) {
+        ZStack {
+            Text(title)
+                .font(.headline.weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+                .opacity(isSubmitting ? 0 : 1)
+
             if isSubmitting {
                 ProgressView()
                     .controlSize(.regular)
                     .tint(.white)
-            } else {
-                Text(title)
-                    .font(.headline.weight(.semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
         }
         .foregroundStyle(.white)
