@@ -1,7 +1,4 @@
-import CoreTransferable
-import Photos
 import SwiftUI
-import UniformTypeIdentifiers
 import UIKit
 
 struct AssetPositionSharePayload: Identifiable {
@@ -18,10 +15,10 @@ struct AssetPositionShareSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     let payload: AssetPositionSharePayload
-    @State private var renderedImage: UIImage?
+    @State private var renderedImage: AssetRenderedShareImage?
     @State private var isSavingImage = false
     @State private var didSaveImage = false
-    @State private var saveAlert: AssetPositionShareSaveAlert?
+    @State private var saveAlert: AssetShareSaveAlert?
 
     var body: some View {
         NavigationStack {
@@ -38,6 +35,11 @@ struct AssetPositionShareSheet: View {
             .background(Color.clear)
             .scrollContentBackground(.hidden)
             .task(id: "\(payload.id)-\(locale.identifier)-\(colorScheme)") {
+                await Task.yield()
+                guard !Task.isCancelled else {
+                    return
+                }
+
                 renderShareImage()
             }
             .alert(item: $saveAlert) { alert in
@@ -77,7 +79,7 @@ struct AssetPositionShareSheet: View {
     @ViewBuilder
     private var preview: some View {
         if let renderedImage {
-            Image(uiImage: renderedImage)
+            Image(uiImage: renderedImage.image)
                 .resizable()
                 .scaledToFit()
                 .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
@@ -101,12 +103,12 @@ struct AssetPositionShareSheet: View {
     @ViewBuilder
     private var shareActions: some View {
         Group {
-            if let renderedImage, let shareItem = AssetPositionShareImage(image: renderedImage) {
+            if let renderedImage {
                 HStack(spacing: 12) {
                     Button {
                         saveImage(renderedImage)
                     } label: {
-                        AssetPositionShareButtonLabel(
+                        AssetShareButtonLabel(
                             title: saveButtonTitle,
                             systemImage: didSaveImage ? "checkmark" : "square.and.arrow.down",
                             isEnabled: !isSavingImage
@@ -116,13 +118,13 @@ struct AssetPositionShareSheet: View {
                     .disabled(isSavingImage)
 
                     ShareLink(
-                        item: shareItem,
+                        item: AssetShareImage(pngData: renderedImage.pngData),
                         preview: SharePreview(
                             L10n.AssetPositionShare.sharePreviewTitle(symbol: payload.symbol, locale: locale),
-                            image: Image(uiImage: renderedImage)
+                            image: Image(uiImage: renderedImage.image)
                         )
                     ) {
-                        AssetPositionShareButtonLabel(
+                        AssetShareButtonLabel(
                             title: L10n.AssetPositionShare.share(locale: locale),
                             systemImage: "square.and.arrow.up",
                             isEnabled: true
@@ -131,7 +133,7 @@ struct AssetPositionShareSheet: View {
                     .buttonStyle(.plain)
                 }
             } else {
-                AssetPositionShareButtonLabel(
+                AssetShareButtonLabel(
                     title: L10n.AssetPositionShare.preparingImage(locale: locale),
                     systemImage: "photo",
                     isEnabled: false
@@ -143,6 +145,7 @@ struct AssetPositionShareSheet: View {
 
     @MainActor
     private func renderShareImage() {
+        renderedImage = nil
         let content = AssetPositionShareCard(payload: payload, locale: locale)
             .frame(width: 540, height: 675)
             .environment(\.colorScheme, colorScheme)
@@ -151,17 +154,17 @@ struct AssetPositionShareSheet: View {
         let renderer = ImageRenderer(content: content)
         renderer.proposedSize = ProposedViewSize(width: 540, height: 675)
         renderer.scale = 2.0
-        renderedImage = renderer.uiImage
+        renderedImage = renderer.uiImage.flatMap(AssetRenderedShareImage.init(image:))
     }
 
-    private func saveImage(_ image: UIImage) {
+    private func saveImage(_ renderedImage: AssetRenderedShareImage) {
         Task {
-            await saveImageToPhotoLibrary(image)
+            await saveImageToPhotoLibrary(renderedImage)
         }
     }
 
     @MainActor
-    private func saveImageToPhotoLibrary(_ image: UIImage) async {
+    private func saveImageToPhotoLibrary(_ renderedImage: AssetRenderedShareImage) async {
         guard !isSavingImage else {
             return
         }
@@ -170,19 +173,14 @@ struct AssetPositionShareSheet: View {
         didSaveImage = false
         defer { isSavingImage = false }
 
-        guard let imageData = image.pngData() else {
-            toastCenter.showErrorMessage(L10n.AssetPositionShare.prepareFailed(locale: locale))
-            return
-        }
-
-        let authorizationStatus = await AssetPositionPhotoLibraryWriter.requestAddAuthorization()
+        let authorizationStatus = await AssetSharePhotoLibraryWriter.requestAddAuthorization()
         guard authorizationStatus == .authorized || authorizationStatus == .limited else {
             saveAlert = .photoAuthorization(status: authorizationStatus, locale: locale)
             return
         }
 
         do {
-            try await AssetPositionPhotoLibraryWriter.writePNGData(imageData)
+            try await AssetSharePhotoLibraryWriter.writePNGData(renderedImage.pngData)
             didSaveImage = true
         } catch {
             toastCenter.showErrorMessage(L10n.AssetPositionShare.saveFailed(locale: locale))
@@ -207,156 +205,6 @@ struct AssetPositionShareSheet: View {
         }
 
         UIApplication.shared.open(settingsURL)
-    }
-}
-
-private enum AssetPositionPhotoLibraryWriter {
-    static func requestAddAuthorization() async -> PHAuthorizationStatus {
-        let currentStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
-        switch currentStatus {
-        case .authorized, .limited:
-            return currentStatus
-        case .notDetermined:
-            return await withCheckedContinuation { continuation in
-                PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
-                    continuation.resume(returning: status)
-                }
-            }
-        case .denied, .restricted:
-            return currentStatus
-        @unknown default:
-            return currentStatus
-        }
-    }
-
-    static func writePNGData(_ imageData: Data) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            PHPhotoLibrary.shared().performChanges {
-                let request = PHAssetCreationRequest.forAsset()
-                let options = PHAssetResourceCreationOptions()
-                options.uniformTypeIdentifier = UTType.png.identifier
-                request.addResource(with: .photo, data: imageData, options: options)
-            } completionHandler: { success, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else if success {
-                    continuation.resume()
-                } else {
-                    continuation.resume(throwing: AssetPositionShareSaveError.failed)
-                }
-            }
-        }
-    }
-}
-
-private struct AssetPositionShareSaveAlert: Identifiable {
-    let id = UUID()
-    let title: String
-    let message: String
-    let showsSettingsButton: Bool
-
-    static func photoAuthorization(status: PHAuthorizationStatus, locale: Locale) -> AssetPositionShareSaveAlert {
-        switch status {
-        case .denied:
-            AssetPositionShareSaveAlert(
-                title: L10n.AssetPositionShare.photoAccessOffTitle(locale: locale),
-                message: L10n.AssetPositionShare.photoAccessOffMessage(locale: locale),
-                showsSettingsButton: true
-            )
-        case .restricted:
-            AssetPositionShareSaveAlert(
-                title: L10n.AssetPositionShare.photoAccessRestrictedTitle(locale: locale),
-                message: L10n.AssetPositionShare.photoAccessRestrictedMessage(locale: locale),
-                showsSettingsButton: false
-            )
-        default:
-            AssetPositionShareSaveAlert(
-                title: L10n.AssetPositionShare.photoAccessNeededTitle(locale: locale),
-                message: L10n.AssetPositionShare.photoAccessNeededMessage(locale: locale),
-                showsSettingsButton: false
-            )
-        }
-    }
-}
-
-private enum AssetPositionShareSaveError: LocalizedError {
-    case failed
-
-    var errorDescription: String? {
-        L10n.AssetPositionShare.saveFailed(locale: AppLocale.current)
-    }
-}
-
-private struct AssetPositionShareImage: Transferable {
-    let pngData: Data
-
-    init?(image: UIImage) {
-        guard let pngData = image.pngData() else {
-            return nil
-        }
-
-        self.pngData = pngData
-    }
-
-    static var transferRepresentation: some TransferRepresentation {
-        DataRepresentation(exportedContentType: .png) { image in
-            image.pngData
-        }
-    }
-}
-
-private struct AssetPositionShareButtonLabel: View {
-    let title: String
-    let systemImage: String
-    let isEnabled: Bool
-
-    var body: some View {
-        label
-            .modifier(AssetPositionShareGlassButton(isEnabled: isEnabled))
-    }
-
-    private var label: some View {
-        Label(title, systemImage: systemImage)
-            .font(.headline.weight(.semibold))
-            .frame(maxWidth: .infinity)
-            .frame(height: 54)
-            .foregroundStyle(isEnabled ? AppTheme.ColorToken.brand : Color(.secondaryLabel))
-            .contentShape(Capsule())
-    }
-}
-
-private struct AssetPositionShareGlassButton: ViewModifier {
-    @Environment(\.colorScheme) private var colorScheme
-    let isEnabled: Bool
-
-    func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            if isEnabled {
-                content
-                    .glassEffect(
-                        .regular.tint(AppTheme.ColorToken.brand.opacity(0.24)).interactive(),
-                        in: .capsule
-                    )
-            } else {
-                content
-                    .glassEffect(
-                        .regular.tint(Color.white.opacity(0.10)),
-                        in: .capsule
-                    )
-            }
-        } else {
-            content
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay {
-                    Capsule()
-                        .strokeBorder(fallbackStrokeColor)
-                }
-                .shadow(color: .black.opacity(0.08), radius: 12, y: 5)
-        }
-    }
-
-    private var fallbackStrokeColor: Color {
-        colorScheme == .light ? Color.black.opacity(0.10) : Color.white.opacity(0.16)
     }
 }
 

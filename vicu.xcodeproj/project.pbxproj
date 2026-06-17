@@ -73,6 +73,8 @@
 		0A0000000000000000000198 /* Features/AssetDetail/AssetQuoteHistorySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000298 /* Features/AssetDetail/AssetQuoteHistorySheet.swift */; };
 		0A0000000000000000000199 /* Features/AssetDetail/AssetLevelOneBook.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000299 /* Features/AssetDetail/AssetLevelOneBook.swift */; };
 		0A00000000000000000001A0 /* Features/AssetDetail/AssetPositionShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002A0 /* Features/AssetDetail/AssetPositionShareSheet.swift */; };
+		0A00000000000000000001A1 /* Features/AssetDetail/AssetShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002A1 /* Features/AssetDetail/AssetShareSheet.swift */; };
+		0A00000000000000000001A2 /* Features/AssetDetail/AssetShareSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002A2 /* Features/AssetDetail/AssetShareSupport.swift */; };
 		0A00000000000000000001B0 /* Features/Positions/PositionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002B0 /* Features/Positions/PositionDetailView.swift */; };
 		0A00000000000000000001B1 /* Features/Positions/PositionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002B1 /* Features/Positions/PositionsView.swift */; };
 		0A00000000000000000001B2 /* Features/Positions/PositionCategorySupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002B2 /* Features/Positions/PositionCategorySupport.swift */; };
@@ -207,6 +209,8 @@
 		0A0000000000000000000298 /* Features/AssetDetail/AssetQuoteHistorySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/AssetQuoteHistorySheet.swift; sourceTree = "<group>"; };
 		0A0000000000000000000299 /* Features/AssetDetail/AssetLevelOneBook.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/AssetLevelOneBook.swift; sourceTree = "<group>"; };
 		0A00000000000000000002A0 /* Features/AssetDetail/AssetPositionShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/AssetPositionShareSheet.swift; sourceTree = "<group>"; };
+		0A00000000000000000002A1 /* Features/AssetDetail/AssetShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/AssetShareSheet.swift; sourceTree = "<group>"; };
+		0A00000000000000000002A2 /* Features/AssetDetail/AssetShareSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/AssetShareSupport.swift; sourceTree = "<group>"; };
 		0A00000000000000000002B0 /* Features/Positions/PositionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Positions/PositionDetailView.swift; sourceTree = "<group>"; };
 		0A00000000000000000002B1 /* Features/Positions/PositionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Positions/PositionsView.swift; sourceTree = "<group>"; };
 		0A00000000000000000002B2 /* Features/Positions/PositionCategorySupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Positions/PositionCategorySupport.swift; sourceTree = "<group>"; };
@@ -319,6 +323,8 @@
 				0A00000000000000000002E6 /* Features/OptionDetail/OptionDetailModels.swift */,
 				0A0000000000000000000299 /* Features/AssetDetail/AssetLevelOneBook.swift */,
 				0A00000000000000000002A0 /* Features/AssetDetail/AssetPositionShareSheet.swift */,
+				0A00000000000000000002A1 /* Features/AssetDetail/AssetShareSheet.swift */,
+				0A00000000000000000002A2 /* Features/AssetDetail/AssetShareSupport.swift */,
 				0A00000000000000000002B0 /* Features/Positions/PositionDetailView.swift */,
 				0A00000000000000000002B1 /* Features/Positions/PositionsView.swift */,
 				0A00000000000000000002B2 /* Features/Positions/PositionCategorySupport.swift */,
@@ -578,6 +584,8 @@
 				0A00000000000000000001E6 /* Features/OptionDetail/OptionDetailModels.swift in Sources */,
 				0A0000000000000000000199 /* Features/AssetDetail/AssetLevelOneBook.swift in Sources */,
 				0A00000000000000000001A0 /* Features/AssetDetail/AssetPositionShareSheet.swift in Sources */,
+				0A00000000000000000001A1 /* Features/AssetDetail/AssetShareSheet.swift in Sources */,
+				0A00000000000000000001A2 /* Features/AssetDetail/AssetShareSupport.swift in Sources */,
 				0A00000000000000000001B0 /* Features/Positions/PositionDetailView.swift in Sources */,
 				0A00000000000000000001B1 /* Features/Positions/PositionsView.swift in Sources */,
 				0A00000000000000000001B2 /* Features/Positions/PositionCategorySupport.swift in Sources */,

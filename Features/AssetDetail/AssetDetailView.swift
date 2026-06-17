@@ -12,6 +12,7 @@ struct AssetDetailView: View {
     @State private var showsOptions = false
     @State private var newsSheetDetent: PresentationDetent = .fraction(Self.newsSheetCompactFraction)
     @State private var optionsSheetDetent: PresentationDetent = .fraction(Self.optionsSheetCompactFraction)
+    @State private var assetSharePayload: AssetSharePayload?
     @State private var positionSharePayload: AssetPositionSharePayload?
     @State private var submittedOrderDestination: AssetSubmittedOrderDestination?
     @State private var pendingSubmittedOrder: AlpacaOrder?
@@ -88,6 +89,9 @@ struct AssetDetailView: View {
                 connectionStatus: headerConnectionStatus,
                 isFavorite: app.isFavoriteMarketSymbol(store.symbol),
                 dismiss: { dismiss() },
+                share: {
+                    assetSharePayload = AssetSharePayload(store: store)
+                },
                 toggleFavorite: {
                     Task { await app.toggleFavoriteMarketSymbol(store.symbol) }
                 }
@@ -161,6 +165,11 @@ struct AssetDetailView: View {
             )
             .presentationDetents([.fraction(Self.optionsSheetCompactFraction), .large], selection: $optionsSheetDetent)
             .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $assetSharePayload) { payload in
+            AssetShareSheet(payload: payload)
+                .presentationDetents([.height(680)])
+                .presentationDragIndicator(.visible)
         }
         .sheet(item: $positionSharePayload) { payload in
             AssetPositionShareSheet(payload: payload)
@@ -664,6 +673,7 @@ private struct AssetDetailFixedHeader: View {
     let connectionStatus: AssetRealtimeConnectionStatus?
     let isFavorite: Bool
     let dismiss: () -> Void
+    let share: () -> Void
     let toggleFavorite: () -> Void
 
     var body: some View {
@@ -686,12 +696,20 @@ private struct AssetDetailFixedHeader: View {
                     .scaleEffect(showsTitle ? 1 : 0.96)
             }
         } trailing: {
-            AppGlassIconButton(
-                systemImage: isFavorite ? "heart.fill" : "heart",
-                foregroundColor: isFavorite ? AppTheme.ColorToken.brand : .primary,
-                accessibilityLabel: L10n.Markets.favorites,
-                action: toggleFavorite
-            )
+            HStack(spacing: 8) {
+                AppGlassIconButton(
+                    systemImage: "square.and.arrow.up",
+                    accessibilityLabel: L10n.Common.share,
+                    action: share
+                )
+
+                AppGlassIconButton(
+                    systemImage: isFavorite ? "heart.fill" : "heart",
+                    foregroundColor: isFavorite ? AppTheme.ColorToken.brand : .primary,
+                    accessibilityLabel: L10n.Markets.favorites,
+                    action: toggleFavorite
+                )
+            }
         }
         .animation(.smooth(duration: 0.18), value: showsTitle)
         .animation(.snappy(duration: 0.18), value: connectionStatus?.title)
@@ -1085,7 +1103,6 @@ private struct AssetDetailTradeBar: View {
     private func content(usesGlass: Bool) -> some View {
         HStack(spacing: 12) {
             AssetTradeMoreButton(
-                symbol: symbol,
                 supportsOptions: supportsOptions,
                 usesGlass: usesGlass,
                 showOrders: showOrders,
@@ -1172,7 +1189,6 @@ private struct AssetTradeSideButtonGlassModifier: ViewModifier {
 }
 
 private struct AssetTradeMoreButton: View {
-    let symbol: String
     let supportsOptions: Bool
     let usesGlass: Bool
     let showOrders: () -> Void
@@ -1194,10 +1210,6 @@ private struct AssetTradeMoreButton: View {
             }
             .disabled(!supportsOptions)
 
-            ShareLink(item: shareText) {
-                Label("Share", systemImage: "square.and.arrow.up")
-            }
-
             Button {
             } label: {
                 Label("Add alert", systemImage: "bell")
@@ -1212,10 +1224,6 @@ private struct AssetTradeMoreButton: View {
         .buttonStyle(.plain)
         .modifier(AssetTradePillModifier(style: .glass, usesGlass: usesGlass))
         .accessibilityLabel("More actions")
-    }
-
-    private var shareText: String {
-        "vicu \(symbol)"
     }
 }
 

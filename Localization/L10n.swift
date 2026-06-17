@@ -114,6 +114,7 @@ enum L10n {
         static var close: LocalizedStringKey { "common.close" }
         static var submit: LocalizedStringKey { "common.submit" }
         static var cancel: LocalizedStringKey { "common.cancel" }
+        static var share: LocalizedStringKey { "common.share" }
         static var copy: LocalizedStringKey { "common.copy" }
         static var noData: LocalizedStringKey { "common.no_data" }
         static var loadingMore: LocalizedStringKey { "common.loading_more" }
@@ -486,6 +487,19 @@ enum L10n {
         static func saveFailed(locale: Locale) -> String { L10n.string("asset_position_share.save_failed", locale: locale) }
         static func entryPrice(locale: Locale) -> String { L10n.string("asset_position_share.entry_price", locale: locale) }
         static func latestPrice(locale: Locale) -> String { L10n.string("asset_position_share.latest_price", locale: locale) }
+    }
+
+    enum AssetShare {
+        static var title: LocalizedStringKey { "asset_share.title" }
+        static var previewAccessibility: LocalizedStringKey { "asset_share.preview_accessibility" }
+        static func sharePreviewTitle(symbol: String, locale: Locale) -> String {
+            L10n.format("asset_share.preview_title_format", locale: locale, symbol)
+        }
+        static func marketSnapshot(locale: Locale) -> String { L10n.string("asset_share.market_snapshot", locale: locale) }
+        static func open(locale: Locale) -> String { L10n.string("asset_share.open", locale: locale) }
+        static func high(locale: Locale) -> String { L10n.string("asset_share.high", locale: locale) }
+        static func low(locale: Locale) -> String { L10n.string("asset_share.low", locale: locale) }
+        static func volume(locale: Locale) -> String { L10n.string("asset_share.volume", locale: locale) }
     }
 
     enum PositionCategory {
