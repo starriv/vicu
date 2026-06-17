@@ -6,8 +6,13 @@ A native iOS client for your Alpaca brokerage account, built in SwiftUI.
 ![Swift](https://img.shields.io/badge/Swift-6.0-orange)
 ![UI](https://img.shields.io/badge/SwiftUI-Liquid%20Glass-7d4bff)
 
-English | [简体中文](#简体中文)
+一款为 Alpaca 证券开发的非官方 iOS 客户端, 设计精美, 功能完善.
 
+>Vicu is named after the vicuña, a close relative of the alpaca.
+
+>Vicu 取意于 vicuña，一种与 alpaca 亲缘相近的南美驼科动物.
+
+English | [简体中文](#简体中文)
 ---
 
 ## Screenshots / 截图
