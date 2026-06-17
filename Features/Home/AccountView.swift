@@ -20,6 +20,10 @@ struct AccountView: View {
 
     @ViewBuilder
     private var content: some View {
+        if app.environment == .paper {
+            AccountPaperTradingBanner()
+        }
+
         if isLoading && account == nil {
             ProgressView(L10n.AccountDetail.loading)
                 .frame(maxWidth: .infinity, minHeight: 280)
@@ -64,6 +68,39 @@ struct AccountView: View {
         } catch {
             toastCenter.showError(error, locale: app.appLanguage.locale)
         }
+    }
+}
+
+private struct AccountPaperTradingBanner: View {
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: AppIcon.Portfolio.warning)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(AppTheme.ColorToken.warning)
+                .frame(width: 28, height: 28)
+                .background(AppTheme.ColorToken.warning.opacity(0.14), in: Circle())
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(L10n.AccountDetail.paperBannerTitle)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(.primary)
+
+                Text(L10n.AccountDetail.paperBannerMessage)
+                    .font(AppTypography.detail)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(AppTheme.ColorToken.warning.opacity(0.10), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(AppTheme.ColorToken.warning.opacity(0.24), lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 

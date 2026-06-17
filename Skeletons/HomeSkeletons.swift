@@ -3,21 +3,9 @@ import SwiftUI
 struct HomeHeroSkeleton: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HomeSkeletonBlock(width: 188, height: 48, fill: Color(.secondarySystemFill), cornerRadius: 14)
-                    HomeSkeletonBlock(width: 116, height: 14, fill: Color(.tertiarySystemFill), cornerRadius: 5)
-                }
-
-                Spacer(minLength: 16)
-
-                HStack(spacing: 6) {
-                    HomeSkeletonBlock(width: 13, height: 13, fill: AppTheme.ColorToken.brandForeground.opacity(0.26), cornerRadius: 5)
-                    HomeSkeletonBlock(width: 48, height: 12, fill: AppTheme.ColorToken.brandForeground.opacity(0.26), cornerRadius: 4)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 9)
-                .background(AppTheme.ColorToken.brand.opacity(0.22), in: Capsule())
+            VStack(alignment: .leading, spacing: 8) {
+                HomeSkeletonBlock(width: 188, height: 48, fill: Color(.secondarySystemFill), cornerRadius: 14)
+                HomeSkeletonBlock(width: 116, height: 14, fill: Color(.tertiarySystemFill), cornerRadius: 5)
             }
 
             HStack(spacing: 8) {

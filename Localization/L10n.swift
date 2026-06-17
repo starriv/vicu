@@ -211,6 +211,8 @@ enum L10n {
     enum AccountDetail {
         static var title: LocalizedStringKey { "account_detail.title" }
         static var loading: LocalizedStringKey { "account_detail.loading" }
+        static var paperBannerTitle: LocalizedStringKey { "account_detail.paper_banner.title" }
+        static var paperBannerMessage: LocalizedStringKey { "account_detail.paper_banner.message" }
         static var overview: LocalizedStringKey { "account_detail.overview" }
         static var accountID: LocalizedStringKey { "account_detail.account_id" }
         static var accountNumber: LocalizedStringKey { "account_detail.account_number" }

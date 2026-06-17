@@ -107,22 +107,15 @@ struct HomeHeroView: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 0) {
-                    AppPriceText(
-                        displayedHeroAmount,
-                        font: AppTypography.heroValue,
-                        minimumScaleFactor: 0.82,
-                        isAnimated: chartSelection == nil,
-                        isSigned: chartMode == .profitLoss
-                    )
-                    .foregroundStyle(heroAmountColor)
-                }
-
-                Spacer(minLength: 16)
-
-                EnvironmentPill()
-            }
+            AppPriceText(
+                displayedHeroAmount,
+                font: AppTypography.heroValue,
+                minimumScaleFactor: 0.82,
+                isAnimated: chartSelection == nil,
+                isSigned: chartMode == .profitLoss
+            )
+            .foregroundStyle(heroAmountColor)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack(spacing: 8) {
                 Text(AppFormatter.signedMoney(displayedRangeChange.amount))
@@ -179,48 +172,6 @@ private enum PortfolioChartMode: String, CaseIterable, Identifiable {
         case .profitLoss:
             "P/L"
         }
-    }
-}
-
-private struct EnvironmentPill: View {
-    @Environment(AppModel.self) private var app
-    @Environment(\.locale) private var locale
-
-    private var title: String {
-        app.environment.titleText(locale: locale)
-    }
-
-    private var systemImage: String {
-        return app.canUseAlpacaAPI ? AppIcon.Portfolio.connected : AppIcon.Portfolio.warning
-    }
-
-    private var backgroundColor: Color {
-        if app.canUseAlpacaAPI {
-            return AppTheme.ColorToken.brand
-        }
-
-        return AppTheme.ColorToken.warning
-    }
-
-    private var accessibilityText: LocalizedStringKey {
-        return LocalizedStringKey(app.credentialsStatus.title(locale: locale))
-    }
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: systemImage)
-            Text(title)
-        }
-        .font(AppTypography.badge)
-        .foregroundStyle(AppTheme.ColorToken.brandForeground)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background {
-            Capsule()
-                .fill(backgroundColor)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(accessibilityText)
     }
 }
 
