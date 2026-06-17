@@ -62,7 +62,7 @@ struct TradeView: View {
                 onSubmittedOrder: { showSubmittedOrder($0) }
             )
         }
-        .fullScreenCover(item: $confirmation) { snapshot in
+        .sheet(item: $confirmation) { snapshot in
             TradeOrderConfirmationSheet(snapshot: snapshot) {
                 await store.submit(snapshot.order, clientOrderID: snapshot.clientOrderID, app: app)
             } onSubmitted: { order in
@@ -215,7 +215,7 @@ private struct TradeLimitOrderView: View {
         .onAppear {
             store.message = nil
         }
-        .fullScreenCover(item: $confirmation) { snapshot in
+        .sheet(item: $confirmation) { snapshot in
             TradeOrderConfirmationSheet(snapshot: snapshot) {
                 await store.submit(snapshot.order, clientOrderID: snapshot.clientOrderID, app: app)
             } onSubmitted: { order in

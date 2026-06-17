@@ -79,25 +79,39 @@ struct TradeOrderConfirmationSheet: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AppTheme.ColorToken.pageBackground.ignoresSafeArea())
+        .presentationDetents([.large])
+        .presentationDragIndicator(.hidden)
         .interactiveDismissDisabled(isSubmitting)
     }
 
     private var header: some View {
-        AppScreenHeader(background: AppTheme.ColorToken.pageBackground) {
-            Button(L10n.Common.cancelText(locale: locale)) {
-                dismiss()
+        VStack(spacing: 10) {
+            Capsule()
+                .fill(.tertiary)
+                .frame(width: 58, height: 5)
+                .padding(.top, 10)
+
+            HStack {
+                Button(L10n.Common.cancelText(locale: locale)) {
+                    dismiss()
+                }
+                .font(AppTypography.control)
+                .foregroundStyle(.secondary)
+                .disabled(isSubmitting)
+
+                Spacer(minLength: 12)
+
+                Text(L10n.Trade.simpleReviewOrder(locale: locale))
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+
+                Spacer(minLength: 12)
+
+                Color.clear
+                    .frame(width: 52, height: 1)
             }
-            .font(AppTypography.control)
-            .foregroundStyle(.secondary)
-            .disabled(isSubmitting)
-            .frame(width: 88, height: 44, alignment: .leading)
-        } center: {
-            Text(L10n.Trade.simpleReviewOrder(locale: locale))
-                .font(.headline)
-                .foregroundStyle(.primary)
-        } trailing: {
-            Color.clear
-                .frame(width: 88, height: 44)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 8)
         }
     }
 
@@ -127,7 +141,7 @@ struct TradeOrderConfirmationSheet: View {
                 .padding(.top, 2)
             }
             .padding(.horizontal, AppTheme.Spacing.pageHorizontal)
-            .padding(.top, 18)
+            .padding(.top, 8)
             .padding(.bottom, AppTheme.Spacing.pageBottom)
         }
     }
@@ -259,17 +273,39 @@ struct TradeOrderConfirmationSheet: View {
 
         isSubmitting = true
         let result = await onSubmit()
+        finishSubmission(result)
+    }
 
+    private func finishSubmission(_ result: TradeSubmitResult) {
         switch result {
         case .success(let submittedOrder):
-            toastCenter.show(L10n.Trade.orderSubmitted(locale: locale))
             dismiss()
+            showToastAfterSheetDismissal(.success(L10n.Trade.orderSubmitted(locale: locale)))
             onSubmitted(submittedOrder)
         case .failure(let message):
             isSubmitting = false
-            toastCenter.showErrorMessage(message)
+            dismiss()
+            showToastAfterSheetDismissal(.error(message))
         }
     }
+
+    private func showToastAfterSheetDismissal(_ feedback: TradeOrderConfirmationFeedback) {
+        Task { @MainActor [toastCenter] in
+            try? await Task.sleep(for: .milliseconds(320))
+
+            switch feedback {
+            case .success(let message):
+                toastCenter.show(message)
+            case .error(let message):
+                toastCenter.showErrorMessage(message)
+            }
+        }
+    }
+}
+
+private enum TradeOrderConfirmationFeedback {
+    case success(String)
+    case error(String)
 }
 
 private struct TradeOrderConfirmationActionButton: View {
@@ -299,7 +335,7 @@ private struct TradeOrderConfirmationActionButton: View {
         .buttonBorderShape(.capsule)
         .tint(tint)
         .disabled(isSubmitting)
-        .accessibilityLabel(accessibilityTitle)
+        .accessibilityLabel(isSubmitting ? submittingTitle : accessibilityTitle)
     }
 
     private var fallbackButton: some View {
@@ -316,21 +352,21 @@ private struct TradeOrderConfirmationActionButton: View {
         }
         .shadow(color: tint.opacity(0.12), radius: 18, y: 7)
         .disabled(isSubmitting)
-        .accessibilityLabel(accessibilityTitle)
+        .accessibilityLabel(isSubmitting ? submittingTitle : accessibilityTitle)
     }
 
     private var label: some View {
         HStack(spacing: 9) {
             if isSubmitting {
                 ProgressView()
-                    .controlSize(.small)
+                    .controlSize(.regular)
                     .tint(.white)
+            } else {
+                Text(title)
+                    .font(.headline.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
             }
-
-            Text(isSubmitting ? submittingTitle : title)
-                .font(.headline.weight(.semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
         }
         .foregroundStyle(.white)
         .frame(maxWidth: .infinity)
