@@ -79,6 +79,8 @@
 		0A0000000000000000000119 /* AppFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000219 /* AppFormatting.swift */; };
 		0A00000000000000000001C1 /* ErrorCancellation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002C1 /* ErrorCancellation.swift */; };
 		0A0000000000000000000120 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000220 /* Assets.xcassets */; };
+		0AC0000000000000000C0002 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0AC0000000000000000C0001 /* AppIcon.icon */; };
+		0AC0000000000000000C0004 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 0AC0000000000000000C0003 /* PrivacyInfo.xcprivacy */; };
 		0A0000000000000000000121 /* AppTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000221 /* AppTypography.swift */; };
 		0A0000000000000000000122 /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000222 /* AppTheme.swift */; };
 		0A0000000000000000000150 /* AppIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000250 /* AppIcon.swift */; };
@@ -210,6 +212,8 @@
 		0A0000000000000000000219 /* AppFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Utilities/AppFormatting.swift; sourceTree = "<group>"; };
 		0A00000000000000000002C1 /* ErrorCancellation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Utilities/ErrorCancellation.swift; sourceTree = "<group>"; };
 		0A0000000000000000000220 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Resources/Assets.xcassets; sourceTree = "<group>"; };
+		0AC0000000000000000C0001 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = Resources/AppIcon.icon; sourceTree = "<group>"; };
+		0AC0000000000000000C0003 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Resources/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		0A0000000000000000000221 /* AppTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Support/AppTypography.swift; sourceTree = "<group>"; };
 		0A0000000000000000000222 /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/AppTheme.swift; sourceTree = "<group>"; };
 		0A0000000000000000000250 /* AppIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/AppIcon.swift; sourceTree = "<group>"; };
@@ -369,6 +373,8 @@
 				0A0000000000000000000234 /* PositionsSummaryView.swift */,
 				0A0000000000000000000264 /* RecentOrdersSummaryView.swift */,
 				0A0000000000000000000220 /* Assets.xcassets */,
+				0AC0000000000000000C0001 /* AppIcon.icon */,
+				0AC0000000000000000C0003 /* PrivacyInfo.xcprivacy */,
 				0A0000000000000000000227 /* Localizable.xcstrings */,
 			);
 			sourceTree = "<group>";
@@ -506,6 +512,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				0A0000000000000000000120 /* Assets.xcassets in Resources */,
+				0AC0000000000000000C0002 /* AppIcon.icon in Resources */,
+				0AC0000000000000000C0004 /* PrivacyInfo.xcprivacy in Resources */,
 				0A0000000000000000000127 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -752,8 +760,9 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = vicu;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+				INFOPLIST_KEY_CFBundleDisplayName = Vicu;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+					INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "vicu can use Face ID to protect Alpaca credentials stored on this device.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "vicu saves generated position share images to your photo library when you choose Save.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
@@ -788,8 +797,9 @@
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = vicu;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+				INFOPLIST_KEY_CFBundleDisplayName = Vicu;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+					INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "vicu can use Face ID to protect Alpaca credentials stored on this device.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "vicu saves generated position share images to your photo library when you choose Save.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
