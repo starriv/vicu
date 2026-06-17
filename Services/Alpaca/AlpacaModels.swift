@@ -188,7 +188,7 @@ enum PositionAssetCategory: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
 
     var title: String {
-        title(locale: .current)
+        title(locale: AppLocale.current)
     }
 
     func title(locale: Locale) -> String {
@@ -218,7 +218,7 @@ enum PositionAssetCategory: String, CaseIterable, Identifiable, Sendable {
     }
 
     var emptyTitle: String {
-        emptyTitle(locale: .current)
+        emptyTitle(locale: AppLocale.current)
     }
 
     func emptyTitle(locale: Locale) -> String {

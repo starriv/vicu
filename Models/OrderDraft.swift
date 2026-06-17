@@ -192,7 +192,7 @@ enum OrderDraftError: LocalizedError {
     case extendedHoursRequiresLimitDayOrGTC
 
     var errorDescription: String? {
-        errorDescription(locale: .current)
+        errorDescription(locale: AppLocale.current)
     }
 
     func errorDescription(locale: Locale) -> String {
@@ -202,23 +202,23 @@ enum OrderDraftError: LocalizedError {
         case .missingSize:
             L10n.Order.missingSize(locale: locale)
         case .conflictingSize:
-            "只能填写股数或金额中的一项。"
+            L10n.Order.conflictingSize(locale: locale)
         case .invalidQuantity:
-            "股数必须大于 0。"
+            L10n.Order.invalidQuantity(locale: locale)
         case .invalidQuantityFormat:
-            "股数格式不正确，最多支持 6 位小数。"
+            L10n.Order.invalidQuantityFormat(locale: locale)
         case .invalidNotional:
-            "金额必须大于 0。"
+            L10n.Order.invalidNotional(locale: locale)
         case .missingLimitPrice:
             L10n.Order.missingLimitPrice(locale: locale)
         case .invalidLimitPrice:
-            "限价必须大于 0。"
+            L10n.Order.invalidLimitPrice(locale: locale)
         case .invalidLimitPriceIncrement:
-            "限价大于等于 $1 时最多 2 位小数，低于 $1 时最多 4 位小数。"
+            L10n.Order.invalidLimitPriceIncrement(locale: locale)
         case .notionalRequiresDay:
-            "金额下单仅支持 DAY 有效期。"
+            L10n.Order.notionalRequiresDay(locale: locale)
         case .extendedHoursRequiresLimitDayOrGTC:
-            "盘前盘后交易仅支持限价单，且有效期必须为 DAY 或 GTC。"
+            L10n.Order.extendedHoursRequiresLimitDayOrGTC(locale: locale)
         }
     }
 }

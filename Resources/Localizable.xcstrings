@@ -39,9 +39,6 @@
     "%@ Options" : {
 
     },
-    "%@ position" : {
-
-    },
     "%lld" : {
 
     },
@@ -2517,6 +2514,360 @@
     "Asset data unavailable" : {
 
     },
+    "asset_position_share.done" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成"
+          }
+        }
+      }
+    },
+    "asset_position_share.entry_price" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entry price"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "建仓价格"
+          }
+        }
+      }
+    },
+    "asset_position_share.latest_price" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Latest price"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最新价格"
+          }
+        }
+      }
+    },
+    "asset_position_share.ok" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "好的"
+          }
+        }
+      }
+    },
+    "asset_position_share.open_settings" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Settings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开设置"
+          }
+        }
+      }
+    },
+    "asset_position_share.photo_access_needed.message" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow vicu to add images to Photos, then try saving again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许 vicu 添加图片到照片后再试一次。"
+          }
+        }
+      }
+    },
+    "asset_position_share.photo_access_needed.title" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo access needed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要照片权限"
+          }
+        }
+      }
+    },
+    "asset_position_share.photo_access_off.message" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Settings and allow vicu to add images to Photos, then try saving again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开设置并允许 vicu 添加图片到照片后再试一次。"
+          }
+        }
+      }
+    },
+    "asset_position_share.photo_access_off.title" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo access is off"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "照片访问已关闭"
+          }
+        }
+      }
+    },
+    "asset_position_share.photo_access_restricted.message" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device does not allow vicu to add images to Photos."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此设备不允许 vicu 添加图片到照片。"
+          }
+        }
+      }
+    },
+    "asset_position_share.photo_access_restricted.title" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photo access restricted"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "照片访问受限"
+          }
+        }
+      }
+    },
+    "asset_position_share.prepare_failed" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The image could not be prepared for Photos."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法为照片准备图片。"
+          }
+        }
+      }
+    },
+    "asset_position_share.preparing_image" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparing image"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在准备图片"
+          }
+        }
+      }
+    },
+    "asset_position_share.preview_accessibility" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Position share preview"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "持仓分享预览"
+          }
+        }
+      }
+    },
+    "asset_position_share.preview_title_format" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ position"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 持仓"
+          }
+        }
+      }
+    },
+    "asset_position_share.save" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存"
+          }
+        }
+      }
+    },
+    "asset_position_share.save_failed" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The image could not be saved to Photos."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法将图片保存到照片。"
+          }
+        }
+      }
+    },
+    "asset_position_share.saved" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已保存"
+          }
+        }
+      }
+    },
+    "asset_position_share.saving" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saving"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存中"
+          }
+        }
+      }
+    },
+    "asset_position_share.share" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分享"
+          }
+        }
+      }
+    },
+    "asset_position_share.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share position"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分享持仓"
+          }
+        }
+      }
+    },
     "Bid size %@, ask size %@" : {
       "localizations" : {
         "en" : {
@@ -2967,9 +3318,6 @@
       }
     },
     "Delayed quotes" : {
-
-    },
-    "Done" : {
 
     },
     "environment.live" : {
@@ -4124,13 +4472,7 @@
         }
       }
     },
-    "OK" : {
-
-    },
     "Open" : {
-
-    },
-    "Open Settings" : {
 
     },
     "Opens options" : {
@@ -4144,6 +4486,125 @@
     },
     "Options quotes are delayed" : {
 
+    },
+    "order.error.conflicting_size" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter either quantity or notional amount, not both."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只能填写股数或金额中的一项。"
+          }
+        }
+      }
+    },
+    "order.error.extended_hours_requires_limit_day_or_gtc" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extended-hours trading requires a limit order with DAY or GTC time in force."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "盘前盘后交易仅支持限价单，且有效期必须为 DAY 或 GTC。"
+          }
+        }
+      }
+    },
+    "order.error.invalid_limit_price" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limit price must be greater than 0."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "限价必须大于 0。"
+          }
+        }
+      }
+    },
+    "order.error.invalid_limit_price_increment" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Limit price supports up to 2 decimal places at $1 or above, or 4 decimal places below $1."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "限价大于等于 $1 时最多 2 位小数，低于 $1 时最多 4 位小数。"
+          }
+        }
+      }
+    },
+    "order.error.invalid_notional" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amount must be greater than 0."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "金额必须大于 0。"
+          }
+        }
+      }
+    },
+    "order.error.invalid_quantity" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quantity must be greater than 0."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "股数必须大于 0。"
+          }
+        }
+      }
+    },
+    "order.error.invalid_quantity_format" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quantity format is invalid. Use up to 6 decimal places."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "股数格式不正确，最多支持 6 位小数。"
+          }
+        }
+      }
     },
     "order.error.missing_limit_price" : {
       "extractionState" : "stale",
@@ -4192,6 +4653,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "必须填写标的。"
+          }
+        }
+      }
+    },
+    "order.error.notional_requires_day" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notional orders only support DAY time in force."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "金额下单仅支持 DAY 有效期。"
           }
         }
       }
@@ -6851,9 +7329,6 @@
         }
       }
     },
-    "Position share preview" : {
-
-    },
     "position_detail.asset_class" : {
       "localizations" : {
         "en" : {
@@ -8011,9 +8486,6 @@
     "Quote stream" : {
 
     },
-    "Retry" : {
-
-    },
     "risk.decision.account_missing_static" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -8592,9 +9064,6 @@
       }
     },
     "Share" : {
-
-    },
-    "Share position" : {
 
     },
     "Spread" : {

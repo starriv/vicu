@@ -15,7 +15,7 @@ enum CredentialsStatus: Equatable {
     case failed(TradeEnvironment, message: String)
 
     var title: String {
-        title(locale: .current)
+        title(locale: AppLocale.current)
     }
 
     func title(locale: Locale) -> String {
@@ -36,7 +36,7 @@ enum CredentialsStatus: Equatable {
     }
 
     var detail: String {
-        detail(locale: .current)
+        detail(locale: AppLocale.current)
     }
 
     func detail(locale: Locale) -> String {

@@ -1,21 +1,100 @@
 import Foundation
 import SwiftUI
 
+enum AppLocale {
+    static let defaultIdentifier = "en"
+    static let simplifiedChineseIdentifier = "zh-Hans"
+    static let supportedIdentifiers = [defaultIdentifier, simplifiedChineseIdentifier]
+
+    static var current: Locale {
+        resolvedLocale(for: .current)
+    }
+
+    static var system: Locale {
+        let preferences = Locale.preferredLanguages.isEmpty
+            ? [Locale.autoupdatingCurrent.identifier]
+            : Locale.preferredLanguages
+
+        return Locale(identifier: resolvedIdentifier(forPreferences: preferences))
+    }
+
+    static func resolvedLocale(for locale: Locale) -> Locale {
+        Locale(identifier: resolvedIdentifier(for: locale))
+    }
+
+    static func resolvedIdentifier(for locale: Locale) -> String {
+        resolvedIdentifier(forPreferences: localePreferences(for: locale))
+    }
+
+    static func resolvedIdentifier(forPreferences preferences: [String]) -> String {
+        let normalizedPreferences = preferences.flatMap(localePreferences(forIdentifier:))
+        if let preferred = Bundle.preferredLocalizations(
+            from: supportedIdentifiers,
+            forPreferences: normalizedPreferences
+        ).first {
+            return preferred
+        }
+
+        return defaultIdentifier
+    }
+
+    static func localizationCandidates(for locale: Locale) -> [String] {
+        var candidates = localePreferences(for: locale)
+        append(resolvedIdentifier(for: locale), to: &candidates)
+        append(defaultIdentifier, to: &candidates)
+        return candidates
+    }
+
+    static func acceptLanguageHeader(for locale: Locale? = nil) -> String {
+        let identifier = locale.map(resolvedIdentifier(for:)) ?? resolvedIdentifier(forPreferences: Locale.preferredLanguages)
+        let fallback = identifier == defaultIdentifier ? simplifiedChineseIdentifier : defaultIdentifier
+        return "\(identifier), \(fallback);q=0.8"
+    }
+
+    private static func localePreferences(for locale: Locale) -> [String] {
+        localePreferences(forIdentifier: locale.identifier)
+    }
+
+    private static func localePreferences(forIdentifier identifier: String) -> [String] {
+        let normalizedIdentifier = normalized(identifier)
+        var preferences: [String] = []
+        append(normalizedIdentifier, to: &preferences)
+
+        let locale = Locale(identifier: normalizedIdentifier)
+        append(locale.language.languageCode?.identifier, to: &preferences)
+
+        return preferences
+    }
+
+    private static func normalized(_ identifier: String) -> String {
+        identifier
+            .replacingOccurrences(of: "_", with: "-")
+            .split(separator: "@", maxSplits: 1)
+            .first
+            .map(String.init) ?? identifier
+    }
+
+    private static func append(_ candidate: String?, to candidates: inout [String]) {
+        guard let candidate, !candidate.isEmpty, !candidates.contains(candidate) else {
+            return
+        }
+
+        candidates.append(candidate)
+    }
+}
+
 enum L10n {
     static func string(_ key: String, locale: Locale = .current) -> String {
         localizedBundle(for: locale).localizedString(forKey: key, value: key, table: "Localizable")
     }
 
     static func format(_ key: String, locale: Locale = .current, _ arguments: CVarArg...) -> String {
-        String(format: string(key, locale: locale), locale: locale, arguments: arguments)
+        let resolvedLocale = AppLocale.resolvedLocale(for: locale)
+        return String(format: string(key, locale: resolvedLocale), locale: resolvedLocale, arguments: arguments)
     }
 
     private static func localizedBundle(for locale: Locale) -> Bundle {
-        let normalizedIdentifier = locale.identifier.replacingOccurrences(of: "_", with: "-")
-        let languageCode = normalizedIdentifier.split(separator: "-").first.map(String.init)
-        let candidates = localizationCandidates(identifier: normalizedIdentifier, languageCode: languageCode)
-
-        for candidate in candidates {
+        for candidate in AppLocale.localizationCandidates(for: locale) {
             guard let path = Bundle.main.path(forResource: candidate, ofType: "lproj"),
                   let bundle = Bundle(path: path) else {
                 continue
@@ -25,30 +104,6 @@ enum L10n {
         }
 
         return .main
-    }
-
-    private static func localizationCandidates(identifier: String, languageCode: String?) -> [String] {
-        var candidates: [String] = []
-
-        func append(_ candidate: String?) {
-            guard let candidate, !candidate.isEmpty, !candidates.contains(candidate) else {
-                return
-            }
-
-            candidates.append(candidate)
-        }
-
-        append(identifier)
-
-        if identifier.hasPrefix("zh-Hans") || identifier == "zh" {
-            append("zh-Hans")
-        } else if identifier.hasPrefix("en") {
-            append("en")
-        }
-
-        append(languageCode)
-        append("en")
-        return candidates
     }
 
     enum Common {
@@ -405,6 +460,32 @@ enum L10n {
         static func quantityUnitUnits(locale: Locale = .current) -> String {
             L10n.string("position_detail.quantity_unit.units", locale: locale)
         }
+    }
+
+    enum AssetPositionShare {
+        static var title: LocalizedStringKey { "asset_position_share.title" }
+        static var done: LocalizedStringKey { "asset_position_share.done" }
+        static var previewAccessibility: LocalizedStringKey { "asset_position_share.preview_accessibility" }
+        static func save(locale: Locale) -> String { L10n.string("asset_position_share.save", locale: locale) }
+        static func saving(locale: Locale) -> String { L10n.string("asset_position_share.saving", locale: locale) }
+        static func saved(locale: Locale) -> String { L10n.string("asset_position_share.saved", locale: locale) }
+        static func share(locale: Locale) -> String { L10n.string("asset_position_share.share", locale: locale) }
+        static func preparingImage(locale: Locale) -> String { L10n.string("asset_position_share.preparing_image", locale: locale) }
+        static func sharePreviewTitle(symbol: String, locale: Locale) -> String {
+            L10n.format("asset_position_share.preview_title_format", locale: locale, symbol)
+        }
+        static func openSettings(locale: Locale) -> String { L10n.string("asset_position_share.open_settings", locale: locale) }
+        static func ok(locale: Locale) -> String { L10n.string("asset_position_share.ok", locale: locale) }
+        static func photoAccessOffTitle(locale: Locale) -> String { L10n.string("asset_position_share.photo_access_off.title", locale: locale) }
+        static func photoAccessOffMessage(locale: Locale) -> String { L10n.string("asset_position_share.photo_access_off.message", locale: locale) }
+        static func photoAccessRestrictedTitle(locale: Locale) -> String { L10n.string("asset_position_share.photo_access_restricted.title", locale: locale) }
+        static func photoAccessRestrictedMessage(locale: Locale) -> String { L10n.string("asset_position_share.photo_access_restricted.message", locale: locale) }
+        static func photoAccessNeededTitle(locale: Locale) -> String { L10n.string("asset_position_share.photo_access_needed.title", locale: locale) }
+        static func photoAccessNeededMessage(locale: Locale) -> String { L10n.string("asset_position_share.photo_access_needed.message", locale: locale) }
+        static func prepareFailed(locale: Locale) -> String { L10n.string("asset_position_share.prepare_failed", locale: locale) }
+        static func saveFailed(locale: Locale) -> String { L10n.string("asset_position_share.save_failed", locale: locale) }
+        static func entryPrice(locale: Locale) -> String { L10n.string("asset_position_share.entry_price", locale: locale) }
+        static func latestPrice(locale: Locale) -> String { L10n.string("asset_position_share.latest_price", locale: locale) }
     }
 
     enum PositionCategory {
@@ -1029,6 +1110,14 @@ enum L10n {
         static func typeLimitText(locale: Locale) -> String { L10n.string("order.type.limit", locale: locale) }
         static func missingSymbol(locale: Locale = .current) -> String { L10n.string("order.error.missing_symbol", locale: locale) }
         static func missingSize(locale: Locale = .current) -> String { L10n.string("order.error.missing_size", locale: locale) }
+        static func conflictingSize(locale: Locale = .current) -> String { L10n.string("order.error.conflicting_size", locale: locale) }
+        static func invalidQuantity(locale: Locale = .current) -> String { L10n.string("order.error.invalid_quantity", locale: locale) }
+        static func invalidQuantityFormat(locale: Locale = .current) -> String { L10n.string("order.error.invalid_quantity_format", locale: locale) }
+        static func invalidNotional(locale: Locale = .current) -> String { L10n.string("order.error.invalid_notional", locale: locale) }
         static func missingLimitPrice(locale: Locale = .current) -> String { L10n.string("order.error.missing_limit_price", locale: locale) }
+        static func invalidLimitPrice(locale: Locale = .current) -> String { L10n.string("order.error.invalid_limit_price", locale: locale) }
+        static func invalidLimitPriceIncrement(locale: Locale = .current) -> String { L10n.string("order.error.invalid_limit_price_increment", locale: locale) }
+        static func notionalRequiresDay(locale: Locale = .current) -> String { L10n.string("order.error.notional_requires_day", locale: locale) }
+        static func extendedHoursRequiresLimitDayOrGTC(locale: Locale = .current) -> String { L10n.string("order.error.extended_hours_requires_limit_day_or_gtc", locale: locale) }
     }
 }

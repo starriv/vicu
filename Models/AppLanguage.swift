@@ -34,7 +34,7 @@ enum AppLanguage: String, CaseIterable, Codable, Identifiable, Sendable {
     var locale: Locale {
         switch self {
         case .system:
-            Locale.autoupdatingCurrent
+            AppLocale.system
         case .english:
             Locale(identifier: "en")
         case .simplifiedChinese:
