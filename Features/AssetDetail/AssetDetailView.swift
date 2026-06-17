@@ -14,8 +14,6 @@ struct AssetDetailView: View {
     @State private var optionsSheetDetent: PresentationDetent = .fraction(Self.optionsSheetCompactFraction)
     @State private var assetSharePayload: AssetSharePayload?
     @State private var positionSharePayload: AssetPositionSharePayload?
-    @State private var submittedOrderDestination: AssetSubmittedOrderDestination?
-    @State private var pendingSubmittedOrder: AlpacaOrder?
     @State private var tradeDestination: AssetTradeDestination?
 
     init(symbol: String) {
@@ -71,7 +69,6 @@ struct AssetDetailView: View {
             }
             .onAppear {
                 proxy.scrollTo(Self.topAnchorID, anchor: .top)
-                presentPendingSubmittedOrderIfNeeded()
             }
         }
         .background(Color(.systemBackground).ignoresSafeArea())
@@ -117,10 +114,12 @@ struct AssetDetailView: View {
             }
         }
         .navigationDestination(item: $tradeDestination) { destination in
-            TradeView(symbol: destination.symbol, side: destination.side, onSubmittedOrder: showSubmittedOrder(_:))
-        }
-        .navigationDestination(item: $submittedOrderDestination) { destination in
-            OrderDetailView(order: destination.order)
+            TradeView(
+                symbol: destination.symbol,
+                side: destination.side,
+                seed: destination.seed,
+                onSubmittedOrder: showSubmittedOrder(_:)
+            )
         }
         .task {
             store.start(app: app)
@@ -133,13 +132,6 @@ struct AssetDetailView: View {
         }
         .onDisappear {
             store.stop()
-        }
-        .onChange(of: tradeDestination) { _, destination in
-            guard destination == nil else {
-                return
-            }
-
-            presentPendingSubmittedOrderIfNeeded()
         }
         .sheet(isPresented: $showsQuoteHistory) {
             AssetQuoteHistorySheet(
@@ -183,27 +175,23 @@ struct AssetDetailView: View {
     private static let newsSheetCompactFraction = 0.67
     private static let optionsSheetCompactFraction = 0.72
 
-    private func showSubmittedOrder(_ order: AlpacaOrder) {
-        pendingSubmittedOrder = order
-        guard tradeDestination != nil else {
-            presentPendingSubmittedOrderIfNeeded()
-            return
-        }
-
+    private func showSubmittedOrder(_: AlpacaOrder) {
         tradeDestination = nil
     }
 
     private func openTrade(_ side: OrderSide) {
-        tradeDestination = AssetTradeDestination(symbol: store.symbol, side: side)
-    }
-
-    private func presentPendingSubmittedOrderIfNeeded() {
-        guard let pendingSubmittedOrder else {
-            return
-        }
-
-        self.pendingSubmittedOrder = nil
-        submittedOrderDestination = AssetSubmittedOrderDestination(order: pendingSubmittedOrder)
+        tradeDestination = AssetTradeDestination(
+            symbol: store.symbol,
+            side: side,
+            seed: TradeSeedContext(
+                account: app.portfolio.account,
+                asset: store.asset,
+                position: store.position,
+                latestQuote: store.quote,
+                latestTrade: store.latestTrade,
+                feed: store.feed
+            )
+        )
     }
 
     private func showErrorMessage(_ message: String?) {
@@ -338,18 +326,13 @@ private struct InteractivePopGestureRestorer: UIViewControllerRepresentable {
 private struct AssetTradeDestination: Identifiable, Hashable {
     let symbol: String
     let side: OrderSide
+    let seed: TradeSeedContext
 
     var id: String {
         "\(symbol)-\(side.rawValue)"
     }
-}
 
-private struct AssetSubmittedOrderDestination: Identifiable, Hashable {
-    let order: AlpacaOrder
-
-    var id: String { order.id }
-
-    static func == (lhs: AssetSubmittedOrderDestination, rhs: AssetSubmittedOrderDestination) -> Bool {
+    static func == (lhs: AssetTradeDestination, rhs: AssetTradeDestination) -> Bool {
         lhs.id == rhs.id
     }
 

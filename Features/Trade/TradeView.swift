@@ -7,7 +7,6 @@ struct TradeView: View {
 
     @State private var store: TradeStore
     @State private var confirmation: TradeOrderConfirmationSnapshot?
-    @State private var submittedOrder: TradeSubmittedOrderDestination?
     @State private var isShowingLimitOrder = false
 
     private let submittedOrderHandler: ((AlpacaOrder) -> Void)?
@@ -15,9 +14,10 @@ struct TradeView: View {
     init(
         symbol: String? = nil,
         side: OrderSide = .buy,
+        seed: TradeSeedContext? = nil,
         onSubmittedOrder: ((AlpacaOrder) -> Void)? = nil
     ) {
-        _store = State(initialValue: TradeStore(symbol: symbol, side: side, orderType: .market, sizingMode: .shares))
+        _store = State(initialValue: TradeStore(symbol: symbol, side: side, orderType: .market, sizingMode: .shares, seed: seed))
         submittedOrderHandler = onSubmittedOrder
     }
 
@@ -49,6 +49,10 @@ struct TradeView: View {
             store.updateLocale(language.locale)
         }
         .onDisappear {
+            guard confirmation == nil else {
+                return
+            }
+
             store.stopPolling()
         }
         .navigationDestination(isPresented: $isShowingLimitOrder) {
@@ -58,10 +62,7 @@ struct TradeView: View {
                 onSubmittedOrder: { showSubmittedOrder($0) }
             )
         }
-        .navigationDestination(item: $submittedOrder) { destination in
-            OrderDetailView(order: destination.order)
-        }
-        .sheet(item: $confirmation) { snapshot in
+        .fullScreenCover(item: $confirmation) { snapshot in
             TradeOrderConfirmationSheet(snapshot: snapshot) {
                 await store.submit(snapshot.order, clientOrderID: snapshot.clientOrderID, app: app)
             } onSubmitted: { order in
@@ -92,7 +93,8 @@ struct TradeView: View {
             return
         }
 
-        submittedOrder = TradeSubmittedOrderDestination(order: order)
+        store.stopPolling()
+        dismiss()
     }
 
     private func showErrorMessage(_ message: String?) {
@@ -101,20 +103,6 @@ struct TradeView: View {
         }
 
         toastCenter.showErrorMessage(message)
-    }
-}
-
-private struct TradeSubmittedOrderDestination: Identifiable, Hashable {
-    let order: AlpacaOrder
-
-    var id: String { order.id }
-
-    static func == (lhs: TradeSubmittedOrderDestination, rhs: TradeSubmittedOrderDestination) -> Bool {
-        lhs.id == rhs.id
-    }
-
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
     }
 }
 
@@ -227,7 +215,7 @@ private struct TradeLimitOrderView: View {
         .onAppear {
             store.message = nil
         }
-        .sheet(item: $confirmation) { snapshot in
+        .fullScreenCover(item: $confirmation) { snapshot in
             TradeOrderConfirmationSheet(snapshot: snapshot) {
                 await store.submit(snapshot.order, clientOrderID: snapshot.clientOrderID, app: app)
             } onSubmitted: { order in
@@ -649,7 +637,7 @@ private struct TradeSimpleView: View {
     }
 
     private var showsSkeleton: Bool {
-        canUseAPI && store.context == nil && store.message == nil
+        canUseAPI && store.normalizedSymbol.isEmpty && store.context == nil && store.isLoadingContext
     }
 
     private var tradeContent: some View {

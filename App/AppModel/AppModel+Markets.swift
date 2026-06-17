@@ -489,6 +489,23 @@ extension AppModel {
     }
 
     func fetchTradeContext(symbol: String, feed: AlpacaMarketDataFeed = .iex) async throws -> TradeContext {
+        async let coreContextRequest = fetchTradeCoreContext(symbol: symbol, feed: feed)
+        async let snapshotRequest: AlpacaResolvedStockSnapshot? = try? fetchTradeSnapshot(symbol: symbol, feed: feed)
+
+        let coreContext = try await coreContextRequest
+        let resolvedSnapshot = await snapshotRequest
+
+        return TradeContext(
+            account: coreContext.account,
+            asset: coreContext.asset,
+            position: coreContext.position,
+            snapshot: resolvedSnapshot?.snapshot,
+            feed: resolvedSnapshot?.feed ?? coreContext.feed,
+            activeSession: resolvedSnapshot?.activeSession
+        )
+    }
+
+    func fetchTradeCoreContext(symbol: String, feed: AlpacaMarketDataFeed = .iex) async throws -> TradeContext {
         guard let credentials else {
             throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
         }
@@ -504,26 +521,37 @@ extension AppModel {
             credentials: credentials
         )
         async let assetRequest = services.alpaca.fetchAsset(symbolOrAssetID: normalizedSymbol, credentials: credentials)
-        async let snapshotRequest: AlpacaResolvedStockSnapshot? = try? services.alpaca.fetchCurrentStockSnapshot(
-            symbol: normalizedSymbol,
-            feed: feed,
-            credentials: credentials
-        )
 
         let (account, position, asset) = try await (
             accountRequest,
             positionRequest,
             assetRequest
         )
-        let resolvedSnapshot = await snapshotRequest
 
         return TradeContext(
             account: account,
             asset: asset,
             position: position,
-            snapshot: resolvedSnapshot?.snapshot,
-            feed: resolvedSnapshot?.feed ?? feed,
-            activeSession: resolvedSnapshot?.activeSession
+            snapshot: nil,
+            feed: feed,
+            activeSession: nil
+        )
+    }
+
+    func fetchTradeSnapshot(symbol: String, feed: AlpacaMarketDataFeed = .iex) async throws -> AlpacaResolvedStockSnapshot {
+        guard let credentials else {
+            throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
+        }
+
+        let normalizedSymbol = normalizedMarketSymbol(symbol)
+        guard !normalizedSymbol.isEmpty else {
+            throw APIClientError.underlying(L10n.Order.missingSymbol(locale: appLanguage.locale))
+        }
+
+        return try await services.alpaca.fetchCurrentStockSnapshot(
+            symbol: normalizedSymbol,
+            feed: feed,
+            credentials: credentials
         )
     }
 

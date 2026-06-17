@@ -11,6 +11,31 @@ struct TradeContext: Sendable {
     let activeSession: MarketSessionKind?
 }
 
+struct TradeSeedContext: Sendable {
+    let account: AlpacaAccount?
+    let asset: AlpacaAsset?
+    let position: AlpacaPosition?
+    let latestQuote: AlpacaRealtimeQuote?
+    let latestTrade: AlpacaRealtimeTrade?
+    let feed: AlpacaMarketDataFeed
+
+    init(
+        account: AlpacaAccount? = nil,
+        asset: AlpacaAsset? = nil,
+        position: AlpacaPosition? = nil,
+        latestQuote: AlpacaRealtimeQuote? = nil,
+        latestTrade: AlpacaRealtimeTrade? = nil,
+        feed: AlpacaMarketDataFeed = .iex
+    ) {
+        self.account = account
+        self.asset = asset
+        self.position = position
+        self.latestQuote = latestQuote
+        self.latestTrade = latestTrade
+        self.feed = feed
+    }
+}
+
 enum TradeSizingMode: String, CaseIterable, Identifiable {
     case shares
     case notional
@@ -78,6 +103,7 @@ private struct TradeContextRequest: Equatable {
 
 private enum TradeContextLoadEvent {
     case success(symbol: String, context: TradeContext)
+    case snapshot(symbol: String, snapshot: AlpacaResolvedStockSnapshot)
     case failure(symbol: String, error: Error)
 }
 
@@ -107,6 +133,9 @@ final class TradeStore {
     private(set) var contextErrorMessage: String?
     var submittedOrder: AlpacaOrder?
     private var locale = AppLocale.current
+    private var optimisticAccount: AlpacaAccount?
+    private var optimisticAsset: AlpacaAsset?
+    private var optimisticPosition: AlpacaPosition?
     private var estimatedNotionalSnapshot: Decimal?
     private var estimatedExecutionPriceSnapshot: Decimal?
     private var validationSnapshot: TradeValidationResult = .empty
@@ -124,7 +153,8 @@ final class TradeStore {
         symbol: String? = nil,
         side: OrderSide = .buy,
         orderType: OrderType = .market,
-        sizingMode: TradeSizingMode? = nil
+        sizingMode: TradeSizingMode? = nil,
+        seed: TradeSeedContext? = nil
     ) {
         var draft = OrderDraft()
         if let symbol {
@@ -132,6 +162,22 @@ final class TradeStore {
         }
         draft.side = side
         draft.orderType = orderType
+        feed = seed?.feed ?? .iex
+        optimisticAccount = seed?.account
+        optimisticAsset = seed?.asset
+        optimisticPosition = seed?.position
+        realtimeQuote = seed?.latestQuote
+        realtimeTrade = seed?.latestTrade
+        if let account = seed?.account, let asset = seed?.asset {
+            context = TradeContext(
+                account: account,
+                asset: asset,
+                position: seed?.position,
+                snapshot: nil,
+                feed: seed?.feed ?? .iex,
+                activeSession: nil
+            )
+        }
         self.draft = draft
         self.sizingMode = sizingMode ?? (draft.notionalText.isEmpty ? .shares : .notional)
         refreshDerivedState()
@@ -152,7 +198,7 @@ final class TradeStore {
     }
 
     var assetDisplayName: String {
-        context?.asset.name?.displayAssetName ?? AppFormatter.placeholder
+        currentAsset?.name?.displayAssetName ?? AppFormatter.placeholder
     }
 
     var bidPrice: Decimal? {
@@ -197,27 +243,27 @@ final class TradeStore {
     }
 
     var currencyCode: String {
-        context?.account.currency ?? "USD"
+        currentAccount?.currency ?? "USD"
     }
 
     var buyingPower: Decimal? {
-        NumberParser.decimal(from: context?.account.buyingPower)
+        NumberParser.decimal(from: currentAccount?.buyingPower)
     }
 
     var cash: Decimal? {
-        NumberParser.decimal(from: context?.account.cash)
+        NumberParser.decimal(from: currentAccount?.cash)
     }
 
     var positionQuantity: Decimal {
-        NumberParser.decimal(from: context?.position?.quantity) ?? 0
+        NumberParser.decimal(from: currentPosition?.quantity) ?? 0
     }
 
     var positionMarketValue: Decimal {
-        NumberParser.decimal(from: context?.position?.marketValue) ?? 0
+        NumberParser.decimal(from: currentPosition?.marketValue) ?? 0
     }
 
     var canOpenShortPosition: Bool {
-        context?.account.shortingEnabled == true && context?.asset.shortable == true
+        currentAccount?.shortingEnabled == true && currentAsset?.shortable == true
     }
 
     var sellQuickFillQuantityBase: Decimal? {
@@ -271,6 +317,18 @@ final class TradeStore {
 
     var supportsNotionalOrder: Bool {
         draft.orderType == .market && draft.timeInForce == .day && !draft.extendedHours
+    }
+
+    private var currentAccount: AlpacaAccount? {
+        context?.account ?? optimisticAccount
+    }
+
+    private var currentAsset: AlpacaAsset? {
+        context?.asset ?? optimisticAsset
+    }
+
+    private var currentPosition: AlpacaPosition? {
+        context?.position ?? optimisticPosition
     }
 
     private func refreshDerivedState() {
@@ -470,8 +528,14 @@ final class TradeStore {
 
         let symbol = normalizedSymbol
         contextSymbol = symbol
-        if context?.asset.symbol.uppercased() != symbol {
+        let currentAssetSymbol = (context?.asset.symbol ?? optimisticAsset?.symbol)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased()
+        if currentAssetSymbol != symbol {
             context = nil
+            optimisticAccount = nil
+            optimisticAsset = nil
+            optimisticPosition = nil
             realtimeQuote = nil
             realtimeTrade = nil
             if draft.orderType.requiresLimitPrice {
@@ -510,7 +574,6 @@ final class TradeStore {
                     && !lhs.force
                     && !rhs.force
             }
-            .debounce(.milliseconds(250), scheduler: MainScheduler.instance)
             .flatMapLatest { request in
                 tradeContextLoadEvents(for: request, app: app)
             }
@@ -531,6 +594,9 @@ final class TradeStore {
 
             let previousFeed = feed
             feed = context.feed
+            optimisticAccount = context.account
+            optimisticAsset = context.asset
+            optimisticPosition = context.position
             self.context = context
             if previousFeed != feed {
                 startQuoteStream(app: app)
@@ -541,6 +607,29 @@ final class TradeStore {
             isLoadingContext = false
             message = nil
             contextErrorMessage = nil
+        case .snapshot(let symbol, let snapshot):
+            guard normalizedSymbol == symbol else {
+                return
+            }
+
+            let previousFeed = feed
+            feed = snapshot.feed
+            if let context {
+                self.context = TradeContext(
+                    account: context.account,
+                    asset: context.asset,
+                    position: context.position,
+                    snapshot: snapshot.snapshot,
+                    feed: snapshot.feed,
+                    activeSession: snapshot.activeSession
+                )
+            }
+            if previousFeed != feed {
+                startQuoteStream(app: app)
+            }
+            applySnapshotQuote(snapshot.snapshot, symbol: symbol)
+            applySessionDefaults()
+            fillDefaultLimitPriceIfNeeded()
         case .failure(let symbol, let error):
             guard normalizedSymbol == symbol else {
                 return
@@ -821,10 +910,18 @@ private func tradeContextLoadEvents(
         let observerBox = TradeContextLoadObserverBox(observer)
         let task = Task { @MainActor [app, request, observerBox] in
             do {
-                let context = try await app.fetchTradeContext(symbol: request.symbol, feed: request.feed)
+                async let snapshotRequest: AlpacaResolvedStockSnapshot? = try? app.fetchTradeSnapshot(
+                    symbol: request.symbol,
+                    feed: request.feed
+                )
+                let context = try await app.fetchTradeCoreContext(symbol: request.symbol, feed: request.feed)
                 try Task.checkCancellation()
-
                 observerBox.onNext(.success(symbol: request.symbol, context: context))
+
+                if let snapshot = await snapshotRequest {
+                    try Task.checkCancellation()
+                    observerBox.onNext(.snapshot(symbol: request.symbol, snapshot: snapshot))
+                }
             } catch where error.isRequestCancellation {
                 return
             } catch {
