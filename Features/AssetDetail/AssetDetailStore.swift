@@ -905,6 +905,13 @@ final class AssetDetailStore {
         }
 
         guard feed == .overnight else {
+            if let preMarketFallbackInput = preMarketFallbackChartRenderInput(
+                from: sourceBars,
+                priceChangeBaseline: priceChangeBaseline
+            ) {
+                return preMarketFallbackInput
+            }
+
             return activeSessionChartRenderInput(
                 from: sourceBars,
                 priceChangeBaseline: priceChangeBaseline
@@ -965,6 +972,87 @@ final class AssetDetailStore {
             xDomain: xDomain,
             priceChangeBaseline: priceChangeBaseline
         )
+    }
+
+    private func preMarketFallbackChartRenderInput(
+        from sourceBars: [AlpacaMarketBar],
+        priceChangeBaseline: Double?
+    ) -> AssetChartRenderInput? {
+        guard let interval = activeReferenceInterval(),
+              interval.session == .preMarket else {
+            return nil
+        }
+
+        let baseBars = sourceBars.filter { bar in
+            guard let barDate = AlpacaDateParser.date(bar.timestamp) else {
+                return false
+            }
+
+            return barDate < interval.start
+        }
+        guard baseBars.count >= 2 else {
+            return nil
+        }
+
+        let baseInputBars = Self.indexedChartInputBars(from: baseBars)
+        let baseCount = baseInputBars.count
+        var overlayInputBars = sourceBars.compactMap { bar -> AssetChartInputBar? in
+            guard let barDate = AlpacaDateParser.date(bar.timestamp),
+                  barDate >= interval.start,
+                  barDate <= interval.end else {
+                return nil
+            }
+
+            return AssetChartInputBar(
+                bar: bar,
+                xPosition: Double(baseCount) + oneDayXPosition(for: barDate, in: interval)
+            )
+        }
+
+        if let realtimeInputBar = realtimeActiveSessionInputBar(in: interval) {
+            upsertNewerChartInputBar(
+                AssetChartInputBar(
+                    bar: realtimeInputBar.bar,
+                    xPosition: Double(baseCount) + realtimeInputBar.xPosition
+                ),
+                in: &overlayInputBars
+            )
+        }
+
+        overlayInputBars.sort { lhs, rhs in
+            if lhs.xPosition == rhs.xPosition {
+                let lhsDate = AlpacaDateParser.date(lhs.bar.timestamp) ?? .distantPast
+                let rhsDate = AlpacaDateParser.date(rhs.bar.timestamp) ?? .distantPast
+                return lhsDate < rhsDate
+            }
+
+            return lhs.xPosition < rhs.xPosition
+        }
+
+        return AssetChartRenderInput(
+            bars: baseInputBars + overlayInputBars,
+            xDomain: preMarketFallbackXDomain(
+                baseCount: baseCount,
+                latestXPosition: overlayInputBars.last?.xPosition,
+                interval: interval
+            ),
+            priceChangeBaseline: priceChangeBaseline
+        )
+    }
+
+    private func preMarketFallbackXDomain(
+        baseCount: Int,
+        latestXPosition: Double?,
+        interval: MarketSessionInterval
+    ) -> ClosedRange<Double> {
+        let totalUnits = oneDaySlotMetrics(for: interval.end, in: interval).totalUnits
+        let upperBound = max(
+            Double(baseCount) + totalUnits,
+            (latestXPosition ?? 0) + 1,
+            Double(baseCount),
+            1
+        )
+        return 0...upperBound
     }
 
     private func activeSessionChartRenderInput(
@@ -1221,6 +1309,22 @@ final class AssetDetailStore {
         return sessionProgress?.intervals.first { interval in
             interval.session == .overnight
         }
+    }
+
+    private func activeReferenceInterval() -> MarketSessionInterval? {
+        guard let sessionProgress else {
+            return nil
+        }
+
+        return sessionProgress.intervals
+            .filter { $0.contains(sessionProgress.referenceDate) }
+            .min { lhs, rhs in
+                if lhs.session.activePriority == rhs.session.activePriority {
+                    return lhs.start < rhs.start
+                }
+
+                return lhs.session.activePriority < rhs.session.activePriority
+            }
     }
 
     private func activeNonOvernightInterval(for date: Date?) -> MarketSessionInterval? {

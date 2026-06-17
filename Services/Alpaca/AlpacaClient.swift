@@ -771,6 +771,20 @@ struct AlpacaClient: AlpacaServicing {
             interval: context.interval,
             credentials: credentials
         )
+        if range == .oneDay,
+           bars.count < 2,
+           let fallbackInterval = context.emptyBarsFallbackInterval {
+            let fallbackBars = try await fetchStockBars(
+                symbol: symbol,
+                range: range,
+                feed: context.barsFeed,
+                interval: fallbackInterval,
+                credentials: credentials
+            )
+            if !fallbackBars.isEmpty {
+                return (fallbackBars + bars, context)
+            }
+        }
         return (bars, context)
     }
 
@@ -1068,6 +1082,7 @@ struct AlpacaClient: AlpacaServicing {
                 feed: defaultFeed,
                 barsFeed: defaultFeed,
                 interval: Self.stockDataInterval(for: range),
+                emptyBarsFallbackInterval: nil,
                 sessionProgress: nil
             )
         }
@@ -1114,6 +1129,7 @@ struct AlpacaClient: AlpacaServicing {
                         start: formatter.string(from: latestSession.start),
                         end: formatter.string(from: latestSession.end)
                     ),
+                    emptyBarsFallbackInterval: nil,
                     sessionProgress: MarketSessionSchedule.progress(
                         for: activeInterval,
                         in: calendarResponse.calendar,
@@ -1123,6 +1139,21 @@ struct AlpacaClient: AlpacaServicing {
                 )
             }
 
+            let emptyBarsFallbackInterval: StockDataInterval?
+            if activeInterval.session == .preMarket,
+               let latestSession = MarketSessionSchedule.latestRegularInterval(
+                before: referenceDate,
+                in: calendarResponse.calendar,
+                overnightDays: overnightCalendar
+               ) {
+                emptyBarsFallbackInterval = StockDataInterval(
+                    start: formatter.string(from: latestSession.start),
+                    end: formatter.string(from: latestSession.end)
+                )
+            } else {
+                emptyBarsFallbackInterval = nil
+            }
+
             return AssetChartDataContext(
                 feed: defaultFeed,
                 barsFeed: defaultFeed,
@@ -1130,6 +1161,7 @@ struct AlpacaClient: AlpacaServicing {
                     start: formatter.string(from: activeInterval.start),
                     end: formatter.string(from: referenceDate)
                 ),
+                emptyBarsFallbackInterval: emptyBarsFallbackInterval,
                 sessionProgress: MarketSessionSchedule.progress(
                     for: activeInterval,
                     in: calendarResponse.calendar,
@@ -1154,6 +1186,7 @@ struct AlpacaClient: AlpacaServicing {
                 start: formatter.string(from: latestSession.start),
                 end: formatter.string(from: latestSession.end)
             ),
+            emptyBarsFallbackInterval: nil,
             sessionProgress: nil
         )
     }
@@ -1669,6 +1702,7 @@ private struct AssetChartDataContext: Sendable {
     let feed: AlpacaMarketDataFeed
     let barsFeed: AlpacaMarketDataFeed
     let interval: StockDataInterval
+    let emptyBarsFallbackInterval: StockDataInterval?
     let sessionProgress: MarketSessionProgress?
 }
 
