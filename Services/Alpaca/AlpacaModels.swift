@@ -728,6 +728,15 @@ enum MarketSessionKind: String, Sendable {
             3
         }
     }
+
+    var usesLatestRegularBarsFallback: Bool {
+        switch self {
+        case .preMarket, .afterHours:
+            true
+        case .regular, .overnight:
+            false
+        }
+    }
 }
 
 struct MarketSessionInterval: Identifiable, Sendable {

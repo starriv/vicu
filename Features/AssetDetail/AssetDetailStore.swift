@@ -962,11 +962,11 @@ final class AssetDetailStore {
         }
 
         guard feed == .overnight else {
-            if let preMarketFallbackInput = preMarketFallbackChartRenderInput(
+            if let extendedSessionFallbackInput = extendedSessionFallbackChartRenderInput(
                 from: sourceBars,
                 priceChangeBaseline: priceChangeBaseline
             ) {
-                return preMarketFallbackInput
+                return extendedSessionFallbackInput
             }
 
             return activeSessionChartRenderInput(
@@ -1031,12 +1031,12 @@ final class AssetDetailStore {
         )
     }
 
-    private func preMarketFallbackChartRenderInput(
+    private func extendedSessionFallbackChartRenderInput(
         from sourceBars: [AlpacaMarketBar],
         priceChangeBaseline: Double?
     ) -> AssetChartRenderInput? {
         guard let interval = activeReferenceInterval(),
-              interval.session == .preMarket else {
+              interval.session.usesLatestRegularBarsFallback else {
             return nil
         }
 
@@ -1088,7 +1088,7 @@ final class AssetDetailStore {
 
         return AssetChartRenderInput(
             bars: baseInputBars + overlayInputBars,
-            xDomain: preMarketFallbackXDomain(
+            xDomain: extendedSessionFallbackXDomain(
                 baseCount: baseCount,
                 latestXPosition: overlayInputBars.last?.xPosition,
                 interval: interval
@@ -1097,7 +1097,7 @@ final class AssetDetailStore {
         )
     }
 
-    private func preMarketFallbackXDomain(
+    private func extendedSessionFallbackXDomain(
         baseCount: Int,
         latestXPosition: Double?,
         interval: MarketSessionInterval

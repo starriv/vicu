@@ -1245,7 +1245,7 @@ struct AlpacaClient: AlpacaServicing {
             }
 
             let emptyBarsFallbackInterval: StockDataInterval?
-            if activeInterval.session == .preMarket,
+            if activeInterval.session.usesLatestRegularBarsFallback,
                let latestSession = MarketSessionSchedule.latestRegularInterval(
                 before: referenceDate,
                 in: sessionContext.calendar,
