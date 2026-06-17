@@ -1022,7 +1022,7 @@ private struct AssetTradeSideButtonGlassModifier: ViewModifier {
     let usesGlass: Bool
 
     func body(content: Content) -> some View {
-        if usesGlass {
+        if usesGlass, #available(iOS 26.0, *) {
             content
                 .background {
                     Capsule()
@@ -1155,7 +1155,7 @@ private struct AssetTradePillModifier: ViewModifier {
                 .background(AppTheme.ColorToken.brand, in: Capsule())
                 .shadow(color: AppTheme.ColorToken.brand.opacity(0.20), radius: 12, y: 5)
         case .glass:
-            if usesGlass {
+            if usesGlass, #available(iOS 26.0, *) {
                 content
                     .glassEffect(.regular.tint(Color.white.opacity(0.12)).interactive(), in: .capsule)
             } else {

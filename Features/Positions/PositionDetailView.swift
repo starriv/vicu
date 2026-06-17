@@ -35,7 +35,9 @@ struct PositionDetailView: View {
                         .accessibilityLabel(L10n.PositionDetail.share)
                     }
 
-                    ToolbarSpacer(.fixed, placement: .topBarTrailing)
+                    if #available(iOS 26.0, *) {
+                        ToolbarSpacer(.fixed, placement: .topBarTrailing)
+                    }
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {

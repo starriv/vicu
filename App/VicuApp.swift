@@ -77,7 +77,7 @@ private struct RootView: View {
                 .searchable(text: $searchText, prompt: Text(searchPlaceholderSymbol))
             }
         }
-        .tabBarMinimizeBehavior(.onScrollDown)
+        .tabBarMinimizeOnScrollIfAvailable()
         .task {
             await refreshSearchPlaceholderSymbol()
         }
@@ -94,6 +94,17 @@ private struct RootView: View {
 
     private func refreshSearchPlaceholderSymbol() async {
         searchPlaceholderSymbol = await app.fetchSearchPlaceholderSymbol()
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func tabBarMinimizeOnScrollIfAvailable() -> some View {
+        if #available(iOS 26.0, *) {
+            tabBarMinimizeBehavior(.onScrollDown)
+        } else {
+            self
+        }
     }
 }
 
