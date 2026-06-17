@@ -774,15 +774,19 @@ struct AlpacaClient: AlpacaServicing {
         if range == .oneDay,
            bars.count < 2,
            let fallbackInterval = context.emptyBarsFallbackInterval {
-            let fallbackBars = try await fetchStockBars(
-                symbol: symbol,
-                range: range,
-                feed: context.barsFeed,
-                interval: fallbackInterval,
-                credentials: credentials
-            )
-            if !fallbackBars.isEmpty {
-                return (fallbackBars + bars, context)
+            do {
+                let fallbackBars = try await fetchStockBars(
+                    symbol: symbol,
+                    range: range,
+                    feed: context.barsFeed,
+                    interval: fallbackInterval,
+                    credentials: credentials
+                )
+                if !fallbackBars.isEmpty {
+                    return (fallbackBars + bars, context)
+                }
+            } catch {
+                return (bars, context)
             }
         }
         return (bars, context)
