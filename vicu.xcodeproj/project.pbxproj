@@ -1,0 +1,893 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0A0000000000000000000101 /* VicuApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000201 /* VicuApp.swift */; };
+		0A0000000000000000000102 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000202 /* AppModel.swift */; };
+		0A00000000000000000001F5 /* AppModelTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F5 /* AppModelTypes.swift */; };
+		0A00000000000000000001F6 /* AppModelCaches.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F6 /* AppModelCaches.swift */; };
+		0A00000000000000000001F7 /* AppModel+Navigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F7 /* AppModel+Navigation.swift */; };
+		0A00000000000000000001F8 /* AppModel+Credentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F8 /* AppModel+Credentials.swift */; };
+		0A00000000000000000001F9 /* AppModel+Portfolio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F9 /* AppModel+Portfolio.swift */; };
+		0A00000000000000000001FA /* AppModel+Markets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002FA /* AppModel+Markets.swift */; };
+		0A00000000000000000001FB /* AppModel+Realtime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002FB /* AppModel+Realtime.swift */; };
+		0A00000000000000000001FC /* AppModel+Utilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002FC /* AppModel+Utilities.swift */; };
+		0A0000000000000000000103 /* AppTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000203 /* AppTab.swift */; };
+		0A0000000000000000000104 /* LoadState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000204 /* LoadState.swift */; };
+		0A0000000000000000000105 /* TradeEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000205 /* TradeEnvironment.swift */; };
+		0A0000000000000000000106 /* AlpacaCredentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000206 /* AlpacaCredentials.swift */; };
+		0A0000000000000000000151 /* AppLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000251 /* AppLanguage.swift */; };
+		0A0000000000000000000148 /* AppearanceMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000248 /* AppearanceMode.swift */; };
+		0A0000000000000000000107 /* AlpacaModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000207 /* AlpacaModels.swift */; };
+		0A0000000000000000000108 /* OrderDraft.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000208 /* OrderDraft.swift */; };
+		0A0000000000000000000110 /* AlpacaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000210 /* AlpacaClient.swift */; };
+		0A0000000000000000000111 /* CredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000211 /* CredentialStore.swift */; };
+		0A0000000000000000000113 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000213 /* HomeView.swift */; };
+		0A0000000000000000000160 /* AccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000260 /* AccountView.swift */; };
+		0A0000000000000000000168 /* AccountActivityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000268 /* AccountActivityView.swift */; };
+		0A0000000000000000000162 /* HomeAccountPolling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000262 /* HomeAccountPolling.swift */; };
+		0A0000000000000000000170 /* RxSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 0A0000000000000000000270 /* RxSwift */; };
+		0A0000000000000000000181 /* AlpacaRealtimeModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000281 /* AlpacaRealtimeModels.swift */; };
+		0A0000000000000000000182 /* AlpacaStockStreamClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000282 /* AlpacaStockStreamClient.swift */; };
+		0A00000000000000000001F1 /* AlpacaActivityStreamClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F1 /* AlpacaActivityStreamClient.swift */; };
+		0A0000000000000000000183 /* AssetDetailStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000283 /* AssetDetailStore.swift */; };
+		0A0000000000000000000184 /* AssetDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000284 /* AssetDetailView.swift */; };
+		0A0000000000000000000185 /* SymbolLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000285 /* SymbolLogoView.swift */; };
+		0A0000000000000000000186 /* AssetDetailChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000286 /* AssetDetailChart.swift */; };
+		0A0000000000000000000198 /* AssetQuoteHistorySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000298 /* AssetQuoteHistorySheet.swift */; };
+		0A00000000000000000001E0 /* AssetNewsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002E0 /* AssetNewsSheet.swift */; };
+		0A00000000000000000001E1 /* AssetOptionsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002E1 /* AssetOptionsSheet.swift */; };
+		0A00000000000000000001E2 /* AssetOptionsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002E2 /* AssetOptionsStore.swift */; };
+		0A00000000000000000001E3 /* AssetOptionsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002E3 /* AssetOptionsModels.swift */; };
+		0A00000000000000000001E4 /* OptionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002E4 /* OptionDetailView.swift */; };
+		0A00000000000000000001E5 /* OptionDetailStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002E5 /* OptionDetailStore.swift */; };
+		0A00000000000000000001E6 /* OptionDetailModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002E6 /* OptionDetailModels.swift */; };
+		0A0000000000000000000199 /* AssetLevelOneBook.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000299 /* AssetLevelOneBook.swift */; };
+		0A00000000000000000001A0 /* AssetPositionShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002A0 /* AssetPositionShareSheet.swift */; };
+		0A00000000000000000001B0 /* PositionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002B0 /* PositionDetailView.swift */; };
+		0A00000000000000000001B1 /* PositionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002B1 /* PositionsView.swift */; };
+		0A00000000000000000001B2 /* PositionCategorySupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002B2 /* PositionCategorySupport.swift */; };
+		0A0000000000000000000192 /* MarketSessionTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000292 /* MarketSessionTimelineView.swift */; };
+		0A0000000000000000000193 /* MarketsSkeletons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000293 /* MarketsSkeletons.swift */; };
+		0A00000000000000000001D1 /* TradeSkeletons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002D1 /* TradeSkeletons.swift */; };
+		0A00000000000000000001D3 /* AssetSkeletons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002D3 /* AssetSkeletons.swift */; };
+		0A0000000000000000000194 /* AppPriceText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000294 /* AppPriceText.swift */; };
+		0A0000000000000000000195 /* AppRangePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000295 /* AppRangePicker.swift */; };
+		0A0000000000000000000197 /* AppEmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000297 /* AppEmptyStateView.swift */; };
+		0A0000000000000000000187 /* TradeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000287 /* TradeStore.swift */; };
+		0A00000000000000000001D0 /* TradeOrderConfirmationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002D0 /* TradeOrderConfirmationSheet.swift */; };
+		0A00000000000000000001D2 /* HoldToConfirmButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002D2 /* HoldToConfirmButton.swift */; };
+		0A92A92A92A92A92A92A9201 /* AppScreenHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A92A92A92A92A92A92A9202 /* AppScreenHeader.swift */; };
+		0A90A90A90A90A90A90A9001 /* QuoteSizeRatioBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A90A90A90A90A90A90A9002 /* QuoteSizeRatioBar.swift */; };
+		0A91A91A91A91A91A91A9101 /* AppMarqueeText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A91A91A91A91A91A91A9102 /* AppMarqueeText.swift */; };
+		0A0000000000000000000114 /* MarketsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000214 /* MarketsView.swift */; };
+		0A0000000000000000000115 /* TradeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000215 /* TradeView.swift */; };
+		0A0000000000000000000116 /* OrdersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000216 /* OrdersView.swift */; };
+		0A0000000000000000000165 /* OrderSummaryListCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000265 /* OrderSummaryListCard.swift */; };
+		0A0000000000000000000166 /* OrdersFilterState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000266 /* OrdersFilterState.swift */; };
+		0A0000000000000000000167 /* OrdersFilterSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000267 /* OrdersFilterSheet.swift */; };
+		0A0000000000000000000190 /* OrderDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000290 /* OrderDetailView.swift */; };
+		0A0000000000000000000118 /* AlpacaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000218 /* AlpacaView.swift */; };
+		0A0000000000000000000119 /* AppFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000219 /* AppFormatting.swift */; };
+		0A00000000000000000001C1 /* ErrorCancellation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002C1 /* ErrorCancellation.swift */; };
+		0A0000000000000000000120 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000220 /* Assets.xcassets */; };
+		0A0000000000000000000121 /* AppTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000221 /* AppTypography.swift */; };
+		0A0000000000000000000122 /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000222 /* AppTheme.swift */; };
+		0A0000000000000000000150 /* AppIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000250 /* AppIcon.swift */; };
+		0A0000000000000000000123 /* AppSectionHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000223 /* AppSectionHeader.swift */; };
+		0A0000000000000000000124 /* AppMetricRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000224 /* AppMetricRow.swift */; };
+		0A0000000000000000000125 /* AppFilterChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000225 /* AppFilterChip.swift */; };
+		0A0000000000000000000191 /* AppCopyableIdentifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000291 /* AppCopyableIdentifier.swift */; };
+		0A0000000000000000000196 /* AppToast.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000296 /* AppToast.swift */; };
+		0A00000000000000000001C2 /* AppInfiniteScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002C2 /* AppInfiniteScrollView.swift */; };
+		0A0000000000000000000161 /* AppAccountAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000261 /* AppAccountAvatar.swift */; };
+		0A0000000000000000000163 /* RxPolling.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000263 /* RxPolling.swift */; };
+		0A0000000000000000000126 /* L10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000226 /* L10n.swift */; };
+		0A0000000000000000000127 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000227 /* Localizable.xcstrings */; };
+		0A0000000000000000000128 /* APIRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000228 /* APIRequest.swift */; };
+		0A0000000000000000000129 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000229 /* APIClient.swift */; };
+		0A0000000000000000000130 /* AppServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000230 /* AppServices.swift */; };
+		0A00000000000000000001F2 /* AccountActivityNotificationCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F2 /* AccountActivityNotificationCenter.swift */; };
+		0A00000000000000000001F3 /* AppNotificationTemplates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F3 /* AppNotificationTemplates.swift */; };
+		0A0000000000000000000132 /* HomeHeroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000232 /* HomeHeroView.swift */; };
+		0A0000000000000000000133 /* AccountMetricsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000233 /* AccountMetricsView.swift */; };
+		0A0000000000000000000134 /* PositionsSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000234 /* PositionsSummaryView.swift */; };
+		0A0000000000000000000164 /* RecentOrdersSummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000264 /* RecentOrdersSummaryView.swift */; };
+		0A0000000000000000000135 /* PortfolioState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000235 /* PortfolioState.swift */; };
+		0A0000000000000000000136 /* APIInterceptors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000236 /* APIInterceptors.swift */; };
+		0A0000000000000000000146 /* BasicLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000246 /* BasicLayout.swift */; };
+		0A0000000000000000000147 /* MoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000247 /* MoreView.swift */; };
+		0A0000000000000000000149 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000249 /* SettingsView.swift */; };
+		0A00000000000000000001F4 /* NotificationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F4 /* NotificationSettingsView.swift */; };
+		0B0000000000000000000101 /* OrderActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000000000000000000201 /* OrderActivityAttributes.swift */; };
+		0B0000000000000000000102 /* OrderActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000000000000000000202 /* OrderActivityManager.swift */; };
+		0B0000000000000000000103 /* OrderActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000000000000000000201 /* OrderActivityAttributes.swift */; };
+		0B0000000000000000000104 /* OrderLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000000000000000000203 /* OrderLiveActivityWidget.swift */; };
+		0B0000000000000000000105 /* VicuLiveActivities.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 0B0000000000000000000301 /* VicuLiveActivities.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		0B0000000000000000000901 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0A0000000000000000000901 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0B0000000000000000000601;
+			remoteInfo = VicuLiveActivities;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		0B0000000000000000000803 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				0B0000000000000000000105 /* VicuLiveActivities.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		0A0000000000000000000201 /* VicuApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/VicuApp.swift; sourceTree = "<group>"; };
+		0A0000000000000000000202 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppModel.swift; sourceTree = "<group>"; };
+		0A00000000000000000002F5 /* AppModelTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppModelTypes.swift; sourceTree = "<group>"; };
+		0A00000000000000000002F6 /* AppModelCaches.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppModelCaches.swift; sourceTree = "<group>"; };
+		0A00000000000000000002F7 /* AppModel+Navigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/AppModel+Navigation.swift"; sourceTree = "<group>"; };
+		0A00000000000000000002F8 /* AppModel+Credentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/AppModel+Credentials.swift"; sourceTree = "<group>"; };
+		0A00000000000000000002F9 /* AppModel+Portfolio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/AppModel+Portfolio.swift"; sourceTree = "<group>"; };
+		0A00000000000000000002FA /* AppModel+Markets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/AppModel+Markets.swift"; sourceTree = "<group>"; };
+		0A00000000000000000002FB /* AppModel+Realtime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/AppModel+Realtime.swift"; sourceTree = "<group>"; };
+		0A00000000000000000002FC /* AppModel+Utilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/AppModel+Utilities.swift"; sourceTree = "<group>"; };
+		0A0000000000000000000203 /* AppTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppTab.swift; sourceTree = "<group>"; };
+		0A0000000000000000000204 /* LoadState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/LoadState.swift; sourceTree = "<group>"; };
+		0A0000000000000000000205 /* TradeEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/TradeEnvironment.swift; sourceTree = "<group>"; };
+		0A0000000000000000000206 /* AlpacaCredentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/AlpacaCredentials.swift; sourceTree = "<group>"; };
+		0A0000000000000000000251 /* AppLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/AppLanguage.swift; sourceTree = "<group>"; };
+		0A0000000000000000000248 /* AppearanceMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/AppearanceMode.swift; sourceTree = "<group>"; };
+		0A0000000000000000000207 /* AlpacaModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Alpaca/AlpacaModels.swift; sourceTree = "<group>"; };
+		0A0000000000000000000208 /* OrderDraft.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/OrderDraft.swift; sourceTree = "<group>"; };
+		0A0000000000000000000210 /* AlpacaClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Alpaca/AlpacaClient.swift; sourceTree = "<group>"; };
+		0A0000000000000000000211 /* CredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Credentials/CredentialStore.swift; sourceTree = "<group>"; };
+		0A0000000000000000000213 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Home/HomeView.swift; sourceTree = "<group>"; };
+		0A0000000000000000000260 /* AccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Home/AccountView.swift; sourceTree = "<group>"; };
+		0A0000000000000000000268 /* AccountActivityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Home/AccountActivityView.swift; sourceTree = "<group>"; };
+		0A0000000000000000000262 /* HomeAccountPolling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Home/HomeAccountPolling.swift; sourceTree = "<group>"; };
+		0A0000000000000000000281 /* AlpacaRealtimeModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Alpaca/AlpacaRealtimeModels.swift; sourceTree = "<group>"; };
+		0A0000000000000000000282 /* AlpacaStockStreamClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Alpaca/AlpacaStockStreamClient.swift; sourceTree = "<group>"; };
+		0A00000000000000000002F1 /* AlpacaActivityStreamClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Alpaca/AlpacaActivityStreamClient.swift; sourceTree = "<group>"; };
+		0A0000000000000000000283 /* AssetDetailStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/AssetDetailStore.swift; sourceTree = "<group>"; };
+		0A0000000000000000000284 /* AssetDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/AssetDetailView.swift; sourceTree = "<group>"; };
+		0A0000000000000000000285 /* SymbolLogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/SymbolLogoView.swift; sourceTree = "<group>"; };
+		0A0000000000000000000286 /* AssetDetailChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/AssetDetailChart.swift; sourceTree = "<group>"; };
+		0A0000000000000000000298 /* AssetQuoteHistorySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/AssetQuoteHistorySheet.swift; sourceTree = "<group>"; };
+		0A00000000000000000002E0 /* AssetNewsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/AssetNewsSheet.swift; sourceTree = "<group>"; };
+		0A00000000000000000002E1 /* AssetOptionsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/AssetOptionsSheet.swift; sourceTree = "<group>"; };
+		0A00000000000000000002E2 /* AssetOptionsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/AssetOptionsStore.swift; sourceTree = "<group>"; };
+		0A00000000000000000002E3 /* AssetOptionsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/AssetOptionsModels.swift; sourceTree = "<group>"; };
+		0A00000000000000000002E4 /* OptionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/OptionDetail/OptionDetailView.swift; sourceTree = "<group>"; };
+		0A00000000000000000002E5 /* OptionDetailStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/OptionDetail/OptionDetailStore.swift; sourceTree = "<group>"; };
+		0A00000000000000000002E6 /* OptionDetailModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/OptionDetail/OptionDetailModels.swift; sourceTree = "<group>"; };
+		0A0000000000000000000299 /* AssetLevelOneBook.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/AssetLevelOneBook.swift; sourceTree = "<group>"; };
+		0A00000000000000000002A0 /* AssetPositionShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/AssetPositionShareSheet.swift; sourceTree = "<group>"; };
+		0A00000000000000000002B0 /* PositionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Positions/PositionDetailView.swift; sourceTree = "<group>"; };
+		0A00000000000000000002B1 /* PositionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Positions/PositionsView.swift; sourceTree = "<group>"; };
+		0A00000000000000000002B2 /* PositionCategorySupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Positions/PositionCategorySupport.swift; sourceTree = "<group>"; };
+		0A0000000000000000000292 /* MarketSessionTimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/MarketSessionTimelineView.swift; sourceTree = "<group>"; };
+		0A0000000000000000000293 /* MarketsSkeletons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarketsSkeletons.swift; sourceTree = "<group>"; };
+		0A00000000000000000002D1 /* TradeSkeletons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TradeSkeletons.swift; sourceTree = "<group>"; };
+		0A00000000000000000002D3 /* AssetSkeletons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssetSkeletons.swift; sourceTree = "<group>"; };
+		0A0000000000000000000294 /* AppPriceText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppPriceText.swift; sourceTree = "<group>"; };
+		0A0000000000000000000295 /* AppRangePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppRangePicker.swift; sourceTree = "<group>"; };
+		0A0000000000000000000297 /* AppEmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppEmptyStateView.swift; sourceTree = "<group>"; };
+		0A0000000000000000000287 /* TradeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Trade/TradeStore.swift; sourceTree = "<group>"; };
+		0A00000000000000000002D0 /* TradeOrderConfirmationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Trade/TradeOrderConfirmationSheet.swift; sourceTree = "<group>"; };
+		0A00000000000000000002D2 /* HoldToConfirmButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/HoldToConfirmButton.swift; sourceTree = "<group>"; };
+		0A92A92A92A92A92A92A9202 /* AppScreenHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppScreenHeader.swift; sourceTree = "<group>"; };
+		0A90A90A90A90A90A90A9002 /* QuoteSizeRatioBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/QuoteSizeRatioBar.swift; sourceTree = "<group>"; };
+		0A91A91A91A91A91A91A9102 /* AppMarqueeText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppMarqueeText.swift; sourceTree = "<group>"; };
+		0A0000000000000000000214 /* MarketsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Markets/MarketsView.swift; sourceTree = "<group>"; };
+		0A0000000000000000000215 /* TradeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Trade/TradeView.swift; sourceTree = "<group>"; };
+		0A0000000000000000000216 /* OrdersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Orders/OrdersView.swift; sourceTree = "<group>"; };
+		0A0000000000000000000265 /* OrderSummaryListCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Orders/OrderSummaryListCard.swift; sourceTree = "<group>"; };
+		0A0000000000000000000266 /* OrdersFilterState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Orders/OrdersFilterState.swift; sourceTree = "<group>"; };
+		0A0000000000000000000267 /* OrdersFilterSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Orders/OrdersFilterSheet.swift; sourceTree = "<group>"; };
+		0A0000000000000000000290 /* OrderDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Orders/OrderDetailView.swift; sourceTree = "<group>"; };
+		0A0000000000000000000218 /* AlpacaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Alpaca/AlpacaView.swift; sourceTree = "<group>"; };
+		0A0000000000000000000219 /* AppFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Utilities/AppFormatting.swift; sourceTree = "<group>"; };
+		0A00000000000000000002C1 /* ErrorCancellation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Utilities/ErrorCancellation.swift; sourceTree = "<group>"; };
+		0A0000000000000000000220 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Resources/Assets.xcassets; sourceTree = "<group>"; };
+		0A0000000000000000000221 /* AppTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Support/AppTypography.swift; sourceTree = "<group>"; };
+		0A0000000000000000000222 /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/AppTheme.swift; sourceTree = "<group>"; };
+		0A0000000000000000000250 /* AppIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/AppIcon.swift; sourceTree = "<group>"; };
+		0A0000000000000000000223 /* AppSectionHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppSectionHeader.swift; sourceTree = "<group>"; };
+		0A0000000000000000000224 /* AppMetricRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppMetricRow.swift; sourceTree = "<group>"; };
+		0A0000000000000000000225 /* AppFilterChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppFilterChip.swift; sourceTree = "<group>"; };
+		0A0000000000000000000291 /* AppCopyableIdentifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppCopyableIdentifier.swift; sourceTree = "<group>"; };
+		0A0000000000000000000296 /* AppToast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppToast.swift; sourceTree = "<group>"; };
+		0A00000000000000000002C2 /* AppInfiniteScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppInfiniteScrollView.swift; sourceTree = "<group>"; };
+		0A0000000000000000000261 /* AppAccountAvatar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppAccountAvatar.swift; sourceTree = "<group>"; };
+		0A0000000000000000000263 /* RxPolling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Reactive/RxPolling.swift; sourceTree = "<group>"; };
+		0A0000000000000000000226 /* L10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization/L10n.swift; sourceTree = "<group>"; };
+		0A0000000000000000000227 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Resources/Localizable.xcstrings; sourceTree = "<group>"; };
+		0A0000000000000000000228 /* APIRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/API/APIRequest.swift; sourceTree = "<group>"; };
+		0A0000000000000000000229 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/API/APIClient.swift; sourceTree = "<group>"; };
+		0A0000000000000000000230 /* AppServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/App/AppServices.swift; sourceTree = "<group>"; };
+		0A00000000000000000002F2 /* AccountActivityNotificationCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Notifications/AccountActivityNotificationCenter.swift; sourceTree = "<group>"; };
+		0A00000000000000000002F3 /* AppNotificationTemplates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Notifications/AppNotificationTemplates.swift; sourceTree = "<group>"; };
+		0A0000000000000000000232 /* HomeHeroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Home/HomeHeroView.swift; sourceTree = "<group>"; };
+		0A0000000000000000000233 /* AccountMetricsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Home/AccountMetricsView.swift; sourceTree = "<group>"; };
+		0A0000000000000000000234 /* PositionsSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Home/PositionsSummaryView.swift; sourceTree = "<group>"; };
+		0A0000000000000000000264 /* RecentOrdersSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Home/RecentOrdersSummaryView.swift; sourceTree = "<group>"; };
+		0A0000000000000000000235 /* PortfolioState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/PortfolioState.swift; sourceTree = "<group>"; };
+		0A0000000000000000000236 /* APIInterceptors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/API/APIInterceptors.swift; sourceTree = "<group>"; };
+		0A0000000000000000000246 /* BasicLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Layouts/BasicLayout.swift; sourceTree = "<group>"; };
+		0A0000000000000000000247 /* MoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/More/MoreView.swift; sourceTree = "<group>"; };
+		0A0000000000000000000249 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Settings/SettingsView.swift; sourceTree = "<group>"; };
+		0A00000000000000000002F4 /* NotificationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Notifications/NotificationSettingsView.swift; sourceTree = "<group>"; };
+		0A0000000000000000000301 /* vicu.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = vicu.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		0B0000000000000000000201 /* OrderActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/LiveActivities/OrderActivityAttributes.swift; sourceTree = "<group>"; };
+		0B0000000000000000000202 /* OrderActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/LiveActivities/OrderActivityManager.swift; sourceTree = "<group>"; };
+		0B0000000000000000000203 /* OrderLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Widgets/OrderLiveActivityWidget.swift; sourceTree = "<group>"; };
+		0B0000000000000000000204 /* VicuLiveActivities-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Widgets/VicuLiveActivities-Info.plist; sourceTree = "<group>"; };
+		0B0000000000000000000301 /* VicuLiveActivities.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VicuLiveActivities.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		0A0000000000000000000401 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0A0000000000000000000170 /* RxSwift in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0B0000000000000000000401 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0A0000000000000000000501 = {
+			isa = PBXGroup;
+			children = (
+				0A0000000000000000000502 /* vicu */,
+				0A0000000000000000000503 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		0A0000000000000000000502 /* vicu */ = {
+			isa = PBXGroup;
+			children = (
+				0A0000000000000000000201 /* VicuApp.swift */,
+				0A0000000000000000000202 /* AppModel.swift */,
+				0A00000000000000000002F5 /* AppModelTypes.swift */,
+				0A00000000000000000002F6 /* AppModelCaches.swift */,
+				0A00000000000000000002F7 /* AppModel+Navigation.swift */,
+				0A00000000000000000002F8 /* AppModel+Credentials.swift */,
+				0A00000000000000000002F9 /* AppModel+Portfolio.swift */,
+				0A00000000000000000002FA /* AppModel+Markets.swift */,
+				0A00000000000000000002FB /* AppModel+Realtime.swift */,
+				0A00000000000000000002FC /* AppModel+Utilities.swift */,
+				0A0000000000000000000203 /* AppTab.swift */,
+				0A0000000000000000000235 /* PortfolioState.swift */,
+				0A0000000000000000000204 /* LoadState.swift */,
+				0A0000000000000000000205 /* TradeEnvironment.swift */,
+				0A0000000000000000000206 /* AlpacaCredentials.swift */,
+				0A0000000000000000000251 /* AppLanguage.swift */,
+				0A0000000000000000000248 /* AppearanceMode.swift */,
+				0A0000000000000000000208 /* OrderDraft.swift */,
+				0A0000000000000000000207 /* AlpacaModels.swift */,
+				0A0000000000000000000210 /* AlpacaClient.swift */,
+				0A0000000000000000000281 /* AlpacaRealtimeModels.swift */,
+				0A0000000000000000000282 /* AlpacaStockStreamClient.swift */,
+				0A00000000000000000002F1 /* AlpacaActivityStreamClient.swift */,
+				0A0000000000000000000211 /* CredentialStore.swift */,
+				0A0000000000000000000213 /* HomeView.swift */,
+				0A0000000000000000000260 /* AccountView.swift */,
+				0A0000000000000000000268 /* AccountActivityView.swift */,
+				0A0000000000000000000262 /* HomeAccountPolling.swift */,
+				0A0000000000000000000283 /* AssetDetailStore.swift */,
+				0A0000000000000000000284 /* AssetDetailView.swift */,
+				0A0000000000000000000286 /* AssetDetailChart.swift */,
+				0A0000000000000000000298 /* AssetQuoteHistorySheet.swift */,
+				0A00000000000000000002E0 /* AssetNewsSheet.swift */,
+				0A00000000000000000002E1 /* AssetOptionsSheet.swift */,
+				0A00000000000000000002E2 /* AssetOptionsStore.swift */,
+				0A00000000000000000002E3 /* AssetOptionsModels.swift */,
+				0A00000000000000000002E4 /* OptionDetailView.swift */,
+				0A00000000000000000002E5 /* OptionDetailStore.swift */,
+				0A00000000000000000002E6 /* OptionDetailModels.swift */,
+				0A0000000000000000000299 /* AssetLevelOneBook.swift */,
+				0A00000000000000000002A0 /* AssetPositionShareSheet.swift */,
+				0A00000000000000000002B0 /* PositionDetailView.swift */,
+				0A00000000000000000002B1 /* PositionsView.swift */,
+				0A00000000000000000002B2 /* PositionCategorySupport.swift */,
+				0A0000000000000000000214 /* MarketsView.swift */,
+				0A0000000000000000000504 /* Skeletons */,
+				0A0000000000000000000287 /* TradeStore.swift */,
+				0A00000000000000000002D0 /* TradeOrderConfirmationSheet.swift */,
+				0A0000000000000000000215 /* TradeView.swift */,
+				0A0000000000000000000216 /* OrdersView.swift */,
+				0A0000000000000000000265 /* OrderSummaryListCard.swift */,
+				0A0000000000000000000266 /* OrdersFilterState.swift */,
+				0A0000000000000000000267 /* OrdersFilterSheet.swift */,
+				0A0000000000000000000290 /* OrderDetailView.swift */,
+				0B0000000000000000000201 /* OrderActivityAttributes.swift */,
+				0B0000000000000000000202 /* OrderActivityManager.swift */,
+				0B0000000000000000000203 /* OrderLiveActivityWidget.swift */,
+				0B0000000000000000000204 /* VicuLiveActivities-Info.plist */,
+				0A0000000000000000000218 /* AlpacaView.swift */,
+				0A0000000000000000000247 /* MoreView.swift */,
+				0A0000000000000000000249 /* SettingsView.swift */,
+				0A00000000000000000002F4 /* NotificationSettingsView.swift */,
+				0A0000000000000000000219 /* AppFormatting.swift */,
+				0A00000000000000000002C1 /* ErrorCancellation.swift */,
+				0A0000000000000000000246 /* BasicLayout.swift */,
+				0A0000000000000000000221 /* AppTypography.swift */,
+				0A0000000000000000000222 /* AppTheme.swift */,
+				0A0000000000000000000250 /* AppIcon.swift */,
+				0A0000000000000000000223 /* AppSectionHeader.swift */,
+				0A0000000000000000000224 /* AppMetricRow.swift */,
+				0A0000000000000000000225 /* AppFilterChip.swift */,
+				0A0000000000000000000291 /* AppCopyableIdentifier.swift */,
+				0A0000000000000000000296 /* AppToast.swift */,
+				0A00000000000000000002C2 /* AppInfiniteScrollView.swift */,
+				0A0000000000000000000261 /* AppAccountAvatar.swift */,
+				0A0000000000000000000285 /* SymbolLogoView.swift */,
+				0A0000000000000000000292 /* MarketSessionTimelineView.swift */,
+				0A0000000000000000000294 /* AppPriceText.swift */,
+				0A0000000000000000000295 /* AppRangePicker.swift */,
+				0A0000000000000000000297 /* AppEmptyStateView.swift */,
+				0A00000000000000000002D2 /* HoldToConfirmButton.swift */,
+				0A92A92A92A92A92A92A9202 /* AppScreenHeader.swift */,
+				0A90A90A90A90A90A90A9002 /* QuoteSizeRatioBar.swift */,
+				0A91A91A91A91A91A91A9102 /* AppMarqueeText.swift */,
+				0A0000000000000000000263 /* RxPolling.swift */,
+				0A0000000000000000000226 /* L10n.swift */,
+				0A0000000000000000000228 /* APIRequest.swift */,
+				0A0000000000000000000229 /* APIClient.swift */,
+				0A0000000000000000000236 /* APIInterceptors.swift */,
+				0A0000000000000000000230 /* AppServices.swift */,
+				0A00000000000000000002F2 /* AccountActivityNotificationCenter.swift */,
+				0A00000000000000000002F3 /* AppNotificationTemplates.swift */,
+				0A0000000000000000000232 /* HomeHeroView.swift */,
+				0A0000000000000000000233 /* AccountMetricsView.swift */,
+				0A0000000000000000000234 /* PositionsSummaryView.swift */,
+				0A0000000000000000000264 /* RecentOrdersSummaryView.swift */,
+				0A0000000000000000000220 /* Assets.xcassets */,
+				0A0000000000000000000227 /* Localizable.xcstrings */,
+			);
+			sourceTree = "<group>";
+		};
+		0A0000000000000000000503 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				0A0000000000000000000301 /* vicu.app */,
+				0B0000000000000000000301 /* VicuLiveActivities.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		0A0000000000000000000504 /* Skeletons */ = {
+			isa = PBXGroup;
+			children = (
+				0A0000000000000000000293 /* MarketsSkeletons.swift */,
+				0A00000000000000000002D1 /* TradeSkeletons.swift */,
+				0A00000000000000000002D3 /* AssetSkeletons.swift */,
+			);
+			path = Skeletons;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		0A0000000000000000000601 /* vicu */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0A0000000000000000000702 /* Build configuration list for PBXNativeTarget "vicu" */;
+			buildPhases = (
+				0A0000000000000000000801 /* Sources */,
+				0A0000000000000000000401 /* Frameworks */,
+				0A0000000000000000000802 /* Resources */,
+				0B0000000000000000000803 /* Embed App Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				0B0000000000000000000902 /* PBXTargetDependency */,
+			);
+			name = vicu;
+			packageProductDependencies = (
+				0A0000000000000000000270 /* RxSwift */,
+			);
+			productName = vicu;
+			productReference = 0A0000000000000000000301 /* vicu.app */;
+			productType = "com.apple.product-type.application";
+		};
+		0B0000000000000000000601 /* VicuLiveActivities */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0B0000000000000000000701 /* Build configuration list for PBXNativeTarget "VicuLiveActivities" */;
+			buildPhases = (
+				0B0000000000000000000801 /* Sources */,
+				0B0000000000000000000401 /* Frameworks */,
+				0B0000000000000000000802 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VicuLiveActivities;
+			packageProductDependencies = (
+			);
+			productName = VicuLiveActivities;
+			productReference = 0B0000000000000000000301 /* VicuLiveActivities.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		0A0000000000000000000901 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2650;
+				LastUpgradeCheck = 2650;
+				TargetAttributes = {
+					0A0000000000000000000601 = {
+						CreatedOnToolsVersion = 26.5;
+					};
+					0B0000000000000000000601 = {
+						CreatedOnToolsVersion = 26.5;
+					};
+				};
+			};
+			buildConfigurationList = 0A0000000000000000000701 /* Build configuration list for PBXProject "vicu" */;
+			compatibilityVersion = "Xcode 15.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				zh-Hans,
+				Base,
+			);
+			mainGroup = 0A0000000000000000000501;
+			packageReferences = (
+				0A0000000000000000000370 /* XCRemoteSwiftPackageReference "RxSwift" */,
+			);
+			productRefGroup = 0A0000000000000000000503 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				0A0000000000000000000601 /* vicu */,
+				0B0000000000000000000601 /* VicuLiveActivities */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		0A0000000000000000000802 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0A0000000000000000000120 /* Assets.xcassets in Resources */,
+				0A0000000000000000000127 /* Localizable.xcstrings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0B0000000000000000000802 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		0A0000000000000000000801 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0A0000000000000000000101 /* VicuApp.swift in Sources */,
+				0A0000000000000000000102 /* AppModel.swift in Sources */,
+				0A00000000000000000001F5 /* AppModelTypes.swift in Sources */,
+				0A00000000000000000001F6 /* AppModelCaches.swift in Sources */,
+				0A00000000000000000001F7 /* AppModel+Navigation.swift in Sources */,
+				0A00000000000000000001F8 /* AppModel+Credentials.swift in Sources */,
+				0A00000000000000000001F9 /* AppModel+Portfolio.swift in Sources */,
+				0A00000000000000000001FA /* AppModel+Markets.swift in Sources */,
+				0A00000000000000000001FB /* AppModel+Realtime.swift in Sources */,
+				0A00000000000000000001FC /* AppModel+Utilities.swift in Sources */,
+				0A0000000000000000000103 /* AppTab.swift in Sources */,
+				0A0000000000000000000104 /* LoadState.swift in Sources */,
+				0A0000000000000000000105 /* TradeEnvironment.swift in Sources */,
+				0A0000000000000000000106 /* AlpacaCredentials.swift in Sources */,
+				0A0000000000000000000151 /* AppLanguage.swift in Sources */,
+				0A0000000000000000000148 /* AppearanceMode.swift in Sources */,
+				0A0000000000000000000107 /* AlpacaModels.swift in Sources */,
+				0A0000000000000000000108 /* OrderDraft.swift in Sources */,
+				0A0000000000000000000110 /* AlpacaClient.swift in Sources */,
+				0A0000000000000000000181 /* AlpacaRealtimeModels.swift in Sources */,
+				0A0000000000000000000182 /* AlpacaStockStreamClient.swift in Sources */,
+				0A00000000000000000001F1 /* AlpacaActivityStreamClient.swift in Sources */,
+				0A0000000000000000000111 /* CredentialStore.swift in Sources */,
+				0A0000000000000000000113 /* HomeView.swift in Sources */,
+				0A0000000000000000000160 /* AccountView.swift in Sources */,
+				0A0000000000000000000168 /* AccountActivityView.swift in Sources */,
+				0A0000000000000000000162 /* HomeAccountPolling.swift in Sources */,
+				0A0000000000000000000183 /* AssetDetailStore.swift in Sources */,
+				0A0000000000000000000184 /* AssetDetailView.swift in Sources */,
+				0A0000000000000000000186 /* AssetDetailChart.swift in Sources */,
+				0A0000000000000000000198 /* AssetQuoteHistorySheet.swift in Sources */,
+				0A00000000000000000001E0 /* AssetNewsSheet.swift in Sources */,
+				0A00000000000000000001E1 /* AssetOptionsSheet.swift in Sources */,
+				0A00000000000000000001E2 /* AssetOptionsStore.swift in Sources */,
+				0A00000000000000000001E3 /* AssetOptionsModels.swift in Sources */,
+				0A00000000000000000001E4 /* OptionDetailView.swift in Sources */,
+				0A00000000000000000001E5 /* OptionDetailStore.swift in Sources */,
+				0A00000000000000000001E6 /* OptionDetailModels.swift in Sources */,
+				0A0000000000000000000199 /* AssetLevelOneBook.swift in Sources */,
+				0A00000000000000000001A0 /* AssetPositionShareSheet.swift in Sources */,
+				0A00000000000000000001B0 /* PositionDetailView.swift in Sources */,
+				0A00000000000000000001B1 /* PositionsView.swift in Sources */,
+				0A00000000000000000001B2 /* PositionCategorySupport.swift in Sources */,
+				0A0000000000000000000192 /* MarketSessionTimelineView.swift in Sources */,
+				0A0000000000000000000114 /* MarketsView.swift in Sources */,
+				0A0000000000000000000193 /* MarketsSkeletons.swift in Sources */,
+				0A00000000000000000001D1 /* TradeSkeletons.swift in Sources */,
+				0A00000000000000000001D3 /* AssetSkeletons.swift in Sources */,
+				0A0000000000000000000187 /* TradeStore.swift in Sources */,
+				0A00000000000000000001D0 /* TradeOrderConfirmationSheet.swift in Sources */,
+				0A0000000000000000000115 /* TradeView.swift in Sources */,
+				0A0000000000000000000116 /* OrdersView.swift in Sources */,
+				0A0000000000000000000165 /* OrderSummaryListCard.swift in Sources */,
+				0A0000000000000000000166 /* OrdersFilterState.swift in Sources */,
+				0A0000000000000000000167 /* OrdersFilterSheet.swift in Sources */,
+				0A0000000000000000000190 /* OrderDetailView.swift in Sources */,
+				0B0000000000000000000101 /* OrderActivityAttributes.swift in Sources */,
+				0B0000000000000000000102 /* OrderActivityManager.swift in Sources */,
+				0A0000000000000000000118 /* AlpacaView.swift in Sources */,
+				0A0000000000000000000119 /* AppFormatting.swift in Sources */,
+				0A00000000000000000001C1 /* ErrorCancellation.swift in Sources */,
+				0A0000000000000000000121 /* AppTypography.swift in Sources */,
+				0A0000000000000000000122 /* AppTheme.swift in Sources */,
+				0A0000000000000000000150 /* AppIcon.swift in Sources */,
+				0A0000000000000000000123 /* AppSectionHeader.swift in Sources */,
+				0A0000000000000000000124 /* AppMetricRow.swift in Sources */,
+				0A0000000000000000000125 /* AppFilterChip.swift in Sources */,
+				0A0000000000000000000191 /* AppCopyableIdentifier.swift in Sources */,
+				0A0000000000000000000196 /* AppToast.swift in Sources */,
+				0A00000000000000000001C2 /* AppInfiniteScrollView.swift in Sources */,
+				0A0000000000000000000161 /* AppAccountAvatar.swift in Sources */,
+				0A0000000000000000000185 /* SymbolLogoView.swift in Sources */,
+				0A0000000000000000000194 /* AppPriceText.swift in Sources */,
+				0A0000000000000000000195 /* AppRangePicker.swift in Sources */,
+				0A0000000000000000000197 /* AppEmptyStateView.swift in Sources */,
+				0A00000000000000000001D2 /* HoldToConfirmButton.swift in Sources */,
+				0A92A92A92A92A92A92A9201 /* AppScreenHeader.swift in Sources */,
+				0A90A90A90A90A90A90A9001 /* QuoteSizeRatioBar.swift in Sources */,
+				0A91A91A91A91A91A91A9101 /* AppMarqueeText.swift in Sources */,
+				0A0000000000000000000163 /* RxPolling.swift in Sources */,
+				0A0000000000000000000126 /* L10n.swift in Sources */,
+				0A0000000000000000000128 /* APIRequest.swift in Sources */,
+				0A0000000000000000000129 /* APIClient.swift in Sources */,
+				0A0000000000000000000136 /* APIInterceptors.swift in Sources */,
+				0A0000000000000000000130 /* AppServices.swift in Sources */,
+				0A00000000000000000001F2 /* AccountActivityNotificationCenter.swift in Sources */,
+				0A00000000000000000001F3 /* AppNotificationTemplates.swift in Sources */,
+				0A0000000000000000000146 /* BasicLayout.swift in Sources */,
+				0A0000000000000000000147 /* MoreView.swift in Sources */,
+				0A0000000000000000000149 /* SettingsView.swift in Sources */,
+				0A00000000000000000001F4 /* NotificationSettingsView.swift in Sources */,
+				0A0000000000000000000132 /* HomeHeroView.swift in Sources */,
+				0A0000000000000000000133 /* AccountMetricsView.swift in Sources */,
+				0A0000000000000000000134 /* PositionsSummaryView.swift in Sources */,
+				0A0000000000000000000164 /* RecentOrdersSummaryView.swift in Sources */,
+				0A0000000000000000000135 /* PortfolioState.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0B0000000000000000000801 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0B0000000000000000000103 /* OrderActivityAttributes.swift in Sources */,
+				0B0000000000000000000104 /* OrderLiveActivityWidget.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		0B0000000000000000000902 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0B0000000000000000000601 /* VicuLiveActivities */;
+			targetProxy = 0B0000000000000000000901 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0A0000000000000000000A01 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		0A0000000000000000000A02 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		0A0000000000000000000A03 /* Debug */ = {
+			isa = XCBuildConfiguration;
+				buildSettings = {
+					ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+					CODE_SIGN_ENTITLEMENTS = vicu.entitlements;
+					CODE_SIGN_STYLE = Automatic;
+					CURRENT_PROJECT_VERSION = 1;
+					ENTITLEMENTS_REQUIRED = YES;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = vicu;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "vicu can use Face ID to protect Alpaca credentials stored on this device.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "vicu saves generated position share images to your photo library when you choose Save.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.starriv.vicu;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		0A0000000000000000000A04 /* Release */ = {
+			isa = XCBuildConfiguration;
+				buildSettings = {
+					ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+					CODE_SIGN_ENTITLEMENTS = vicu.entitlements;
+					CODE_SIGN_STYLE = Automatic;
+					CURRENT_PROJECT_VERSION = 1;
+					ENTITLEMENTS_REQUIRED = YES;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = vicu;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "vicu can use Face ID to protect Alpaca credentials stored on this device.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "vicu saves generated position share images to your photo library when you choose Save.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.starriv.vicu;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		0B0000000000000000000A01 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Widgets/VicuLiveActivities-Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.starriv.vicu.liveactivities;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		0B0000000000000000000A02 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Widgets/VicuLiveActivities-Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.starriv.vicu.liveactivities;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0A0000000000000000000701 /* Build configuration list for PBXProject "vicu" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0A0000000000000000000A01 /* Debug */,
+				0A0000000000000000000A02 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0A0000000000000000000702 /* Build configuration list for PBXNativeTarget "vicu" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0A0000000000000000000A03 /* Debug */,
+				0A0000000000000000000A04 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0B0000000000000000000701 /* Build configuration list for PBXNativeTarget "VicuLiveActivities" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0B0000000000000000000A01 /* Debug */,
+				0B0000000000000000000A02 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		0A0000000000000000000370 /* XCRemoteSwiftPackageReference "RxSwift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ReactiveX/RxSwift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.10.2;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		0A0000000000000000000270 /* RxSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0A0000000000000000000370 /* XCRemoteSwiftPackageReference "RxSwift" */;
+			productName = RxSwift;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 0A0000000000000000000901 /* Project object */;
+}
