@@ -342,6 +342,7 @@ struct MarketSearchView: View {
     private let usesExternalQuery: Bool
     private let presentation: MarketSearchPresentation
     private let submitID: Int
+    private let isExternalQueryPendingSubmit: Bool
     private let openAssetOverride: ((String) -> Void)?
     @State private var localQuery = ""
     @State private var results: [MarketSearchResult] = []
@@ -354,6 +355,7 @@ struct MarketSearchView: View {
     @State private var assetDestination: MarketSearchAssetDestination?
     @State private var seededDefaultSearchQuery: String?
     @State private var hasUserEditedSearchQuery = false
+    @State private var isDefaultSearchQueryPendingSubmit = false
     @State private var suppressedAutomaticSearchQuery: String?
     @State private var searchTextSelectionTrigger = 0
     @FocusState private var isSearchFocused: Bool
@@ -374,23 +376,33 @@ struct MarketSearchView: View {
     }
 
     private var isShowingSeededDefaultSearchQuery: Bool {
+        if isExternalQueryPendingSubmit && !normalizedQuery.isEmpty {
+            return true
+        }
+
         guard let seededDefaultSearchQuery else {
             return false
         }
 
-        return !hasUserEditedSearchQuery && !normalizedQuery.isEmpty && normalizedQuery == seededDefaultSearchQuery
+        return isDefaultSearchQueryPendingSubmit && !normalizedQuery.isEmpty && normalizedQuery == seededDefaultSearchQuery
+    }
+
+    private var showsPopularContent: Bool {
+        normalizedQuery.isEmpty || isShowingSeededDefaultSearchQuery
     }
 
     init(
         query: Binding<String>? = nil,
         presentation: MarketSearchPresentation = .marketNavigation,
         submitID: Int = 0,
+        isExternalQueryPendingSubmit: Bool = false,
         openAsset: ((String) -> Void)? = nil
     ) {
         _externalQuery = query ?? .constant("")
         usesExternalQuery = query != nil
         self.presentation = presentation
         self.submitID = submitID
+        self.isExternalQueryPendingSubmit = isExternalQueryPendingSubmit
         openAssetOverride = openAsset
     }
 
@@ -405,7 +417,7 @@ struct MarketSearchView: View {
         .toolbar(presentation.hidesTabBar ? .hidden : .automatic, for: .tabBar)
         .toolbar(presentation.hidesNavigationBar ? .hidden : .automatic, for: .navigationBar)
         .toolbar {
-            if !presentation.showsPageTitle, normalizedQuery.isEmpty {
+            if !presentation.showsPageTitle, showsPopularContent {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     popularSortPicker
                 }
@@ -435,7 +447,7 @@ struct MarketSearchView: View {
 
     private var titledBody: some View {
         BasicLayout(L10n.Markets.searchTitle, style: .scroll(spacing: 16)) {
-            if normalizedQuery.isEmpty {
+            if showsPopularContent {
                 popularSortPicker
             }
         } content: {
@@ -470,6 +482,7 @@ struct MarketSearchView: View {
     private func updateQuery(_ newValue: String, isUserEdit: Bool = true) {
         if isUserEdit {
             hasUserEditedSearchQuery = true
+            isDefaultSearchQueryPendingSubmit = false
             seededDefaultSearchQuery = nil
             suppressedAutomaticSearchQuery = nil
         }
@@ -515,6 +528,7 @@ struct MarketSearchView: View {
             updateQuery(submittedQuery, isUserEdit: false)
         }
         seededDefaultSearchQuery = nil
+        isDefaultSearchQueryPendingSubmit = false
         suppressedAutomaticSearchQuery = nil
         searchPipeline.submit(submittedQuery)
     }
@@ -531,7 +545,7 @@ struct MarketSearchView: View {
 
         let shouldFillEmptyQuery = normalizedQuery.isEmpty && !hasUserEditedSearchQuery
         let shouldReplaceSeededQuery = replacingExistingSeed
-            && !hasUserEditedSearchQuery
+            && isDefaultSearchQueryPendingSubmit
             && normalizedQuery == seededDefaultSearchQuery
         guard shouldFillEmptyQuery || shouldReplaceSeededQuery else {
             return
@@ -539,6 +553,7 @@ struct MarketSearchView: View {
 
         updateQuery(defaultQuery, isUserEdit: false)
         seededDefaultSearchQuery = defaultQuery
+        isDefaultSearchQueryPendingSubmit = true
         suppressedAutomaticSearchQuery = defaultQuery
         focusSearchField(selectAll: true)
     }
@@ -723,8 +738,6 @@ struct MarketSearchView: View {
 
     @ViewBuilder
     private var searchContent: some View {
-        let showsPopularContent = normalizedQuery.isEmpty || isShowingSeededDefaultSearchQuery
-
         if !app.hasCredentials {
             AppEmptyStateView(
                 title: L10n.Common.noData,
@@ -873,7 +886,9 @@ private struct MarketSearchTextField: UIViewRepresentable {
         context.coordinator.parent = self
 
         if textField.text != text {
-            textField.text = text
+            context.coordinator.performProgrammaticTextUpdate {
+                textField.text = text
+            }
         }
 
         textField.keyboardType = .asciiCapable
@@ -912,6 +927,7 @@ private struct MarketSearchTextField: UIViewRepresentable {
     final class Coordinator: NSObject, UITextFieldDelegate {
         var parent: MarketSearchTextField
         private var handledSelectAllTrigger = 0
+        private var isProgrammaticTextUpdate = false
 
         init(parent: MarketSearchTextField) {
             self.parent = parent
@@ -919,7 +935,17 @@ private struct MarketSearchTextField: UIViewRepresentable {
 
         @objc
         func textDidChange(_ textField: UITextField) {
+            guard !isProgrammaticTextUpdate else {
+                return
+            }
+
             parent.text = textField.text ?? ""
+        }
+
+        func performProgrammaticTextUpdate(_ update: () -> Void) {
+            isProgrammaticTextUpdate = true
+            update()
+            isProgrammaticTextUpdate = false
         }
 
         func textFieldDidBeginEditing(_ textField: UITextField) {

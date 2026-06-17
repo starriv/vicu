@@ -24,6 +24,8 @@ private struct RootView: View {
     @State private var searchNavigationPath: [SearchRoute] = []
     @State private var ordersNavigationPath: [OrdersRoute] = []
     @State private var searchSubmitID = 0
+    @State private var isSearchQueryPendingSubmit = false
+    @State private var isSearchDefaultQueryPendingSubmit = false
     @State private var isSearchPresented = false
 
     var body: some View {
@@ -83,9 +85,10 @@ private struct RootView: View {
             Tab(L10n.Tab.search, systemImage: AppIcon.Tab.search, value: AppTab.search, role: .search) {
                 NavigationStack(path: $searchNavigationPath) {
                     MarketSearchView(
-                        query: $searchText,
+                        query: searchTextBinding,
                         presentation: .globalTab,
                         submitID: searchSubmitID,
+                        isExternalQueryPendingSubmit: isSearchQueryPendingSubmit,
                         openAsset: openSearchAssetDetail(_:)
                     )
                     .navigationDestination(for: SearchRoute.self) { route in
@@ -95,7 +98,7 @@ private struct RootView: View {
                         }
                     }
                 }
-                .searchable(text: $searchText, isPresented: $isSearchPresented, prompt: Text(searchPlaceholderSymbol))
+                .searchable(text: searchTextBinding, isPresented: $isSearchPresented, prompt: Text(searchPlaceholderSymbol))
                 .keyboardType(.asciiCapable)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -129,6 +132,13 @@ private struct RootView: View {
         }
     }
 
+    private var searchTextBinding: Binding<String> {
+        Binding(
+            get: { searchText },
+            set: { updateSearchText($0, isUserEdit: true) }
+        )
+    }
+
     private func openPendingOrderDetail(_ request: OrderDetailNavigationRequest?) {
         guard let request else {
             return
@@ -149,9 +159,16 @@ private struct RootView: View {
 
     private func activateSearchTab(defaultSymbol: String) {
         let normalizedDefaultSymbol = defaultSymbol.trimmingCharacters(in: .whitespacesAndNewlines)
-        if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-           !normalizedDefaultSymbol.isEmpty {
-            searchText = normalizedDefaultSymbol
+        guard !normalizedDefaultSymbol.isEmpty else {
+            isSearchPresented = true
+            return
+        }
+
+        let normalizedSearchText = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalizedSearchText.isEmpty || isSearchDefaultQueryPendingSubmit {
+            updateSearchText(normalizedDefaultSymbol, isUserEdit: false)
+            isSearchQueryPendingSubmit = true
+            isSearchDefaultQueryPendingSubmit = true
         }
 
         isSearchPresented = true
@@ -165,9 +182,20 @@ private struct RootView: View {
         }
 
         if searchText != submittedQuery {
-            searchText = submittedQuery
+            updateSearchText(submittedQuery, isUserEdit: false)
         }
+        isSearchQueryPendingSubmit = false
+        isSearchDefaultQueryPendingSubmit = false
         searchSubmitID += 1
+    }
+
+    private func updateSearchText(_ newValue: String, isUserEdit: Bool) {
+        if isUserEdit, newValue != searchText {
+            isSearchQueryPendingSubmit = !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            isSearchDefaultQueryPendingSubmit = false
+        }
+
+        searchText = newValue
     }
 
     private func openSearchAssetDetail(_ symbol: String) {
