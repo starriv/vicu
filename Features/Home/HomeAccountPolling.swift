@@ -15,6 +15,7 @@ final class HomeAccountPolling {
         isRunning = true
         RxPolling.stream(
             interval: .seconds(30),
+            startsImmediately: false,
             manualTrigger: refreshTrigger.asObservable()
         ) {
             try await app.fetchAccountDetails()

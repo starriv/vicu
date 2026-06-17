@@ -10,51 +10,110 @@ extension AppModel {
             return
         }
 
-        portfolio.isRefreshing = true
-        defer { portfolio.isRefreshing = false }
+        let alpaca = services.alpaca
+        let historyRange = portfolio.historyRange
+        let accountCreatedAt = portfolio.account?.createdAt
+        var didReceiveValue = false
+        var firstFailure: PortfolioRefreshFailure?
+        var authenticationFailure: PortfolioRefreshFailure?
 
-        do {
-            async let accountRequest = services.alpaca.fetchAccount(credentials: activeCredentials)
-            async let positionsRequest = services.alpaca.fetchPositions(credentials: activeCredentials)
-            async let ordersRequest = services.alpaca.fetchRecentOrders(credentials: activeCredentials)
-            async let historyRequest = services.alpaca.fetchPortfolioHistory(
-                range: portfolio.historyRange,
-                accountCreatedAt: portfolio.account?.createdAt,
-                credentials: activeCredentials
-            )
+        portfolio.prepareForRefresh()
+        defer {
+            portfolio.isRefreshing = false
+            portfolio.isLoadingHistory = false
+        }
 
-            let (account, positions, orders, history) = try await (
-                accountRequest,
-                positionsRequest,
-                ordersRequest,
-                historyRequest
-            )
-            guard isCurrentCredentialContext(activeCredentials) else {
-                return
+        await withTaskGroup(of: PortfolioRefreshResult.self) { group in
+            group.addTask {
+                do {
+                    return .account(try await alpaca.fetchAccount(credentials: activeCredentials))
+                } catch {
+                    return .failure(.init(segment: .account, error: error))
+                }
             }
-            portfolio.applySnapshot(
-                account: account,
-                positions: positions,
-                orders: orders,
-                history: history
-            )
+
+            group.addTask {
+                do {
+                    return .positions(try await alpaca.fetchPositions(credentials: activeCredentials))
+                } catch {
+                    return .failure(.init(segment: .positions, error: error))
+                }
+            }
+
+            group.addTask {
+                do {
+                    return .orders(try await alpaca.fetchRecentOrders(credentials: activeCredentials))
+                } catch {
+                    return .failure(.init(segment: .orders, error: error))
+                }
+            }
+
+            group.addTask {
+                do {
+                    return .history(
+                        range: historyRange,
+                        try await alpaca.fetchPortfolioHistory(
+                            range: historyRange,
+                            accountCreatedAt: accountCreatedAt,
+                            credentials: activeCredentials
+                        )
+                    )
+                } catch {
+                    return .failure(.init(segment: .history, error: error))
+                }
+            }
+
+            for await result in group {
+                guard isCurrentCredentialContext(activeCredentials) else {
+                    group.cancelAll()
+                    return
+                }
+
+                switch result {
+                case .account(let account):
+                    portfolio.applyAccount(account)
+                    credentialsStatus = .connected(activeCredentials.environment)
+                    startAccountEventListeners(credentials: activeCredentials)
+                    lastError = nil
+                    didReceiveValue = true
+                case .positions(let positions):
+                    portfolio.applyPositions(positions)
+                    didReceiveValue = true
+                case .orders(let orders):
+                    portfolio.applyOrders(orders)
+                    didReceiveValue = true
+                case .history(let range, let history):
+                    guard portfolio.historyRange == range else {
+                        continue
+                    }
+
+                    portfolio.applyHistory(history)
+                    didReceiveValue = true
+                case .failure(let failure):
+                    guard !failure.isCancellation else {
+                        continue
+                    }
+
+                    firstFailure = firstFailure ?? failure
+                    if failure.isAuthenticationFailure {
+                        authenticationFailure = failure
+                    }
+                }
+            }
+        }
+
+        guard isCurrentCredentialContext(activeCredentials) else {
+            return
+        }
+
+        if let authenticationFailure {
+            applyPortfolioRefreshFailure(authenticationFailure, credentials: activeCredentials)
+        } else if didReceiveValue {
             credentialsStatus = .connected(activeCredentials.environment)
-            startAccountEventListeners(credentials: activeCredentials)
             lastError = nil
             await refreshFavoriteMarketSymbols()
-        } catch where error.isRequestCancellation {
-            return
-        } catch {
-            guard isCurrentCredentialContext(activeCredentials) else {
-                return
-            }
-            if error.isAuthenticationFailure {
-                credentialsStatus = .failed(activeCredentials.environment, message: error.localizedDescription)
-                stopAccountEventListeners()
-            } else if !credentialsStatus.isConnected {
-                credentialsStatus = .connected(activeCredentials.environment)
-            }
-            lastError = error.localizedDescription
+        } else if let firstFailure {
+            applyPortfolioRefreshFailure(firstFailure, credentials: activeCredentials)
         }
     }
 
@@ -77,8 +136,8 @@ extension AppModel {
                 return
             }
 
-            portfolio.account = account
-            portfolio.positions = positions
+            portfolio.applyAccount(account)
+            portfolio.applyPositions(positions)
             credentialsStatus = .connected(activeCredentials.environment)
             lastError = nil
         } catch where error.isRequestCancellation {
@@ -110,6 +169,7 @@ extension AppModel {
     func refreshPortfolioHistory() async {
         guard let credentials else {
             portfolio.history = []
+            portfolio.hasLoadedHistory = false
             return
         }
 
@@ -117,16 +177,16 @@ extension AppModel {
         defer { portfolio.isLoadingHistory = false }
 
         do {
-            portfolio.history = try await services.alpaca.fetchPortfolioHistory(
+            let history = try await services.alpaca.fetchPortfolioHistory(
                 range: portfolio.historyRange,
                 accountCreatedAt: portfolio.account?.createdAt,
                 credentials: credentials
             )
+            portfolio.applyHistory(history)
             lastError = nil
         } catch where error.isRequestCancellation {
             return
         } catch {
-            portfolio.history = []
             lastError = error.localizedDescription
         }
     }
@@ -137,7 +197,7 @@ extension AppModel {
         }
 
         let account = try await services.alpaca.fetchAccount(credentials: credentials)
-        portfolio.account = account
+        portfolio.applyAccount(account)
         return account
     }
 
@@ -248,6 +308,7 @@ extension AppModel {
         } else {
             portfolio.orders.insert(order, at: 0)
         }
+        portfolio.hasLoadedOrders = true
     }
 
     private func replacePortfolioOrder(oldID: String, with order: AlpacaOrder) {
@@ -259,6 +320,7 @@ extension AppModel {
 
     private func removePortfolioOrder(id: String) {
         portfolio.orders.removeAll { $0.id == id }
+        portfolio.hasLoadedOrders = true
     }
 
     private func normalizedOrderPrice(_ text: String) throws -> String {
@@ -272,4 +334,47 @@ extension AppModel {
     func clearPortfolioSnapshot() {
         portfolio.clear()
     }
+
+    private func applyPortfolioRefreshFailure(
+        _ failure: PortfolioRefreshFailure,
+        credentials: AlpacaCredentials
+    ) {
+        if failure.isAuthenticationFailure {
+            credentialsStatus = .failed(credentials.environment, message: failure.message)
+            stopAccountEventListeners()
+        } else if !credentialsStatus.isConnected {
+            credentialsStatus = .connected(credentials.environment)
+        }
+
+        lastError = failure.message
+    }
+}
+
+private enum PortfolioRefreshSegment: Sendable {
+    case account
+    case positions
+    case orders
+    case history
+}
+
+private struct PortfolioRefreshFailure: Sendable {
+    let segment: PortfolioRefreshSegment
+    let message: String
+    let isAuthenticationFailure: Bool
+    let isCancellation: Bool
+
+    init(segment: PortfolioRefreshSegment, error: Error) {
+        self.segment = segment
+        message = error.localizedDescription
+        isAuthenticationFailure = error.isAuthenticationFailure
+        isCancellation = error.isRequestCancellation
+    }
+}
+
+private enum PortfolioRefreshResult: Sendable {
+    case account(AlpacaAccount)
+    case positions([AlpacaPosition])
+    case orders([AlpacaOrder])
+    case history(range: PortfolioHistoryRange, [PortfolioHistoryPoint])
+    case failure(PortfolioRefreshFailure)
 }

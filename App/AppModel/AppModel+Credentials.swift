@@ -128,6 +128,7 @@ extension AppModel {
             credentialsStatus = .connected(newCredentials.environment)
             startAccountEventListeners(credentials: newCredentials)
             clearPortfolioSnapshot()
+            portfolio.prepareForRefresh()
             clearCredentialMessage()
             Task { @MainActor [weak self] in
                 await self?.refresh()

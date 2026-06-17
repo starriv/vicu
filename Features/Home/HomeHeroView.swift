@@ -3,6 +3,7 @@ import SwiftUI
 
 struct HomeHeroView: View {
     @Environment(AppModel.self) private var app
+    var showsInitialSkeleton = false
     @State private var chartMode: PortfolioChartMode = .equity
     @State private var chartSelection: PortfolioChartSelection?
     @State private var isChartScrubbing = false
@@ -89,6 +90,22 @@ struct HomeHeroView: View {
     }
 
     var body: some View {
+        Group {
+            if showsInitialSkeleton {
+                HomeHeroSkeleton()
+            } else {
+                content
+            }
+        }
+        .onChange(of: chartMode) { _, _ in
+            clearChartSelection()
+        }
+        .onChange(of: app.portfolio.historyRange) { _, _ in
+            clearChartSelection()
+        }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 0) {
@@ -132,12 +149,6 @@ struct HomeHeroView: View {
             }
         }
         .padding(.top, 4)
-        .onChange(of: chartMode) { _, _ in
-            clearChartSelection()
-        }
-        .onChange(of: app.portfolio.historyRange) { _, _ in
-            clearChartSelection()
-        }
     }
 
     private func clearChartSelection() {
@@ -225,12 +236,14 @@ private struct PortfolioChartView: View {
 
         ZStack {
             if points.isEmpty {
-                PortfolioChartEmptyState()
+                PortfolioChartEmptyState(
+                    isLoading: !app.portfolio.hasLoadedHistory && (app.portfolio.isRefreshing || app.portfolio.isLoadingHistory)
+                )
             } else {
                 chart(points: points)
             }
 
-            if app.portfolio.isLoadingHistory {
+            if app.portfolio.isLoadingHistory && !points.isEmpty {
                 ProgressView()
                     .padding(14)
                     .background(.regularMaterial, in: Circle())
@@ -572,12 +585,22 @@ private enum PortfolioChartDateLabelFormatter {
 }
 
 private struct PortfolioChartEmptyState: View {
+    let isLoading: Bool
+
     var body: some View {
-        AppEmptyStateView(
-            title: L10n.Common.noData,
-            systemImage: AppIcon.Portfolio.history,
-            minHeight: 230
-        )
+        if isLoading {
+            HomeChartSkeleton()
+                .frame(maxWidth: .infinity, minHeight: 230)
+                .redacted(reason: .placeholder)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        } else {
+            AppEmptyStateView(
+                title: L10n.Common.noData,
+                systemImage: AppIcon.Portfolio.history,
+                minHeight: 230
+            )
+        }
     }
 }
 

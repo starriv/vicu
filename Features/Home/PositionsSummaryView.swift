@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PositionsSummaryView: View {
     @Environment(AppModel.self) private var app
+    var showsInitialSkeleton = false
     @State private var selectedCategory: PositionAssetCategory?
 
     var body: some View {
@@ -10,53 +11,57 @@ struct PositionsSummaryView: View {
             selectedCategory: selectedCategory
         )
 
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.group) {
-            NavigationLink {
-                PositionsView()
-            } label: {
-                AppSectionHeader(L10n.Positions.sectionTitle) {
-                    HStack(spacing: 6) {
-                        if !snapshot.isEmpty {
-                            Text("\(app.portfolio.positions.count)")
-                                .font(AppTypography.detail.monospacedDigit())
-                                .foregroundStyle(.secondary)
+        if showsInitialSkeleton {
+            HomePositionsSummarySkeleton()
+        } else {
+            VStack(alignment: .leading, spacing: AppTheme.Spacing.group) {
+                NavigationLink {
+                    PositionsView()
+                } label: {
+                    AppSectionHeader(L10n.Positions.sectionTitle) {
+                        HStack(spacing: 6) {
+                            if !snapshot.isEmpty {
+                                Text("\(app.portfolio.positions.count)")
+                                    .font(AppTypography.detail.monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.tertiary)
+                                .accessibilityHidden(true)
                         }
-
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.tertiary)
-                            .accessibilityHidden(true)
                     }
+                    .contentShape(Rectangle())
                 }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(
-                L10n.Positions.viewAllAccessibility(
-                    count: app.portfolio.positions.count,
-                    locale: locale
-                )
-            )
-
-            if snapshot.isEmpty {
-                AppEmptyStateView(
-                    title: L10n.Common.noData,
-                    systemImage: AppIcon.Position.empty,
-                    minHeight: 190
-                )
-            } else {
-                if let selectedCategory = snapshot.selectedCategory {
-                    PositionCategoryFilter(
-                        selection: Binding(
-                            get: { selectedCategory },
-                            set: { self.selectedCategory = $0 }
-                        ),
-                        categories: snapshot.visibleCategories,
-                        counts: snapshot.counts,
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    L10n.Positions.viewAllAccessibility(
+                        count: app.portfolio.positions.count,
                         locale: locale
                     )
+                )
 
-                    positionList(snapshot.visiblePositions)
+                if snapshot.isEmpty {
+                    AppEmptyStateView(
+                        title: L10n.Common.noData,
+                        systemImage: AppIcon.Position.empty,
+                        minHeight: 190
+                    )
+                } else {
+                    if let selectedCategory = snapshot.selectedCategory {
+                        PositionCategoryFilter(
+                            selection: Binding(
+                                get: { selectedCategory },
+                                set: { self.selectedCategory = $0 }
+                            ),
+                            categories: snapshot.visibleCategories,
+                            counts: snapshot.counts,
+                            locale: locale
+                        )
+
+                        positionList(snapshot.visiblePositions)
+                    }
                 }
             }
         }
