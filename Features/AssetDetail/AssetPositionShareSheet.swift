@@ -461,7 +461,7 @@ private struct AssetPositionShareCard: View {
                 }
 
                 HStack {
-                    Text("vicu")
+                    Text("@Vicu")
                         .font(.system(size: 18, weight: .black, design: .rounded))
                         .foregroundStyle(AppTheme.ColorToken.brand)
 
