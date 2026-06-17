@@ -1,10 +1,10 @@
 # Vicu
 
-A native iOS client for your Alpaca brokerage account, built in SwiftUI.
-
 ![Platform](https://img.shields.io/badge/platform-iOS%2018%2B-blue)
 ![Swift](https://img.shields.io/badge/Swift-6.0-orange)
 ![UI](https://img.shields.io/badge/SwiftUI-Liquid%20Glass-7d4bff)
+
+A native iOS client for your Alpaca brokerage account, built in SwiftUI.
 
 一款为 Alpaca 证券开发的非官方 iOS 客户端, 设计精美, 功能完善.
 
