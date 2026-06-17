@@ -177,6 +177,77 @@ enum APIClientError: LocalizedError, Equatable {
     }
 }
 
+enum APIErrorDisplayMessage {
+    static func message(for error: Error, locale: Locale = .current) -> String {
+        if let apiError = error as? APIClientError {
+            return message(for: apiError, locale: locale)
+        }
+
+        if let urlError = error as? URLError {
+            return transportMessage(urlError, locale: locale)
+        }
+
+        return APIErrorMessageSanitizer.displayMessage(error.localizedDescription)
+            ?? L10n.API.unexpected(locale: locale)
+    }
+
+    static func message(for apiError: APIClientError, locale: Locale = .current) -> String {
+        switch apiError {
+        case .invalidURL:
+            L10n.API.invalidURLText(locale: locale)
+        case .invalidResponse, .emptyResponse, .decodingFailed(_, _):
+            L10n.API.invalidResponseText(locale: locale)
+        case .cancelled:
+            L10n.API.cancelledText(locale: locale)
+        case .transport(let error):
+            transportMessage(error, locale: locale)
+        case .requestFailed(let statusCode, let message):
+            requestMessage(statusCode: statusCode, fallback: message, locale: locale)
+        case .underlying(let message):
+            APIErrorMessageSanitizer.displayMessage(message) ?? L10n.API.unexpected(locale: locale)
+        }
+    }
+
+    private static func requestMessage(statusCode: Int, fallback: String, locale: Locale) -> String {
+        switch statusCode {
+        case 401:
+            L10n.API.credentialsRejected(locale: locale)
+        case 403:
+            L10n.API.permissionDenied(locale: locale)
+        case 404:
+            L10n.API.resourceUnavailable(locale: locale)
+        case 408:
+            L10n.API.timeout(locale: locale)
+        case 429:
+            L10n.API.rateLimited(locale: locale)
+        case 500...599:
+            L10n.API.serviceUnavailable(locale: locale)
+        case 400...499:
+            L10n.API.requestRejected(locale: locale)
+        default:
+            APIErrorMessageSanitizer.displayMessage(fallback)
+                ?? L10n.API.requestFailed(statusCode: statusCode, message: fallback, locale: locale)
+        }
+    }
+
+    private static func transportMessage(_ error: URLError, locale: Locale) -> String {
+        switch error.code {
+        case .timedOut:
+            L10n.API.timeout(locale: locale)
+        case .notConnectedToInternet,
+             .networkConnectionLost,
+             .cannotFindHost,
+             .cannotConnectToHost,
+             .dnsLookupFailed,
+             .internationalRoamingOff,
+             .dataNotAllowed:
+            L10n.API.networkUnavailable(locale: locale)
+        default:
+            L10n.API.networkRequestFailed(locale: locale)
+        }
+    }
+}
+
 extension URLSessionConfiguration {
     static var vicuAPI: URLSessionConfiguration {
         let configuration = URLSessionConfiguration.default

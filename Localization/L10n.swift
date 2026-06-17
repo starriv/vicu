@@ -547,14 +547,51 @@ enum L10n {
         static var invalidResponse: String { L10n.string("api.invalid_response") }
         static var emptyResponse: String { L10n.string("api.empty_response") }
         static var cancelled: String { L10n.string("api.cancelled") }
+        static func invalidURLText(locale: Locale = .current) -> String { L10n.string("api.invalid_url", locale: locale) }
+        static func invalidResponseText(locale: Locale = .current) -> String { L10n.string("api.invalid_response", locale: locale) }
+        static func emptyResponseText(locale: Locale = .current) -> String { L10n.string("api.empty_response", locale: locale) }
+        static func cancelledText(locale: Locale = .current) -> String { L10n.string("api.cancelled", locale: locale) }
         static func transportFailed(_ message: String) -> String {
             L10n.format("api.transport_failed_format", message)
         }
         static func requestFailed(statusCode: Int, message: String) -> String {
             L10n.format("api.request_failed_format", statusCode, message)
         }
+        static func requestFailed(statusCode: Int, message: String, locale: Locale) -> String {
+            L10n.format("api.request_failed_format", locale: locale, statusCode, message)
+        }
         static func decodingFailed(_ message: String) -> String {
             L10n.format("api.decoding_failed_format", message)
+        }
+        static func credentialsRejected(locale: Locale = .current) -> String {
+            L10n.string("api.error.credentials_rejected", locale: locale)
+        }
+        static func permissionDenied(locale: Locale = .current) -> String {
+            L10n.string("api.error.permission_denied", locale: locale)
+        }
+        static func resourceUnavailable(locale: Locale = .current) -> String {
+            L10n.string("api.error.resource_unavailable", locale: locale)
+        }
+        static func requestRejected(locale: Locale = .current) -> String {
+            L10n.string("api.error.request_rejected", locale: locale)
+        }
+        static func rateLimited(locale: Locale = .current) -> String {
+            L10n.string("api.error.rate_limited", locale: locale)
+        }
+        static func serviceUnavailable(locale: Locale = .current) -> String {
+            L10n.string("api.error.service_unavailable", locale: locale)
+        }
+        static func timeout(locale: Locale = .current) -> String {
+            L10n.string("api.error.timeout", locale: locale)
+        }
+        static func networkUnavailable(locale: Locale = .current) -> String {
+            L10n.string("api.error.network_unavailable", locale: locale)
+        }
+        static func networkRequestFailed(locale: Locale = .current) -> String {
+            L10n.string("api.error.network_request_failed", locale: locale)
+        }
+        static func unexpected(locale: Locale = .current) -> String {
+            L10n.string("api.error.unexpected", locale: locale)
         }
     }
 

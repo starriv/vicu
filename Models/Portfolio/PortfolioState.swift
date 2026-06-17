@@ -1,5 +1,3 @@
-import Foundation
-
 struct PortfolioState: Sendable {
     var account: AlpacaAccount?
     var positions: [AlpacaPosition] = []

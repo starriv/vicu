@@ -242,23 +242,6 @@ extension AppModel {
         return error.localizedDescription
     }
 
-    private func marketAssets(credentials: AlpacaCredentials) async throws -> [AlpacaAsset] {
-        if let marketAssetCache,
-           let marketAssetCacheDate,
-           Date().timeIntervalSince(marketAssetCacheDate) < marketAssetCacheTTL {
-            return marketAssetCache
-        }
-
-        let fetchedAssets = try await services.alpaca.fetchMarketAssets(credentials: credentials)
-        let assets = fetchedAssets.filter { asset in
-            asset.symbol.isEmpty == false && asset.status?.lowercased() == "active"
-        }
-
-        marketAssetCache = assets
-        marketAssetCacheDate = Date()
-        return assets
-    }
-
     private func mergePortfolioOrder(_ order: AlpacaOrder) {
         if let index = portfolio.orders.firstIndex(where: { $0.id == order.id }) {
             portfolio.orders[index] = order

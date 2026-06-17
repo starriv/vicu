@@ -40,7 +40,7 @@ extension AppModel {
             guard isCurrentCredentialOperation(generation, environment: candidate.environment) else {
                 return false
             }
-            let message = error.localizedDescription
+            let message = credentialErrorMessage(for: error)
             credentialsStatus = .failed(candidate.environment, message: message)
             setCredentialMessage(message)
             return false
@@ -83,7 +83,7 @@ extension AppModel {
             guard isCurrentCredentialOperation(generation, environment: newCredentials.environment) else {
                 return .cancelled
             }
-            let message = error.localizedDescription
+            let message = credentialErrorMessage(for: error)
             credentialsStatus = .failed(newCredentials.environment, message: message)
             setCredentialMessage(message)
             return .failure(message)
@@ -137,7 +137,7 @@ extension AppModel {
             guard isCurrentCredentialOperation(generation, environment: newCredentials.environment) else {
                 return false
             }
-            let message = error.localizedDescription
+            let message = credentialErrorMessage(for: error)
             credentialsStatus = .failed(newCredentials.environment, message: message)
             setCredentialMessage(message)
             return false
@@ -198,7 +198,7 @@ extension AppModel {
             guard isCurrentCredentialOperation(generation, environment: environment) else {
                 return
             }
-            setCredentialMessage(error.localizedDescription)
+            setCredentialMessage(credentialErrorMessage(for: error))
         }
     }
 
@@ -238,7 +238,7 @@ extension AppModel {
             cachedMarketOverview = nil
             credentialsStatus = .missing
             verifiedCredentialFingerprint = nil
-            setCredentialMessage(error.localizedDescription)
+            setCredentialMessage(credentialErrorMessage(for: error))
             portfolio.clear()
             resetFavoriteMarketSymbols()
             completeCredentialBootstrapIfNeeded(completesBootstrap)
@@ -253,6 +253,10 @@ extension AppModel {
     private func clearCredentialMessage() {
         credentialMessage = nil
         lastError = nil
+    }
+
+    private func credentialErrorMessage(for error: Error) -> String {
+        APIErrorDisplayMessage.message(for: error, locale: appLanguage.locale)
     }
 
     private func completeCredentialBootstrapIfNeeded(_ shouldComplete: Bool) {
@@ -341,7 +345,7 @@ extension AppModel {
             guard isCurrentCredentialOperation(generation, environment: stored.environment) else {
                 return
             }
-            let message = error.localizedDescription
+            let message = credentialErrorMessage(for: error)
             if error.isAuthenticationFailure {
                 credentialsStatus = .failed(stored.environment, message: message)
             } else {

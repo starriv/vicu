@@ -1,33 +1,5 @@
 import Foundation
 
-struct OrdersListRequest: Equatable, Identifiable, Sendable {
-    let id: UUID
-    let symbol: String
-    let reason: OrdersListRequestReason
-
-    init(symbol: String, reason: OrdersListRequestReason) {
-        id = UUID()
-        self.symbol = symbol
-        self.reason = reason
-    }
-
-    var criteria: OrdersFilterCriteria {
-        OrdersFilterCriteria(
-            timeRange: .all,
-            symbols: [symbol]
-        )
-    }
-}
-
-enum OrdersListRequestReason: String, Sendable {
-    case assetDetail
-}
-
-enum TradeSubmitResult: Sendable {
-    case success(AlpacaOrder)
-    case failure(String)
-}
-
 enum CredentialConnectResult: Sendable, Equatable {
     case success(TradeEnvironment)
     case failure(String)
@@ -130,22 +102,4 @@ enum CredentialGateState {
     case loading
     case requiresCredentials
     case unlocked
-}
-
-extension Error {
-    var isAuthenticationFailure: Bool {
-        guard let apiError = self as? APIClientError,
-              let statusCode = apiError.statusCode else {
-            return false
-        }
-
-        return statusCode == 401 || statusCode == 403
-    }
-}
-
-extension AlpacaCredentials {
-    var maskedKeyID: String {
-        let visibleSuffix = keyID.suffix(4)
-        return "••••\(visibleSuffix)"
-    }
 }

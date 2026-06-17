@@ -188,8 +188,6 @@ private struct AlpacaCredentialConfigurationView: View {
             .animation(.snappy, value: isConnectInProgress)
             .animation(.snappy, value: hasCredentialInput)
             .accessibilityHint(L10n.Alpaca.saveToKeychainHint)
-
-            LoginStatusMessage(status: app.credentialsStatus, lastMessage: app.credentialMessage)
         }
         .frame(maxWidth: 430, alignment: .leading)
         .frame(maxWidth: .infinity)
@@ -498,79 +496,6 @@ private struct AlpacaLastMessageSection: View {
             } header: {
                 Text(L10n.Alpaca.lastMessage)
             }
-        }
-    }
-}
-
-private struct LoginStatusMessage: View {
-    @Environment(\.locale) private var locale
-
-    let status: CredentialsStatus
-    let lastMessage: String?
-
-    var body: some View {
-        if let message = displayMessage {
-            Label {
-                Text(message)
-                    .font(AppTypography.detail)
-                    .foregroundStyle(.secondary)
-                    .lineSpacing(AppTypography.secondaryLineSpacing)
-                    .fixedSize(horizontal: false, vertical: true)
-            } icon: {
-                if status.isTesting {
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(width: 24)
-                } else {
-                    Image(systemName: iconName)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(iconTint)
-                        .frame(width: 24)
-                }
-            }
-            .accessibilityElement(children: .combine)
-        }
-    }
-
-    private var displayMessage: String? {
-        if status.isTesting {
-            return status.detail(locale: locale)
-        }
-
-        if let lastMessage, !lastMessage.isEmpty {
-            return lastMessage
-        }
-
-        if case .verified = status {
-            return status.detail(locale: locale)
-        }
-
-        return nil
-    }
-
-    private var iconName: String {
-        switch status {
-        case .connected, .verified:
-            AppIcon.Alpaca.connected
-        case .failed:
-            AppIcon.Alpaca.failed
-        case .testing:
-            AppIcon.Alpaca.testing
-        case .missing, .untested:
-            AppIcon.Alpaca.missing
-        }
-    }
-
-    private var iconTint: Color {
-        switch status {
-        case .connected, .verified:
-            AppTheme.ColorToken.positive
-        case .failed:
-            AppTheme.ColorToken.negative
-        case .testing:
-            AppTheme.ColorToken.brand
-        case .missing, .untested:
-            AppTheme.ColorToken.warning
         }
     }
 }

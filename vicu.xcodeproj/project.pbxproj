@@ -9,14 +9,17 @@
 /* Begin PBXBuildFile section */
 		0A0000000000000000000101 /* VicuApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000201 /* VicuApp.swift */; };
 		0A0000000000000000000102 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000202 /* AppModel.swift */; };
-		0A00000000000000000001F5 /* AppModelTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F5 /* AppModelTypes.swift */; };
-		0A00000000000000000001F6 /* AppModelCaches.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F6 /* AppModelCaches.swift */; };
+		0A00000000000000000001F5 /* CredentialModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F5 /* CredentialModels.swift */; };
+		0A00000000000000000001F6 /* AppModelCacheKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F6 /* AppModelCacheKeys.swift */; };
 		0A00000000000000000001F7 /* AppModel+Navigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F7 /* AppModel+Navigation.swift */; };
 		0A00000000000000000001F8 /* AppModel+Credentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F8 /* AppModel+Credentials.swift */; };
 		0A00000000000000000001F9 /* AppModel+Portfolio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F9 /* AppModel+Portfolio.swift */; };
 		0A00000000000000000001FA /* AppModel+Markets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002FA /* AppModel+Markets.swift */; };
 		0A00000000000000000001FB /* AppModel+Realtime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002FB /* AppModel+Realtime.swift */; };
 		0A00000000000000000001FC /* AppModel+Utilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002FC /* AppModel+Utilities.swift */; };
+		0A00000000000000000001FD /* OrdersListRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002FD /* OrdersListRequest.swift */; };
+		0A00000000000000000001FE /* TradeSubmitResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002FE /* TradeSubmitResult.swift */; };
+		0A00000000000000000001FF /* APIClientError+Authentication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002FF /* APIClientError+Authentication.swift */; };
 		0A0000000000000000000103 /* AppTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000203 /* AppTab.swift */; };
 		0A0000000000000000000104 /* LoadState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000204 /* LoadState.swift */; };
 		0A0000000000000000000105 /* TradeEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000205 /* TradeEnvironment.swift */; };
@@ -136,20 +139,23 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		0A0000000000000000000201 /* VicuApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/VicuApp.swift; sourceTree = "<group>"; };
-		0A0000000000000000000202 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppModel.swift; sourceTree = "<group>"; };
-		0A00000000000000000002F5 /* AppModelTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppModelTypes.swift; sourceTree = "<group>"; };
-		0A00000000000000000002F6 /* AppModelCaches.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppModelCaches.swift; sourceTree = "<group>"; };
-		0A00000000000000000002F7 /* AppModel+Navigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/AppModel+Navigation.swift"; sourceTree = "<group>"; };
-		0A00000000000000000002F8 /* AppModel+Credentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/AppModel+Credentials.swift"; sourceTree = "<group>"; };
-		0A00000000000000000002F9 /* AppModel+Portfolio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/AppModel+Portfolio.swift"; sourceTree = "<group>"; };
-		0A00000000000000000002FA /* AppModel+Markets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/AppModel+Markets.swift"; sourceTree = "<group>"; };
-		0A00000000000000000002FB /* AppModel+Realtime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/AppModel+Realtime.swift"; sourceTree = "<group>"; };
-		0A00000000000000000002FC /* AppModel+Utilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/AppModel+Utilities.swift"; sourceTree = "<group>"; };
-		0A0000000000000000000203 /* AppTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppTab.swift; sourceTree = "<group>"; };
+		0A0000000000000000000201 /* VicuApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VicuApp.swift; sourceTree = "<group>"; };
+		0A0000000000000000000202 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		0A00000000000000000002F5 /* CredentialModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/Credentials/CredentialModels.swift; sourceTree = "<group>"; };
+		0A00000000000000000002F6 /* AppModelCacheKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/Caching/AppModelCacheKeys.swift; sourceTree = "<group>"; };
+		0A00000000000000000002F7 /* AppModel+Navigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Navigation.swift"; sourceTree = "<group>"; };
+		0A00000000000000000002F8 /* AppModel+Credentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Credentials.swift"; sourceTree = "<group>"; };
+		0A00000000000000000002F9 /* AppModel+Portfolio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Portfolio.swift"; sourceTree = "<group>"; };
+		0A00000000000000000002FA /* AppModel+Markets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Markets.swift"; sourceTree = "<group>"; };
+		0A00000000000000000002FB /* AppModel+Realtime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Realtime.swift"; sourceTree = "<group>"; };
+		0A00000000000000000002FC /* AppModel+Utilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Utilities.swift"; sourceTree = "<group>"; };
+		0A00000000000000000002FD /* OrdersListRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/Orders/OrdersListRequest.swift; sourceTree = "<group>"; };
+		0A00000000000000000002FE /* TradeSubmitResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/Trade/TradeSubmitResult.swift; sourceTree = "<group>"; };
+		0A00000000000000000002FF /* APIClientError+Authentication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared/Utilities/APIClientError+Authentication.swift"; sourceTree = "<group>"; };
+		0A0000000000000000000203 /* AppTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/Navigation/AppTab.swift; sourceTree = "<group>"; };
 		0A0000000000000000000204 /* LoadState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/LoadState.swift; sourceTree = "<group>"; };
 		0A0000000000000000000205 /* TradeEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/TradeEnvironment.swift; sourceTree = "<group>"; };
-		0A0000000000000000000206 /* AlpacaCredentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/AlpacaCredentials.swift; sourceTree = "<group>"; };
+		0A0000000000000000000206 /* AlpacaCredentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/Credentials/AlpacaCredentials.swift; sourceTree = "<group>"; };
 		0A0000000000000000000251 /* AppLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/AppLanguage.swift; sourceTree = "<group>"; };
 		0A0000000000000000000248 /* AppearanceMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/AppearanceMode.swift; sourceTree = "<group>"; };
 		0A0000000000000000000207 /* AlpacaModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Alpaca/AlpacaModels.swift; sourceTree = "<group>"; };
@@ -226,7 +232,7 @@
 		0A0000000000000000000233 /* AccountMetricsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Home/AccountMetricsView.swift; sourceTree = "<group>"; };
 		0A0000000000000000000234 /* PositionsSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Home/PositionsSummaryView.swift; sourceTree = "<group>"; };
 		0A0000000000000000000264 /* RecentOrdersSummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Home/RecentOrdersSummaryView.swift; sourceTree = "<group>"; };
-		0A0000000000000000000235 /* PortfolioState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/PortfolioState.swift; sourceTree = "<group>"; };
+		0A0000000000000000000235 /* PortfolioState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/Portfolio/PortfolioState.swift; sourceTree = "<group>"; };
 		0A0000000000000000000236 /* APIInterceptors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/API/APIInterceptors.swift; sourceTree = "<group>"; };
 		0A0000000000000000000246 /* BasicLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Layouts/BasicLayout.swift; sourceTree = "<group>"; };
 		0A0000000000000000000247 /* MoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/More/MoreView.swift; sourceTree = "<group>"; };
@@ -270,16 +276,12 @@
 		0A0000000000000000000502 /* vicu */ = {
 			isa = PBXGroup;
 			children = (
-				0A0000000000000000000201 /* VicuApp.swift */,
-				0A0000000000000000000202 /* AppModel.swift */,
-				0A00000000000000000002F5 /* AppModelTypes.swift */,
-				0A00000000000000000002F6 /* AppModelCaches.swift */,
-				0A00000000000000000002F7 /* AppModel+Navigation.swift */,
-				0A00000000000000000002F8 /* AppModel+Credentials.swift */,
-				0A00000000000000000002F9 /* AppModel+Portfolio.swift */,
-				0A00000000000000000002FA /* AppModel+Markets.swift */,
-				0A00000000000000000002FB /* AppModel+Realtime.swift */,
-				0A00000000000000000002FC /* AppModel+Utilities.swift */,
+				0A0000000000000000000505 /* App */,
+				0A00000000000000000002F5 /* CredentialModels.swift */,
+				0A00000000000000000002F6 /* AppModelCacheKeys.swift */,
+				0A00000000000000000002FD /* OrdersListRequest.swift */,
+				0A00000000000000000002FE /* TradeSubmitResult.swift */,
+				0A00000000000000000002FF /* APIClientError+Authentication.swift */,
 				0A0000000000000000000203 /* AppTab.swift */,
 				0A0000000000000000000235 /* PortfolioState.swift */,
 				0A0000000000000000000204 /* LoadState.swift */,
@@ -369,6 +371,29 @@
 				0A0000000000000000000220 /* Assets.xcassets */,
 				0A0000000000000000000227 /* Localizable.xcstrings */,
 			);
+			sourceTree = "<group>";
+		};
+		0A0000000000000000000505 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				0A0000000000000000000201 /* VicuApp.swift */,
+				0A0000000000000000000506 /* AppModel */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		0A0000000000000000000506 /* AppModel */ = {
+			isa = PBXGroup;
+			children = (
+				0A0000000000000000000202 /* AppModel.swift */,
+				0A00000000000000000002F8 /* AppModel+Credentials.swift */,
+				0A00000000000000000002FA /* AppModel+Markets.swift */,
+				0A00000000000000000002F7 /* AppModel+Navigation.swift */,
+				0A00000000000000000002F9 /* AppModel+Portfolio.swift */,
+				0A00000000000000000002FB /* AppModel+Realtime.swift */,
+				0A00000000000000000002FC /* AppModel+Utilities.swift */,
+			);
+			path = AppModel;
 			sourceTree = "<group>";
 		};
 		0A0000000000000000000503 /* Products */ = {
@@ -501,14 +526,17 @@
 			files = (
 				0A0000000000000000000101 /* VicuApp.swift in Sources */,
 				0A0000000000000000000102 /* AppModel.swift in Sources */,
-				0A00000000000000000001F5 /* AppModelTypes.swift in Sources */,
-				0A00000000000000000001F6 /* AppModelCaches.swift in Sources */,
+				0A00000000000000000001F5 /* CredentialModels.swift in Sources */,
+				0A00000000000000000001F6 /* AppModelCacheKeys.swift in Sources */,
 				0A00000000000000000001F7 /* AppModel+Navigation.swift in Sources */,
 				0A00000000000000000001F8 /* AppModel+Credentials.swift in Sources */,
 				0A00000000000000000001F9 /* AppModel+Portfolio.swift in Sources */,
 				0A00000000000000000001FA /* AppModel+Markets.swift in Sources */,
 				0A00000000000000000001FB /* AppModel+Realtime.swift in Sources */,
 				0A00000000000000000001FC /* AppModel+Utilities.swift in Sources */,
+				0A00000000000000000001FD /* OrdersListRequest.swift in Sources */,
+				0A00000000000000000001FE /* TradeSubmitResult.swift in Sources */,
+				0A00000000000000000001FF /* APIClientError+Authentication.swift in Sources */,
 				0A0000000000000000000103 /* AppTab.swift in Sources */,
 				0A0000000000000000000104 /* LoadState.swift in Sources */,
 				0A0000000000000000000105 /* TradeEnvironment.swift in Sources */,
