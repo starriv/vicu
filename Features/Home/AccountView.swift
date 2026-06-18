@@ -235,6 +235,21 @@ private struct AccountInfoRow: View {
 
             Spacer(minLength: 12)
 
+            valueContent
+        }
+        .padding(.vertical, 12)
+        .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private var valueContent: some View {
+        if let copyValue = row.copyValue, AccountDetailFormatter.clean(copyValue) != nil {
+            AppCopyableIdentifier(
+                value: copyValue,
+                displayValue: row.value,
+                accessibilityLabel: row.title
+            )
+        } else {
             Text(row.value)
                 .font(AppTypography.detail.monospacedDigit())
                 .foregroundStyle(row.valueTint)
@@ -242,7 +257,6 @@ private struct AccountInfoRow: View {
                 .lineLimit(2)
                 .minimumScaleFactor(0.78)
         }
-        .padding(.vertical, 12)
     }
 }
 
@@ -257,7 +271,7 @@ private struct AccountSectionModel: Identifiable {
         return [
             AccountSectionModel(title: L10n.AccountDetail.overview, rows: [
                 AccountRowModel(L10n.AccountDetail.accountNumber, account.accountNumber, "number"),
-                AccountRowModel(L10n.AccountDetail.accountID, account.id, "person.text.rectangle"),
+                AccountRowModel(L10n.AccountDetail.accountID, account.id, "person.text.rectangle", copyValue: account.id),
                 AccountRowModel(L10n.AccountDetail.status, account.status, "checkmark.seal.fill", valueTint: AccountDetailFormatter.statusTint(account.status)),
                 AccountRowModel(L10n.AccountDetail.cryptoStatus, account.cryptoStatus, "bitcoinsign.circle", valueTint: AccountDetailFormatter.statusTint(account.cryptoStatus)),
                 AccountRowModel(L10n.AccountDetail.currency, AccountDetailFormatter.currency(account.currency), "dollarsign.circle"),
@@ -265,29 +279,29 @@ private struct AccountSectionModel: Identifiable {
                 AccountRowModel(L10n.AccountDetail.balanceAsOf, account.balanceAsOf, "calendar.badge.clock")
             ]),
             AccountSectionModel(title: L10n.AccountDetail.buyingPowerSection, rows: [
-                AccountRowModel(L10n.Account.buyingPower, AppFormatter.money(account.buyingPower, currencyCode: currency), "creditcard"),
-                AccountRowModel(L10n.AccountDetail.effectiveBuyingPower, AppFormatter.money(account.effectiveBuyingPower, currencyCode: currency), "bolt.circle"),
-                AccountRowModel(L10n.AccountDetail.regtBuyingPower, AppFormatter.money(account.regtBuyingPower, currencyCode: currency), "building.columns"),
-                AccountRowModel(L10n.AccountDetail.daytradingBuyingPower, AppFormatter.money(account.daytradingBuyingPower, currencyCode: currency), "clock.arrow.circlepath"),
-                AccountRowModel(L10n.AccountDetail.nonMarginableBuyingPower, AppFormatter.money(account.nonMarginableBuyingPower, currencyCode: currency), "lock.circle"),
-                AccountRowModel(L10n.AccountDetail.optionsBuyingPower, AppFormatter.money(account.optionsBuyingPower, currencyCode: currency), "slider.horizontal.3"),
-                AccountRowModel(L10n.AccountDetail.bodDtbp, AppFormatter.money(account.bodDtbp, currencyCode: currency), "sunrise")
+                AccountRowModel(L10n.Account.buyingPower, AppFormatter.compactMoney(account.buyingPower, currencyCode: currency), "creditcard"),
+                AccountRowModel(L10n.AccountDetail.effectiveBuyingPower, AppFormatter.compactMoney(account.effectiveBuyingPower, currencyCode: currency), "bolt.circle"),
+                AccountRowModel(L10n.AccountDetail.regtBuyingPower, AppFormatter.compactMoney(account.regtBuyingPower, currencyCode: currency), "building.columns"),
+                AccountRowModel(L10n.AccountDetail.daytradingBuyingPower, AppFormatter.compactMoney(account.daytradingBuyingPower, currencyCode: currency), "clock.arrow.circlepath"),
+                AccountRowModel(L10n.AccountDetail.nonMarginableBuyingPower, AppFormatter.compactMoney(account.nonMarginableBuyingPower, currencyCode: currency), "lock.circle"),
+                AccountRowModel(L10n.AccountDetail.optionsBuyingPower, AppFormatter.compactMoney(account.optionsBuyingPower, currencyCode: currency), "slider.horizontal.3"),
+                AccountRowModel(L10n.AccountDetail.bodDtbp, AppFormatter.compactMoney(account.bodDtbp, currencyCode: currency), "sunrise")
             ]),
             AccountSectionModel(title: L10n.AccountDetail.balances, rows: [
-                AccountRowModel(L10n.AccountDetail.portfolioValue, AppFormatter.money(account.portfolioValue, currencyCode: currency), "chart.pie"),
-                AccountRowModel(L10n.AccountDetail.equity, AppFormatter.money(account.equity, currencyCode: currency), "sum"),
-                AccountRowModel(L10n.AccountDetail.lastEquity, AppFormatter.money(account.lastEquity, currencyCode: currency), "clock"),
-                AccountRowModel(L10n.Account.cash, AppFormatter.money(account.cash, currencyCode: currency), "dollarsign.circle"),
-                AccountRowModel(L10n.Account.longMarketValue, AppFormatter.money(account.longMarketValue, currencyCode: currency), "arrow.up.right.circle"),
-                AccountRowModel(L10n.Account.shortMarketValue, AppFormatter.money(account.shortMarketValue, currencyCode: currency), "arrow.down.right.circle"),
-                AccountRowModel(L10n.AccountDetail.positionMarketValue, AppFormatter.money(account.positionMarketValue, currencyCode: currency), "briefcase")
+                AccountRowModel(L10n.AccountDetail.portfolioValue, AppFormatter.compactMoney(account.portfolioValue, currencyCode: currency), "chart.pie"),
+                AccountRowModel(L10n.AccountDetail.equity, AppFormatter.compactMoney(account.equity, currencyCode: currency), "sum"),
+                AccountRowModel(L10n.AccountDetail.lastEquity, AppFormatter.compactMoney(account.lastEquity, currencyCode: currency), "clock"),
+                AccountRowModel(L10n.Account.cash, AppFormatter.compactMoney(account.cash, currencyCode: currency), "dollarsign.circle"),
+                AccountRowModel(L10n.Account.longMarketValue, AppFormatter.compactMoney(account.longMarketValue, currencyCode: currency), "arrow.up.right.circle"),
+                AccountRowModel(L10n.Account.shortMarketValue, AppFormatter.compactMoney(account.shortMarketValue, currencyCode: currency), "arrow.down.right.circle"),
+                AccountRowModel(L10n.AccountDetail.positionMarketValue, AppFormatter.compactMoney(account.positionMarketValue, currencyCode: currency), "briefcase")
             ]),
             AccountSectionModel(title: L10n.AccountDetail.margin, rows: [
                 AccountRowModel(L10n.AccountDetail.multiplier, AccountDetailFormatter.multiplier(account.multiplier), "multiply.circle"),
-                AccountRowModel(L10n.AccountDetail.initialMargin, AppFormatter.money(account.initialMargin, currencyCode: currency), "flag"),
-                AccountRowModel(L10n.AccountDetail.maintenanceMargin, AppFormatter.money(account.maintenanceMargin, currencyCode: currency), "wrench.adjustable"),
-                AccountRowModel(L10n.AccountDetail.lastMaintenanceMargin, AppFormatter.money(account.lastMaintenanceMargin, currencyCode: currency), "clock.badge.checkmark"),
-                AccountRowModel(L10n.AccountDetail.sma, AppFormatter.money(account.sma, currencyCode: currency), "waveform.path.ecg")
+                AccountRowModel(L10n.AccountDetail.initialMargin, AppFormatter.compactMoney(account.initialMargin, currencyCode: currency), "flag"),
+                AccountRowModel(L10n.AccountDetail.maintenanceMargin, AppFormatter.compactMoney(account.maintenanceMargin, currencyCode: currency), "wrench.adjustable"),
+                AccountRowModel(L10n.AccountDetail.lastMaintenanceMargin, AppFormatter.compactMoney(account.lastMaintenanceMargin, currencyCode: currency), "clock.badge.checkmark"),
+                AccountRowModel(L10n.AccountDetail.sma, AppFormatter.compactMoney(account.sma, currencyCode: currency), "waveform.path.ecg")
             ]),
             AccountSectionModel(title: L10n.AccountDetail.trading, rows: [
                 AccountRowModel(L10n.AccountDetail.shortingEnabled, AccountDetailFormatter.boolean(account.shortingEnabled), "arrow.down.right.circle", valueTint: AccountDetailFormatter.booleanTint(account.shortingEnabled, positiveWhenTrue: true)),
@@ -302,9 +316,9 @@ private struct AccountSectionModel: Identifiable {
                 AccountRowModel(L10n.AccountDetail.daytradeCount, AccountDetailFormatter.integer(account.daytradeCount), "number.circle")
             ]),
             AccountSectionModel(title: L10n.AccountDetail.feesAdjustments, rows: [
-                AccountRowModel(L10n.AccountDetail.accruedFees, AppFormatter.money(account.accruedFees, currencyCode: currency), "receipt"),
-                AccountRowModel(L10n.AccountDetail.pendingRegTAFFees, AppFormatter.money(account.pendingRegTAFFees, currencyCode: currency), "hourglass.circle"),
-                AccountRowModel(L10n.AccountDetail.intradayAdjustments, AppFormatter.money(account.intradayAdjustments, currencyCode: currency), "arrow.triangle.2.circlepath")
+                AccountRowModel(L10n.AccountDetail.accruedFees, AppFormatter.compactMoney(account.accruedFees, currencyCode: currency), "receipt"),
+                AccountRowModel(L10n.AccountDetail.pendingRegTAFFees, AppFormatter.compactMoney(account.pendingRegTAFFees, currencyCode: currency), "hourglass.circle"),
+                AccountRowModel(L10n.AccountDetail.intradayAdjustments, AppFormatter.compactMoney(account.intradayAdjustments, currencyCode: currency), "arrow.triangle.2.circlepath")
             ])
         ]
     }
@@ -317,30 +331,37 @@ private struct AccountRowModel: Identifiable {
     let systemImage: String
     let tint: Color
     let valueTint: Color
+    let copyValue: String?
 
     init(
         _ title: LocalizedStringKey,
         _ value: String?,
         _ systemImage: String,
         tint: Color = AppTheme.ColorToken.icon,
-        valueTint: Color = .secondary
+        valueTint: Color = .secondary,
+        copyValue: String? = nil
     ) {
         self.title = title
         self.value = AccountDetailFormatter.text(value)
         self.systemImage = systemImage
         self.tint = tint
         self.valueTint = valueTint
+        self.copyValue = copyValue
     }
 }
 
 private enum AccountDetailFormatter {
-    static func text(_ value: String?) -> String {
+    static func clean(_ value: String?) -> String? {
         guard let value else {
-            return AppFormatter.placeholder
+            return nil
         }
 
         let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmedValue.isEmpty ? AppFormatter.placeholder : trimmedValue
+        return trimmedValue.isEmpty ? nil : trimmedValue
+    }
+
+    static func text(_ value: String?) -> String {
+        clean(value) ?? AppFormatter.placeholder
     }
 
     static func boolean(_ value: Bool?) -> String {

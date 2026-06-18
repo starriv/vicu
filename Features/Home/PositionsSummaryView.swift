@@ -112,14 +112,14 @@ private struct PositionRow: View {
                 Text(position.symbol)
                     .font(.headline)
                 Spacer()
-                Text(AppFormatter.money(position.marketValue))
+                Text(AppFormatter.compactMoney(position.marketValue))
                     .font(AppTypography.rowValue)
             }
 
             HStack {
                 Text("\(L10n.string("positions.quantity_prefix", locale: locale)) \(PositionDisplay.quantityText(position.quantity, assetClass: position.assetClass, symbol: position.symbol, locale: locale))")
                 Spacer()
-                Text("\(L10n.string("positions.profit_loss_prefix", locale: locale)) \(AppFormatter.money(position.unrealizedPL))")
+                Text("\(L10n.string("positions.profit_loss_prefix", locale: locale)) \(PositionDisplay.signedCompactMoney(position.unrealizedPL))")
                     .foregroundStyle(profitLossColor)
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
@@ -140,7 +140,7 @@ private extension AlpacaPosition {
         [
             symbol,
             "\(L10n.string("positions.quantity_prefix", locale: locale)) \(PositionDisplay.quantityText(quantity, assetClass: assetClass, symbol: symbol, locale: locale))",
-            "\(L10n.string("positions.profit_loss_prefix", locale: locale)) \(AppFormatter.money(unrealizedPL))"
+            "\(L10n.string("positions.profit_loss_prefix", locale: locale)) \(PositionDisplay.signedCompactMoney(unrealizedPL))"
         ].joined(separator: ", ")
     }
 }

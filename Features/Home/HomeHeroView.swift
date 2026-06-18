@@ -112,13 +112,14 @@ struct HomeHeroView: View {
                 font: AppTypography.heroValue,
                 minimumScaleFactor: 0.82,
                 isAnimated: chartSelection == nil,
-                isSigned: chartMode == .profitLoss
+                isSigned: chartMode == .profitLoss,
+                notation: .compact
             )
             .foregroundStyle(heroAmountColor)
             .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack(spacing: 8) {
-                Text(AppFormatter.signedMoney(displayedRangeChange.amount))
+                Text(AppFormatter.signedCompactMoney(displayedRangeChange.amount))
                 Text("(\(AppFormatter.signedPercent(displayedRangeChange.percent)))")
                 Text(app.portfolio.historyRange.title)
                     .foregroundStyle(.secondary)

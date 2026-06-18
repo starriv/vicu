@@ -232,7 +232,7 @@ private struct AccountActivityRowModel: Identifiable, Equatable {
             return nil
         }
 
-        return AppFormatter.money(value)
+        return AppFormatter.compactMoney(value)
     }
 }
 

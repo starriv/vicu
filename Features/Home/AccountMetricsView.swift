@@ -6,6 +6,7 @@ struct AccountMetricsView: View {
 
     var body: some View {
         let account = app.portfolio.account
+        let currencyCode = account?.currency ?? "USD"
 
         if showsInitialSkeleton {
             HomeAccountMetricsSkeleton()
@@ -22,13 +23,13 @@ struct AccountMetricsView: View {
                     }
 
                     VStack(spacing: 0) {
-                        AppMetricRow(title: L10n.Account.buyingPower, value: AppFormatter.money(account?.buyingPower), systemImage: AppIcon.Account.buyingPower)
+                        AppMetricRow(title: L10n.Account.buyingPower, value: AppFormatter.compactMoney(account?.buyingPower, currencyCode: currencyCode), systemImage: AppIcon.Account.buyingPower)
                         Divider().padding(.leading, 44)
-                        AppMetricRow(title: L10n.Account.cash, value: AppFormatter.money(account?.cash), systemImage: AppIcon.Account.cash)
+                        AppMetricRow(title: L10n.Account.cash, value: AppFormatter.compactMoney(account?.cash, currencyCode: currencyCode), systemImage: AppIcon.Account.cash)
                         Divider().padding(.leading, 44)
-                        AppMetricRow(title: L10n.Account.longMarketValue, value: AppFormatter.money(account?.longMarketValue), systemImage: AppIcon.Account.longMarketValue)
+                        AppMetricRow(title: L10n.Account.longMarketValue, value: AppFormatter.compactMoney(account?.longMarketValue, currencyCode: currencyCode), systemImage: AppIcon.Account.longMarketValue)
                         Divider().padding(.leading, 44)
-                        AppMetricRow(title: L10n.Account.shortMarketValue, value: AppFormatter.money(account?.shortMarketValue), systemImage: AppIcon.Account.shortMarketValue)
+                        AppMetricRow(title: L10n.Account.shortMarketValue, value: AppFormatter.compactMoney(account?.shortMarketValue, currencyCode: currencyCode), systemImage: AppIcon.Account.shortMarketValue)
                     }
                     .padding(.horizontal, 16)
                     .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: AppTheme.CornerRadius.groupedSurface, style: .continuous))
