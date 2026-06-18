@@ -1,0 +1,158 @@
+@import "tailwindcss";
+
+:root {
+  /* Surfaces — warm, paper-like near-white to echo the app's grouped backgrounds */
+  --background: #faf9f6;
+  --surface: #ffffff;
+  --surface-muted: #f3f1ea;
+  --surface-ink: #17191c;
+
+  /* Text */
+  --ink: #1b1d20;
+  --ink-soft: #54595f;
+  --ink-mute: #868d94;
+  --foreground: var(--ink);
+
+  /* Lines */
+  --border: #e9e6dd;
+  --border-strong: #ddd9cd;
+
+  /* Brand — the real product yellow (alpaca mark) + readable amber for text on light */
+  --brand: #fcd72b;
+  --brand-deep: #f2c200;
+  --brand-amber: #9a7400;
+  --on-brand: #2a2406;
+
+  /* Signals */
+  --positive: #1f9d57;
+  --negative: #e0483d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  letter-spacing: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+.focus-ring:focus-visible {
+  outline: 2px solid var(--brand-deep);
+  outline-offset: 3px;
+  border-radius: 10px;
+}
+
+/* Radix accordion (FAQ) open/close transitions */
+@keyframes acc-down {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+    opacity: 1;
+  }
+}
+
+@keyframes acc-up {
+  from {
+    height: var(--radix-accordion-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+
+.animate-acc-down {
+  animation: acc-down 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-acc-up {
+  animation: acc-up 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Radix dialog (mobile nav) */
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-overlay-in {
+  animation: overlay-in 0.18s ease-out;
+}
+
+.animate-sheet-in {
+  animation: sheet-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Soft warm grid backdrop used behind the hero */
+.dotgrid {
+  background-image: radial-gradient(circle at center, rgba(27, 29, 32, 0.05) 1px, transparent 1.4px);
+  background-size: 22px 22px;
+}
+
+/* Legal pages */
+.legal-copy {
+  color: #2b2e31;
+  font-size: 1rem;
+  line-height: 1.85;
+}
+
+.legal-copy h2 {
+  color: var(--ink);
+  font-size: 1.3rem;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  margin: 2.4rem 0 0.7rem;
+}
+
+.legal-copy p {
+  margin: 0 0 1rem;
+}
+
+.legal-copy ul {
+  margin: 0 0 1.25rem;
+  padding-left: 1.2rem;
+}
+
+.legal-copy li {
+  margin: 0.4rem 0;
+}
