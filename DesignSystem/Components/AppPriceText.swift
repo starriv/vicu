@@ -15,6 +15,7 @@ struct AppPriceText: View {
     let isAnimated: Bool
     let isSigned: Bool
     let notation: AppPriceTextNotation
+    let usesCompactFormatting: Bool
 
     init(
         _ value: Double?,
@@ -25,7 +26,8 @@ struct AppPriceText: View {
         minimumScaleFactor: CGFloat = 0.8,
         isAnimated: Bool = false,
         isSigned: Bool = false,
-        notation: AppPriceTextNotation = .standard
+        notation: AppPriceTextNotation = .standard,
+        usesCompactFormatting: Bool = true
     ) {
         self.value = value
         self.currencyCode = currencyCode
@@ -36,6 +38,7 @@ struct AppPriceText: View {
         self.isAnimated = isAnimated
         self.isSigned = isSigned
         self.notation = notation
+        self.usesCompactFormatting = usesCompactFormatting
     }
 
     init(
@@ -47,7 +50,8 @@ struct AppPriceText: View {
         minimumScaleFactor: CGFloat = 0.8,
         isAnimated: Bool = false,
         isSigned: Bool = false,
-        notation: AppPriceTextNotation = .standard
+        notation: AppPriceTextNotation = .standard,
+        usesCompactFormatting: Bool = true
     ) {
         self.init(
             NumberParser.double(from: value),
@@ -58,7 +62,8 @@ struct AppPriceText: View {
             minimumScaleFactor: minimumScaleFactor,
             isAnimated: isAnimated,
             isSigned: isSigned,
-            notation: notation
+            notation: notation,
+            usesCompactFormatting: usesCompactFormatting
         )
     }
 
@@ -80,6 +85,7 @@ struct AppPriceText: View {
                     value,
                     currencyCode: currencyCode,
                     standardFractionLength: fractionLength,
+                    usesCompactFormatting: usesCompactFormatting,
                     placeholder: placeholder
                 )
             }
@@ -97,6 +103,7 @@ struct AppPriceText: View {
                 value,
                 currencyCode: currencyCode,
                 standardFractionLength: fractionLength,
+                usesCompactFormatting: usesCompactFormatting,
                 placeholder: placeholder
             )
         }

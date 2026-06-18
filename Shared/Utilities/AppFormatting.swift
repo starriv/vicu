@@ -2,7 +2,7 @@ import Foundation
 
 enum AppFormatter {
     static let placeholder = "--"
-    static let compactMoneyThreshold: Double = 10_000
+    static let compactMoneyThreshold: Double = 1_000_000
 
     private static let moneyLocale = Locale(identifier: "en_US")
     private static let compactMoneyUnits: [(divisor: Double, suffix: String)] = [
@@ -78,6 +78,7 @@ enum AppFormatter {
         fractionLength: Int = 1,
         standardFractionLength: Int = 2,
         threshold: Double = AppFormatter.compactMoneyThreshold,
+        usesCompactFormatting: Bool = true,
         placeholder: String = AppFormatter.placeholder
     ) -> String {
         compactMoney(
@@ -86,6 +87,7 @@ enum AppFormatter {
             fractionLength: fractionLength,
             standardFractionLength: standardFractionLength,
             threshold: threshold,
+            usesCompactFormatting: usesCompactFormatting,
             placeholder: placeholder
         )
     }
@@ -96,6 +98,7 @@ enum AppFormatter {
         fractionLength: Int = 1,
         standardFractionLength: Int = 2,
         threshold: Double = AppFormatter.compactMoneyThreshold,
+        usesCompactFormatting: Bool = true,
         placeholder: String = AppFormatter.placeholder
     ) -> String {
         guard let value else {
@@ -108,6 +111,7 @@ enum AppFormatter {
             fractionLength: fractionLength,
             standardFractionLength: standardFractionLength,
             threshold: threshold,
+            usesCompactFormatting: usesCompactFormatting,
             placeholder: placeholder
         )
     }
@@ -118,6 +122,7 @@ enum AppFormatter {
         fractionLength: Int = 1,
         standardFractionLength: Int = 2,
         threshold: Double = AppFormatter.compactMoneyThreshold,
+        usesCompactFormatting: Bool = true,
         placeholder: String = AppFormatter.placeholder
     ) -> String {
         guard let value else {
@@ -125,7 +130,8 @@ enum AppFormatter {
         }
 
         let magnitude = abs(value)
-        guard magnitude >= threshold,
+        guard usesCompactFormatting,
+              magnitude >= threshold,
               let unit = compactMoneyUnits.first(where: { magnitude >= $0.divisor }) else {
             return money(
                 value,
@@ -166,6 +172,7 @@ enum AppFormatter {
         fractionLength: Int = 1,
         standardFractionLength: Int = 2,
         threshold: Double = AppFormatter.compactMoneyThreshold,
+        usesCompactFormatting: Bool = true,
         placeholder: String = AppFormatter.placeholder
     ) -> String {
         guard let value else {
@@ -179,6 +186,7 @@ enum AppFormatter {
             fractionLength: fractionLength,
             standardFractionLength: standardFractionLength,
             threshold: threshold,
+            usesCompactFormatting: usesCompactFormatting,
             placeholder: placeholder
         )
         return "\(sign)\(compactText)"

@@ -113,7 +113,8 @@ struct HomeHeroView: View {
                 minimumScaleFactor: 0.82,
                 isAnimated: chartSelection == nil,
                 isSigned: chartMode == .profitLoss,
-                notation: .compact
+                notation: .compact,
+                usesCompactFormatting: chartMode == .profitLoss
             )
             .foregroundStyle(heroAmountColor)
             .frame(maxWidth: .infinity, alignment: .leading)
