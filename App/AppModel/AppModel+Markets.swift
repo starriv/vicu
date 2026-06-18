@@ -371,8 +371,19 @@ extension AppModel {
         if !forceReload,
            let cachedEntry = optionBarsPageCache[cacheKey],
            Date().timeIntervalSince(cachedEntry.cachedAt) < optionBarsPageCacheTTL {
+            #if DEBUG
+            print(
+                "[OptionChart][AppModel] cache-hit symbol=\(normalizedSymbol) range=\(range.title) bars=\(cachedEntry.value.bars.count) nextPageToken=\(cachedEntry.value.nextPageToken ?? "nil") first={\(cachedEntry.value.bars.first?.debugSummary ?? "nil")} last={\(cachedEntry.value.bars.last?.debugSummary ?? "nil")}"
+            )
+            #endif
             return cachedEntry.value
         }
+
+        #if DEBUG
+        print(
+            "[OptionChart][AppModel] fetch symbol=\(normalizedSymbol) range=\(range.title) limit=\(resolvedLimit) pageToken=\(pageToken ?? "nil") forceReload=\(forceReload)"
+        )
+        #endif
 
         let page = try await services.alpaca.fetchOptionBars(
             symbol: normalizedSymbol,
@@ -383,6 +394,11 @@ extension AppModel {
             sort: .asc,
             credentials: credentials
         )
+        #if DEBUG
+        print(
+            "[OptionChart][AppModel] fetched symbol=\(normalizedSymbol) range=\(range.title) bars=\(page.bars.count) nextPageToken=\(page.nextPageToken ?? "nil") first={\(page.bars.first?.debugSummary ?? "nil")} last={\(page.bars.last?.debugSummary ?? "nil")}"
+        )
+        #endif
         optionBarsPageCache[cacheKey] = TimedCacheEntry(value: page, cachedAt: Date())
         return page
     }

@@ -16,6 +16,7 @@ struct OptionDetailSnapshotModel {
     let priceText: String
     let typeTint: Color
     let updatedText: String
+    let metricsTitle: String
     let metrics: [OptionDetailMetricModel]
     let specs: [OptionDetailMetricModel]
 
@@ -48,20 +49,54 @@ struct OptionDetailSnapshotModel {
         let eventDate = AlpacaDateParser.date(quote?.timestamp) ?? AlpacaDateParser.date(trade?.timestamp)
         updatedText = OptionValueText.time(eventDate)
 
-        metrics = [
+        var resolvedMetrics = [
             OptionDetailMetricModel(title: "Bid", value: OptionValueText.money(quote?.bidPrice)),
             OptionDetailMetricModel(title: "Ask", value: OptionValueText.money(quote?.askPrice)),
             OptionDetailMetricModel(title: "Mid", value: OptionValueText.money(midPrice)),
-            OptionDetailMetricModel(title: "Last", value: OptionValueText.money(lastPrice)),
-            OptionDetailMetricModel(title: "IV", value: OptionValueText.percent(snapshot?.impliedVolatility)),
-            OptionDetailMetricModel(title: "Delta", value: OptionValueText.decimal(greeks?.delta)),
-            OptionDetailMetricModel(title: "Gamma", value: OptionValueText.decimal(greeks?.gamma)),
-            OptionDetailMetricModel(title: "Theta", value: OptionValueText.decimal(greeks?.theta)),
-            OptionDetailMetricModel(title: "Vega", value: OptionValueText.decimal(greeks?.vega)),
-            OptionDetailMetricModel(title: "Rho", value: OptionValueText.decimal(greeks?.rho)),
-            OptionDetailMetricModel(title: "Bid Size", value: OptionValueText.size(quote?.bidSize)),
-            OptionDetailMetricModel(title: "Ask Size", value: OptionValueText.size(quote?.askSize))
+            OptionDetailMetricModel(title: "Last", value: OptionValueText.money(lastPrice))
         ]
+
+        var greekMetrics: [OptionDetailMetricModel] = []
+        Self.appendAvailableMetric(
+            title: "IV",
+            value: OptionValueText.percent(snapshot?.impliedVolatility),
+            to: &greekMetrics
+        )
+        Self.appendAvailableMetric(
+            title: "Delta",
+            value: OptionValueText.decimal(greeks?.delta),
+            to: &greekMetrics
+        )
+        Self.appendAvailableMetric(
+            title: "Gamma",
+            value: OptionValueText.decimal(greeks?.gamma),
+            to: &greekMetrics
+        )
+        Self.appendAvailableMetric(
+            title: "Theta",
+            value: OptionValueText.decimal(greeks?.theta),
+            to: &greekMetrics
+        )
+        Self.appendAvailableMetric(
+            title: "Vega",
+            value: OptionValueText.decimal(greeks?.vega),
+            to: &greekMetrics
+        )
+        Self.appendAvailableMetric(
+            title: "Rho",
+            value: OptionValueText.decimal(greeks?.rho),
+            to: &greekMetrics
+        )
+
+        metricsTitle = greekMetrics.isEmpty ? "Pricing & liquidity" : "Greeks & liquidity"
+        resolvedMetrics.append(contentsOf: greekMetrics)
+        resolvedMetrics.append(
+            contentsOf: [
+                OptionDetailMetricModel(title: "Bid Size", value: OptionValueText.size(quote?.bidSize)),
+                OptionDetailMetricModel(title: "Ask Size", value: OptionValueText.size(quote?.askSize))
+            ]
+        )
+        metrics = resolvedMetrics
 
         specs = [
             OptionDetailMetricModel(title: "Underlying", value: descriptor.underlyingSymbol),
@@ -71,6 +106,18 @@ struct OptionDetailSnapshotModel {
             OptionDetailMetricModel(title: "Strike", value: descriptor.strikeText),
             OptionDetailMetricModel(title: "Feed", value: "Indicative")
         ]
+    }
+
+    private static func appendAvailableMetric(
+        title: String,
+        value: String,
+        to metrics: inout [OptionDetailMetricModel]
+    ) {
+        guard value != AppFormatter.placeholder else {
+            return
+        }
+
+        metrics.append(OptionDetailMetricModel(title: title, value: value))
     }
 }
 
@@ -85,6 +132,7 @@ struct OptionDetailMetricModel: Identifiable, Equatable {
 
 struct OptionTradeRowModel: Identifiable, Equatable {
     let id: String
+    let dedupeKey: String
     let priceText: String
     let sizeText: String
     let exchangeText: String
@@ -93,7 +141,9 @@ struct OptionTradeRowModel: Identifiable, Equatable {
     init(trade: AlpacaOptionTrade, offset: Int) {
         let timestamp = trade.timestamp ?? "na"
         let exchange = trade.exchange ?? AppFormatter.placeholder
-        id = "\(timestamp)-\(exchange)-\(trade.price ?? 0)-\(trade.size ?? 0)-\(offset)"
+        let fallbackKey = "\(timestamp)-\(exchange)-\(trade.price ?? 0)-\(trade.size ?? 0)"
+        dedupeKey = trade.tradeID ?? fallbackKey
+        id = trade.tradeID ?? "\(fallbackKey)-\(offset)"
         priceText = OptionValueText.money(trade.price)
         sizeText = OptionValueText.size(trade.size)
         exchangeText = exchange

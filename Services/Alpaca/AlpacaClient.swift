@@ -120,6 +120,7 @@ struct AlpacaClient: AlpacaServicing {
     private static let logger = Logger(subsystem: "com.starriv.vicu", category: "AlpacaClient")
     private static let marketDataBaseURL = URL(string: "https://data.alpaca.markets")!
     private static let assetChartSessionContextCacheTTL: TimeInterval = 45
+    private static let optionHistoricalDataDelay: TimeInterval = 15 * 60
     private static let assetChartSessionContextCache = AssetChartSessionContextCache()
     private static let indexProxies: [(title: String, symbol: String)] = [
         ("S&P 500", "SPY"),
@@ -665,12 +666,19 @@ struct AlpacaClient: AlpacaServicing {
             return AlpacaOptionBarsPage(bars: [], nextPageToken: nil)
         }
 
+        let interval = Self.optionDataInterval(for: range)
+        #if DEBUG
+        print(
+            "[OptionChart][Client] request symbol=\(normalizedSymbol) range=\(range.title) timeframe=\(range.timeframe) start=\(interval.start) end=\(interval.end) limit=\(min(max(limit, 1), 10_000)) pageToken=\(pageToken ?? "nil") sort=\(sort.rawValue)"
+        )
+        #endif
+
         let response: AlpacaOptionBarsResponse = try await marketDataRequest(
             .optionBars(
                 symbol: normalizedSymbol,
                 range: range,
                 feed: feed,
-                interval: Self.optionDataInterval(for: range),
+                interval: interval,
                 limit: min(max(limit, 1), 10_000),
                 pageToken: pageToken,
                 sort: sort
@@ -678,8 +686,16 @@ struct AlpacaClient: AlpacaServicing {
             credentials: credentials
         )
 
+        let bars = response.bars[normalizedSymbol] ?? []
+        #if DEBUG
+        let responseKeys = response.bars.keys.sorted().joined(separator: ",")
+        print(
+            "[OptionChart][Client] response symbol=\(normalizedSymbol) bars=\(bars.count) nextPageToken=\(response.nextPageToken ?? "nil") keys=[\(responseKeys)] first={\(bars.first?.debugSummary ?? "nil")} last={\(bars.last?.debugSummary ?? "nil")}"
+        )
+        #endif
+
         return AlpacaOptionBarsPage(
-            bars: response.bars[normalizedSymbol] ?? [],
+            bars: bars,
             nextPageToken: response.nextPageToken
         )
     }
@@ -1475,14 +1491,15 @@ struct AlpacaClient: AlpacaServicing {
     private static func optionDataInterval(for range: AssetChartRange, now: Date = Date()) -> StockDataInterval {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
-        let earliest = calendar.date(from: DateComponents(year: 2024, month: 2, day: 1)) ?? now
-        let requestedStart = range.startDate(now: now)
+        let delayedEnd = now.addingTimeInterval(-Self.optionHistoricalDataDelay)
+        let earliest = calendar.date(from: DateComponents(year: 2024, month: 2, day: 1)) ?? delayedEnd
+        let requestedStart = range.startDate(now: delayedEnd)
         let start = max(requestedStart, earliest)
         let formatter = AlpacaMarketDataEndpoint.makeStockDataDateFormatter()
 
         return StockDataInterval(
             start: formatter.string(from: start),
-            end: formatter.string(from: now)
+            end: formatter.string(from: delayedEnd)
         )
     }
 
@@ -1796,14 +1813,13 @@ private enum AlpacaMarketDataEndpoint: Sendable {
             }
 
             return items
-        case .optionBars(let symbol, let range, let feed, let interval, let limit, let pageToken, let sort):
+        case .optionBars(let symbol, let range, _, let interval, let limit, let pageToken, let sort):
             var items = [
                 URLQueryItem(name: "symbols", value: symbol),
                 URLQueryItem(name: "timeframe", value: range.timeframe),
                 URLQueryItem(name: "start", value: interval.start),
                 URLQueryItem(name: "end", value: interval.end),
                 URLQueryItem(name: "limit", value: String(limit)),
-                URLQueryItem(name: "feed", value: feed.rawValue),
                 URLQueryItem(name: "sort", value: sort.rawValue)
             ]
 
@@ -1812,13 +1828,12 @@ private enum AlpacaMarketDataEndpoint: Sendable {
             }
 
             return items
-        case .optionTrades(let symbol, let feed, let interval, let limit, let pageToken, let sort):
+        case .optionTrades(let symbol, _, let interval, let limit, let pageToken, let sort):
             var items = [
                 URLQueryItem(name: "symbols", value: symbol),
                 URLQueryItem(name: "start", value: interval.start),
                 URLQueryItem(name: "end", value: interval.end),
                 URLQueryItem(name: "limit", value: String(limit)),
-                URLQueryItem(name: "feed", value: feed.rawValue),
                 URLQueryItem(name: "sort", value: sort.rawValue)
             ]
 

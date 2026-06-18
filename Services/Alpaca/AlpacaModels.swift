@@ -369,6 +369,7 @@ struct AlpacaOrderRequest: Encodable, Sendable {
     let notional: String?
     let side: String
     let type: String
+    let position_intent: String?
     let time_in_force: String
     let limit_price: String?
     let stop_price: String?
@@ -1602,16 +1603,49 @@ struct AlpacaOptionSnapshotPayload: Decodable, Equatable, Sendable {
 }
 
 struct AlpacaOptionTrade: Decodable, Equatable, Sendable {
+    let tradeID: String?
     let exchange: String?
     let price: Double?
     let size: Double?
     let timestamp: String?
 
     enum CodingKeys: String, CodingKey {
+        case tradeID = "i"
         case exchange = "x"
         case price = "p"
         case size = "s"
         case timestamp = "t"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        tradeID = try container.decodeFlexibleStringIfPresent(forKey: .tradeID)
+        exchange = try container.decodeIfPresent(String.self, forKey: .exchange)
+        price = try container.decodeIfPresent(Double.self, forKey: .price)
+        size = try container.decodeIfPresent(Double.self, forKey: .size)
+        timestamp = try container.decodeIfPresent(String.self, forKey: .timestamp)
+    }
+}
+
+private extension KeyedDecodingContainer {
+    func decodeFlexibleStringIfPresent(forKey key: Key) throws -> String? {
+        guard contains(key), try !decodeNil(forKey: key) else {
+            return nil
+        }
+
+        if let value = try? decode(String.self, forKey: key) {
+            return value
+        }
+
+        if let value = try? decode(Int64.self, forKey: key) {
+            return String(value)
+        }
+
+        if let value = try? decode(Double.self, forKey: key) {
+            return String(value)
+        }
+
+        return nil
     }
 }
 
@@ -1875,6 +1909,30 @@ struct AlpacaMarketBar: Decodable, Sendable, Equatable {
         case timestamp = "t"
     }
 }
+
+#if DEBUG
+extension AlpacaMarketBar {
+    var debugSummary: String {
+        let openText = open.map { String($0) } ?? "nil"
+        let highText = high.map { String($0) } ?? "nil"
+        let lowText = low.map { String($0) } ?? "nil"
+        let closeText = close.map { String($0) } ?? "nil"
+        let volumeText = volume.map { String($0) } ?? "nil"
+        let tradeCountText = tradeCount.map { String($0) } ?? "nil"
+
+        return [
+            "symbol=\(symbol ?? "nil")",
+            "t=\(timestamp ?? "nil")",
+            "o=\(openText)",
+            "h=\(highText)",
+            "l=\(lowText)",
+            "c=\(closeText)",
+            "v=\(volumeText)",
+            "n=\(tradeCountText)"
+        ].joined(separator: " ")
+    }
+}
+#endif
 
 struct AlpacaStockBarsResponse: Decodable, Sendable {
     let bars: [String: [AlpacaMarketBar]]

@@ -56,6 +56,7 @@ struct AssetLevelOneQuoteContent: View {
     let askSize: Double?
     let spread: Double?
     let sizeUnit: String
+    let priceFormatter: (Double?) -> String
 
     init(
         bidPrice: Double?,
@@ -63,7 +64,8 @@ struct AssetLevelOneQuoteContent: View {
         bidSize: Double?,
         askSize: Double?,
         spread: Double?,
-        sizeUnit: String = "shares"
+        sizeUnit: String = "shares",
+        priceFormatter: @escaping (Double?) -> String = { AppFormatter.money($0) }
     ) {
         self.bidPrice = bidPrice
         self.askPrice = askPrice
@@ -71,6 +73,7 @@ struct AssetLevelOneQuoteContent: View {
         self.askSize = askSize
         self.spread = spread
         self.sizeUnit = sizeUnit
+        self.priceFormatter = priceFormatter
     }
 
     var body: some View {
@@ -80,6 +83,7 @@ struct AssetLevelOneQuoteContent: View {
                 price: bidPrice,
                 size: bidSize,
                 sizeUnit: sizeUnit,
+                priceFormatter: priceFormatter,
                 alignment: .leading,
                 tint: AppTheme.ColorToken.positive
             )
@@ -87,7 +91,8 @@ struct AssetLevelOneQuoteContent: View {
             AssetOrderSizeBalance(
                 bidSize: bidSize,
                 askSize: askSize,
-                spread: spread
+                spread: spread,
+                priceFormatter: priceFormatter
             )
             .frame(width: 92)
 
@@ -96,6 +101,7 @@ struct AssetLevelOneQuoteContent: View {
                 price: askPrice,
                 size: askSize,
                 sizeUnit: sizeUnit,
+                priceFormatter: priceFormatter,
                 alignment: .trailing,
                 tint: AppTheme.ColorToken.negative
             )
@@ -114,6 +120,7 @@ private struct AssetBookQuoteSide: View {
     let price: Double?
     let size: Double?
     let sizeUnit: String
+    let priceFormatter: (Double?) -> String
     let alignment: AlignmentMode
     let tint: Color
 
@@ -123,7 +130,7 @@ private struct AssetBookQuoteSide: View {
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.primary)
 
-            Text(AppFormatter.money(price))
+            Text(priceFormatter(price))
                 .font(.callout.monospacedDigit().weight(.bold))
                 .foregroundStyle(tint)
                 .lineLimit(1)
@@ -151,6 +158,7 @@ private struct AssetOrderSizeBalance: View {
     let bidSize: Double?
     let askSize: Double?
     let spread: Double?
+    let priceFormatter: (Double?) -> String
 
     var body: some View {
         VStack(spacing: 6) {
@@ -164,7 +172,7 @@ private struct AssetOrderSizeBalance: View {
                 askOpacity: 0.62
             )
 
-            Text("Spread \(AppFormatter.money(spread))")
+            Text("Spread \(priceFormatter(spread))")
                 .font(.caption2.monospacedDigit().weight(.medium))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)

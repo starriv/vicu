@@ -10,6 +10,7 @@ struct OrderDraft: Equatable, Sendable {
     var notionalText = ""
     var limitPriceText = ""
     var extendedHours = false
+    var positionIntent: OrderPositionIntent?
 
     var normalizedSymbol: String {
         symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
@@ -68,6 +69,7 @@ struct OrderDraft: Equatable, Sendable {
             notional: NumberText.nilIfEmpty(notional),
             side: side.rawValue,
             type: orderType.rawValue,
+            position_intent: positionIntent?.rawValue,
             time_in_force: timeInForce.rawValue,
             limit_price: NumberText.nilIfEmpty(limitPrice),
             stop_price: nil,
@@ -142,6 +144,50 @@ enum OrderSide: String, CaseIterable, Identifiable, Sendable {
             AppTheme.ColorToken.positive
         case .sell:
             AppTheme.ColorToken.negative
+        }
+    }
+}
+
+enum OrderPositionIntent: String, CaseIterable, Identifiable, Sendable {
+    case buyToOpen = "buy_to_open"
+    case buyToClose = "buy_to_close"
+    case sellToOpen = "sell_to_open"
+    case sellToClose = "sell_to_close"
+
+    var id: String { rawValue }
+
+    var side: OrderSide {
+        switch self {
+        case .buyToOpen, .buyToClose:
+            .buy
+        case .sellToOpen, .sellToClose:
+            .sell
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .buyToOpen:
+            "Buy to Open"
+        case .buyToClose:
+            "Buy to Close"
+        case .sellToOpen:
+            "Sell to Open"
+        case .sellToClose:
+            "Sell to Close"
+        }
+    }
+
+    var shortTitle: String {
+        switch self {
+        case .buyToOpen:
+            "Buy Open"
+        case .buyToClose:
+            "Buy Close"
+        case .sellToOpen:
+            "Sell Open"
+        case .sellToClose:
+            "Sell Close"
         }
     }
 }

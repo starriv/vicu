@@ -26,6 +26,16 @@
         }
       }
     },
+    "%@  %@  %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@  %2$@  %3$@"
+          }
+        }
+      }
+    },
     "%@ %@" : {
       "localizations" : {
         "en" : {
@@ -1130,6 +1140,9 @@
           }
         }
       }
+    },
+    "Action" : {
+
     },
     "activity_notification.body.amount_format" : {
       "extractionState" : "stale",
@@ -3502,6 +3515,9 @@
         }
       }
     },
+    "Delayed" : {
+
+    },
     "Delayed quotes" : {
 
     },
@@ -3550,6 +3566,9 @@
 
     },
     "Latest quote" : {
+
+    },
+    "Limit Price" : {
 
     },
     "Loading news" : {
@@ -4661,6 +4680,9 @@
 
     },
     "Opens options" : {
+
+    },
+    "Option Order" : {
 
     },
     "Option quotes and trades are delayed." : {
@@ -8671,6 +8693,9 @@
     "Quote stream" : {
 
     },
+    "Review Option Order" : {
+
+    },
     "risk.decision.account_missing_static" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -9352,6 +9377,9 @@
           }
         }
       }
+    },
+    "This %@ order will be submitted as a DAY limit option order." : {
+
     },
     "Time" : {
 

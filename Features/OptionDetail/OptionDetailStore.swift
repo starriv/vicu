@@ -41,7 +41,7 @@ final class OptionDetailStore {
     @ObservationIgnored private var chartRenderTask: Task<Void, Never>?
     @ObservationIgnored private var chartRenderRevision = 0
     @ObservationIgnored private var chartCache: [OptionDetailChartCacheKey: OptionDetailChartCacheEntry] = [:]
-    @ObservationIgnored private var tradeIDs = Set<String>()
+    @ObservationIgnored private var tradeKeys = Set<String>()
 
     init(contractSymbol: String, initialSnapshot: AlpacaOptionSnapshot? = nil) {
         let normalizedSymbol = contractSymbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
@@ -55,7 +55,10 @@ final class OptionDetailStore {
     }
 
     var canLoadMoreTrades: Bool {
-        nextTradePageToken != nil && tradeLoadMoreErrorMessage == nil
+        nextTradePageToken != nil
+            && tradeLoadMoreErrorMessage == nil
+            && !isLoadingTrades
+            && !isLoadingMoreTrades
     }
 
     var tradesLoadMoreTrigger: OptionTradesLoadMoreTrigger {
@@ -71,7 +74,9 @@ final class OptionDetailStore {
     }
 
     var hasInitialContent: Bool {
-        snapshot != nil || !chartRenderModels.line.points.isEmpty || !tradeRows.isEmpty
+        snapshot != nil
+            || latestTrade != nil
+            || !chartRenderModels.line.points.isEmpty
     }
 
     func start(app: AppModel) {
@@ -83,8 +88,6 @@ final class OptionDetailStore {
         isStarted = true
         bindSnapshotPipeline(app: app)
         bindChartPipeline(app: app)
-        bindTradePipeline(app: app)
-        bindTradeLoadMorePipeline(app: app)
         reloadAll(forceReload: false)
     }
 
@@ -108,7 +111,6 @@ final class OptionDetailStore {
     func reloadAll(forceReload: Bool = true) {
         snapshotRefreshRequests.onNext(forceReload)
         reloadChart(forceReload: forceReload)
-        reloadTrades(forceReload: forceReload)
     }
 
     func selectRange(_ range: AssetChartRange) {
@@ -123,7 +125,6 @@ final class OptionDetailStore {
         } else {
             reloadChart(forceReload: false)
         }
-        reloadTrades(forceReload: false)
     }
 
     func selectChartMode(_ mode: AssetChartMode) {
@@ -160,6 +161,10 @@ final class OptionDetailStore {
 
     func loadMoreTradesIfNeeded(force: Bool = false) {
         guard let nextTradePageToken else {
+            return
+        }
+
+        guard !isLoadingTrades, !isLoadingMoreTrades else {
             return
         }
 
@@ -279,8 +284,11 @@ final class OptionDetailStore {
         tradeLoadMoreRequests
             .observe(on: MainScheduler.instance)
             .filter { $0.pageToken != nil }
-            .do(onNext: { [weak self] _ in
-                self?.beginTradeLoadMore()
+            .filter { [weak self] request in
+                self?.canBeginTradeLoadMore(request) == true
+            }
+            .do(onNext: { [weak self] request in
+                self?.beginTradeLoadMore(request)
             })
             .flatMapFirst { [weak app] request -> Observable<OptionDetailTradesLoadResult> in
                 guard let app else {
@@ -307,12 +315,17 @@ final class OptionDetailStore {
         activeChartRequest = request
         isLoadingChart = true
         chartErrorMessage = nil
+        #if DEBUG
+        print(
+            "[OptionChart][Store] begin symbol=\(request.symbol) range=\(request.range.title) forceReload=\(request.forceReload) selectedRange=\(selectedRange.title) mode=\(effectiveChartMode.rawValue)"
+        )
+        #endif
     }
 
     private func beginTradeReset(_ request: OptionDetailTradesRequest) {
         activeTradeRequest = request
         tradeRows = []
-        tradeIDs = []
+        tradeKeys = []
         nextTradePageToken = nil
         isLoadingTrades = true
         isLoadingMoreTrades = false
@@ -320,8 +333,17 @@ final class OptionDetailStore {
         tradeLoadMoreErrorMessage = nil
     }
 
-    private func beginTradeLoadMore() {
-        guard !isLoadingTrades, !isLoadingMoreTrades else {
+    private func canBeginTradeLoadMore(_ request: OptionDetailTradesRequest) -> Bool {
+        request.symbol == contractSymbol
+            && request.range == selectedRange
+            && request.pageToken == nextTradePageToken
+            && request.pageToken != nil
+            && !isLoadingTrades
+            && !isLoadingMoreTrades
+    }
+
+    private func beginTradeLoadMore(_ request: OptionDetailTradesRequest) {
+        guard canBeginTradeLoadMore(request) else {
             return
         }
 
@@ -352,10 +374,20 @@ final class OptionDetailStore {
         switch result {
         case .success(let request, let page):
             guard request == activeChartRequest else {
+                #if DEBUG
+                print(
+                    "[OptionChart][Store] drop-stale-success requestRange=\(request.range.title) activeRange=\(activeChartRequest?.range.title ?? "nil") bars=\(page.bars.count)"
+                )
+                #endif
                 return
             }
 
             activeChartRequest = nil
+            #if DEBUG
+            print(
+                "[OptionChart][Store] success symbol=\(request.symbol) range=\(request.range.title) bars=\(page.bars.count) nextPageToken=\(page.nextPageToken ?? "nil") first={\(page.bars.first?.debugSummary ?? "nil")} last={\(page.bars.last?.debugSummary ?? "nil")}"
+            )
+            #endif
             scheduleChartRender(
                 bars: page.bars,
                 range: request.range,
@@ -365,12 +397,22 @@ final class OptionDetailStore {
             chartErrorMessage = nil
         case .failure(let request, let error):
             guard request == activeChartRequest else {
+                #if DEBUG
+                print(
+                    "[OptionChart][Store] drop-stale-failure requestRange=\(request.range.title) activeRange=\(activeChartRequest?.range.title ?? "nil") error=\(error.localizedDescription)"
+                )
+                #endif
                 return
             }
 
             activeChartRequest = nil
             chartErrorMessage = displayErrorMessage(for: error)
             isLoadingChart = false
+            #if DEBUG
+            print(
+                "[OptionChart][Store] failure symbol=\(request.symbol) range=\(request.range.title) error=\(error.localizedDescription)"
+            )
+            #endif
         }
     }
 
@@ -390,7 +432,7 @@ final class OptionDetailStore {
 
             if request.isReset {
                 tradeRows = newRows
-                tradeIDs = Set(newRows.map(\.id))
+                tradeKeys = Set(newRows.map(\.dedupeKey))
                 activeTradeRequest = nil
                 isLoadingTrades = false
             } else {
@@ -404,7 +446,7 @@ final class OptionDetailStore {
 
             if request.isReset {
                 tradeRows = []
-                tradeIDs = []
+                tradeKeys = []
                 nextTradePageToken = nil
                 tradesErrorMessage = displayErrorMessage(for: error)
                 activeTradeRequest = nil
@@ -430,14 +472,14 @@ final class OptionDetailStore {
             return activeTradeRequest == nil || activeTradeRequest == request
         }
 
-        return true
+        return !isLoadingTrades && activeTradeRequest == nil
     }
 
     private func appendUniqueTrades(_ rows: [OptionTradeRowModel]) {
         var uniqueRows: [OptionTradeRowModel] = []
-        for row in rows where !tradeIDs.contains(row.id) {
+        for row in rows where !tradeKeys.contains(row.dedupeKey) {
             uniqueRows.append(row)
-            tradeIDs.insert(row.id)
+            tradeKeys.insert(row.dedupeKey)
         }
 
         tradeRows.append(contentsOf: uniqueRows)
@@ -495,6 +537,25 @@ final class OptionDetailStore {
             if self.selectedRange == range, self.effectiveChartMode == mode {
                 self.chartRenderModels = renderModels
                 self.isLoadingChart = false
+                #if DEBUG
+                let periodChangeText: String
+                if let periodPriceChange = renderModels.line.periodPriceChange {
+                    let percentChangeText = periodPriceChange.percentChange.map { String($0) } ?? "nil"
+                    periodChangeText = "\(periodPriceChange.change)/\(percentChangeText)"
+                } else {
+                    periodChangeText = "nil"
+                }
+
+                print(
+                    "[OptionChart][Store] rendered range=\(range.title) mode=\(mode.rawValue) bars=\(bars.count) linePoints=\(renderModels.line.points.count) candlePoints=\(renderModels.candles.points.count) linePeriodChange=\(periodChangeText)"
+                )
+                #endif
+            } else {
+                #if DEBUG
+                print(
+                    "[OptionChart][Store] drop-render range=\(range.title) mode=\(mode.rawValue) selectedRange=\(self.selectedRange.title) effectiveMode=\(self.effectiveChartMode.rawValue) bars=\(bars.count)"
+                )
+                #endif
             }
         }
     }
@@ -589,32 +650,95 @@ private func optionDetailSnapshotLoad(
     Observable.create { observer in
         let observerBox = OptionDetailSnapshotLoadObserverBox(observer)
         let task = Task { @MainActor [app, symbol, forceReload, observerBox] in
-            do {
-                async let snapshotRequest = app.fetchOptionSnapshot(
-                    symbol: symbol,
-                    forceReload: forceReload
-                )
-                async let latestTradeRequest = app.fetchLatestOptionTrade(
-                    symbol: symbol,
-                    forceReload: forceReload
-                )
-                let result = try await (snapshotRequest, latestTradeRequest)
-                try Task.checkCancellation()
-                observerBox.onNext(.success(result.0, result.1))
-            } catch where error.isRequestCancellation {
+            async let snapshotRequest = optionDetailSnapshotResult(
+                app: app,
+                symbol: symbol,
+                forceReload: forceReload
+            )
+            async let latestTradeRequest = optionDetailLatestTradeResult(
+                app: app,
+                symbol: symbol,
+                forceReload: forceReload
+            )
+
+            let (snapshotResult, latestTradeResult) = await (snapshotRequest, latestTradeRequest)
+            guard !Task.isCancelled else {
                 return
-            } catch {
-                guard !Task.isCancelled else {
+            }
+
+            let loadedSnapshot: AlpacaOptionSnapshot?
+            let snapshotError: Error?
+            switch snapshotResult {
+            case .success(let snapshot):
+                loadedSnapshot = snapshot
+                snapshotError = nil
+            case .failure(let error):
+                loadedSnapshot = nil
+                snapshotError = error
+            }
+
+            let loadedLatestTrade: AlpacaOptionTrade?
+            let latestTradeError: Error?
+            switch latestTradeResult {
+            case .success(let latestTrade):
+                loadedLatestTrade = latestTrade
+                latestTradeError = nil
+            case .failure(let error):
+                loadedLatestTrade = nil
+                latestTradeError = error
+            }
+
+            if let snapshotError, let latestTradeError {
+                if snapshotError.isRequestCancellation || latestTradeError.isRequestCancellation {
                     return
                 }
 
-                observerBox.onNext(.failure(error))
+                observerBox.onNext(.failure(snapshotError))
+                return
             }
+
+            observerBox.onNext(.success(loadedSnapshot, loadedLatestTrade))
         }
 
         return Disposables.create {
             task.cancel()
         }
+    }
+}
+
+@MainActor
+private func optionDetailSnapshotResult(
+    app: AppModel,
+    symbol: String,
+    forceReload: Bool
+) async -> Result<AlpacaOptionSnapshot?, Error> {
+    do {
+        return .success(
+            try await app.fetchOptionSnapshot(
+                symbol: symbol,
+                forceReload: forceReload
+            )
+        )
+    } catch {
+        return .failure(error)
+    }
+}
+
+@MainActor
+private func optionDetailLatestTradeResult(
+    app: AppModel,
+    symbol: String,
+    forceReload: Bool
+) async -> Result<AlpacaOptionTrade?, Error> {
+    do {
+        return .success(
+            try await app.fetchLatestOptionTrade(
+                symbol: symbol,
+                forceReload: forceReload
+            )
+        )
+    } catch {
+        return .failure(error)
     }
 }
 
@@ -632,14 +756,29 @@ private func optionDetailChartLoad(
                     forceReload: request.forceReload
                 )
                 try Task.checkCancellation()
+                #if DEBUG
+                print(
+                    "[OptionChart][Load] complete symbol=\(request.symbol) range=\(request.range.title) bars=\(page.bars.count)"
+                )
+                #endif
                 observerBox.onNext(.success(request, page))
             } catch where error.isRequestCancellation {
+                #if DEBUG
+                print(
+                    "[OptionChart][Load] cancelled symbol=\(request.symbol) range=\(request.range.title)"
+                )
+                #endif
                 return
             } catch {
                 guard !Task.isCancelled else {
                     return
                 }
 
+                #if DEBUG
+                print(
+                    "[OptionChart][Load] failure symbol=\(request.symbol) range=\(request.range.title) error=\(error.localizedDescription)"
+                )
+                #endif
                 observerBox.onNext(.failure(request, error))
             }
         }

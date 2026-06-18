@@ -92,6 +92,7 @@
 		0A00000000000000000001E4 /* Features/OptionDetail/OptionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002E4 /* Features/OptionDetail/OptionDetailView.swift */; };
 		0A00000000000000000001E5 /* Features/OptionDetail/OptionDetailStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002E5 /* Features/OptionDetail/OptionDetailStore.swift */; };
 		0A00000000000000000001E6 /* Features/OptionDetail/OptionDetailModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002E6 /* Features/OptionDetail/OptionDetailModels.swift */; };
+		0A00000000000000000001E7 /* Features/OptionDetail/OptionTradeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002E7 /* Features/OptionDetail/OptionTradeView.swift */; };
 		0A00000000000000000001F1 /* Services/Alpaca/AlpacaActivityStreamClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F1 /* Services/Alpaca/AlpacaActivityStreamClient.swift */; };
 		0A00000000000000000001F2 /* Services/Notifications/AccountActivityNotificationCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F2 /* Services/Notifications/AccountActivityNotificationCenter.swift */; };
 		0A00000000000000000001F3 /* Services/Notifications/AppNotificationTemplates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F3 /* Services/Notifications/AppNotificationTemplates.swift */; };
@@ -228,6 +229,7 @@
 		0A00000000000000000002E4 /* Features/OptionDetail/OptionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/OptionDetail/OptionDetailView.swift; sourceTree = "<group>"; };
 		0A00000000000000000002E5 /* Features/OptionDetail/OptionDetailStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/OptionDetail/OptionDetailStore.swift; sourceTree = "<group>"; };
 		0A00000000000000000002E6 /* Features/OptionDetail/OptionDetailModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/OptionDetail/OptionDetailModels.swift; sourceTree = "<group>"; };
+		0A00000000000000000002E7 /* Features/OptionDetail/OptionTradeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/OptionDetail/OptionTradeView.swift; sourceTree = "<group>"; };
 		0A00000000000000000002F1 /* Services/Alpaca/AlpacaActivityStreamClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Alpaca/AlpacaActivityStreamClient.swift; sourceTree = "<group>"; };
 		0A00000000000000000002F2 /* Services/Notifications/AccountActivityNotificationCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Notifications/AccountActivityNotificationCenter.swift; sourceTree = "<group>"; };
 		0A00000000000000000002F3 /* Services/Notifications/AppNotificationTemplates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Notifications/AppNotificationTemplates.swift; sourceTree = "<group>"; };
@@ -321,6 +323,7 @@
 				0A00000000000000000002E4 /* Features/OptionDetail/OptionDetailView.swift */,
 				0A00000000000000000002E5 /* Features/OptionDetail/OptionDetailStore.swift */,
 				0A00000000000000000002E6 /* Features/OptionDetail/OptionDetailModels.swift */,
+				0A00000000000000000002E7 /* Features/OptionDetail/OptionTradeView.swift */,
 				0A0000000000000000000299 /* Features/AssetDetail/AssetLevelOneBook.swift */,
 				0A00000000000000000002A0 /* Features/AssetDetail/AssetPositionShareSheet.swift */,
 				0A00000000000000000002A1 /* Features/AssetDetail/AssetShareSheet.swift */,
@@ -582,6 +585,7 @@
 				0A00000000000000000001E4 /* Features/OptionDetail/OptionDetailView.swift in Sources */,
 				0A00000000000000000001E5 /* Features/OptionDetail/OptionDetailStore.swift in Sources */,
 				0A00000000000000000001E6 /* Features/OptionDetail/OptionDetailModels.swift in Sources */,
+				0A00000000000000000001E7 /* Features/OptionDetail/OptionTradeView.swift in Sources */,
 				0A0000000000000000000199 /* Features/AssetDetail/AssetLevelOneBook.swift in Sources */,
 				0A00000000000000000001A0 /* Features/AssetDetail/AssetPositionShareSheet.swift in Sources */,
 				0A00000000000000000001A1 /* Features/AssetDetail/AssetShareSheet.swift in Sources */,

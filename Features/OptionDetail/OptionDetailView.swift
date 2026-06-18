@@ -14,12 +14,10 @@ struct OptionDetailView: View {
     var body: some View {
         AppInfiniteScrollView(
             spacing: 20,
-            canLoadMore: app.hasCredentials && store.canLoadMoreTrades,
-            isLoadingMore: store.isLoadingMoreTrades,
-            loadMoreTrigger: store.tradesLoadMoreTrigger,
-            loadMore: {
-                store.loadMoreTradesIfNeeded()
-            }
+            canLoadMore: false,
+            isLoadingMore: false,
+            loadMoreTrigger: false,
+            loadMore: {}
         ) {
             if !app.hasCredentials {
                 ContentUnavailableView(
@@ -52,12 +50,6 @@ struct OptionDetailView: View {
         .onChange(of: store.chartErrorMessage) { _, message in
             showErrorMessage(message)
         }
-        .onChange(of: store.tradesErrorMessage) { _, message in
-            showErrorMessage(message)
-        }
-        .onChange(of: store.tradeLoadMoreErrorMessage) { _, message in
-            showErrorMessage(message)
-        }
         .onDisappear {
             store.stop()
         }
@@ -88,9 +80,9 @@ private struct OptionDetailContent: View {
                 isChartScrubbing: $isChartScrubbing
             )
             OptionQuoteSection(model: store.snapshotModel)
-            OptionMetricsSection(title: "Greeks & liquidity", metrics: store.snapshotModel.metrics)
+            OptionTradeActionSection(store: store)
+            OptionMetricsSection(title: store.snapshotModel.metricsTitle, metrics: store.snapshotModel.metrics)
             OptionMetricsSection(title: "Contract", metrics: store.snapshotModel.specs)
-            OptionTradesSection(store: store)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -142,9 +134,12 @@ private struct OptionPriceHeroSection: View {
     @Binding var chartSelection: AssetChartSelection?
 
     var body: some View {
+        let displayPrice = chartSelection?.point.close ?? store.snapshotModel.displayPrice
+
         VStack(alignment: .leading, spacing: 4) {
             AppPriceText(
-                chartSelection?.point.close ?? store.snapshotModel.displayPrice,
+                displayPrice,
+                fractionLength: OptionValueText.moneyFractionLength(for: displayPrice),
                 font: .system(size: 44, weight: .medium, design: .rounded),
                 minimumScaleFactor: 0.72,
                 isAnimated: chartSelection == nil
@@ -245,7 +240,8 @@ private struct OptionQuoteSection: View {
                     bidSize: model.bidSize,
                     askSize: model.askSize,
                     spread: model.spread,
-                    sizeUnit: "contracts"
+                    sizeUnit: "contracts",
+                    priceFormatter: OptionValueText.money
                 )
 
                 HStack {
@@ -274,6 +270,74 @@ private struct OptionMetricsSection: View {
                 }
             }
         }
+    }
+}
+
+private struct OptionTradeActionSection: View {
+    let store: OptionDetailStore
+
+    var body: some View {
+        AssetDetailSection(title: "Trade") {
+            HStack(spacing: 12) {
+                OptionTradeNavigationButton(
+                    title: "Buy",
+                    subtitle: "Open",
+                    tint: OrderSide.buy.tradeActionTint
+                ) {
+                    OptionTradeView(
+                        contractSymbol: store.descriptor.symbol,
+                        initialIntent: .buyToOpen,
+                        initialSnapshotModel: store.snapshotModel
+                    )
+                }
+
+                OptionTradeNavigationButton(
+                    title: "Sell",
+                    subtitle: "Close",
+                    tint: OrderSide.sell.tradeActionTint
+                ) {
+                    OptionTradeView(
+                        contractSymbol: store.descriptor.symbol,
+                        initialIntent: .sellToClose,
+                        initialSnapshotModel: store.snapshotModel
+                    )
+                }
+            }
+        }
+    }
+}
+
+private struct OptionTradeNavigationButton<Destination: View>: View {
+    let title: String
+    let subtitle: String
+    let tint: Color
+    let destination: () -> Destination
+
+    var body: some View {
+        NavigationLink(destination: destination) {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.headline.weight(.bold))
+
+                    Text(subtitle)
+                        .font(AppTypography.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.82))
+                }
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.white.opacity(0.82))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .frame(height: 58)
+            .frame(maxWidth: .infinity)
+            .background(tint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 }
 

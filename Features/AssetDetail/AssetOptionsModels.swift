@@ -307,13 +307,20 @@ struct AssetOptionRowModel: Equatable, Identifiable {
 }
 
 enum OptionValueText {
+    static func moneyFractionLength(for value: Double?) -> Int {
+        guard let value, value.isFinite else {
+            return 2
+        }
+
+        return value >= 10 ? 2 : 3
+    }
+
     static func money(_ value: Double?) -> String {
-        guard let value, value.isFinite, value > 0 else {
+        guard let value, value.isFinite, value >= 0 else {
             return AppFormatter.placeholder
         }
 
-        let fractionLength = value >= 10 ? 2 : 3
-        return AppFormatter.money(value, fractionLength: fractionLength)
+        return AppFormatter.money(value, fractionLength: moneyFractionLength(for: value))
     }
 
     static func strike(_ value: Double?) -> String {
