@@ -125,6 +125,9 @@ struct KeychainCredentialStore: CredentialStore {
     }
 
     private func protectionAttributes() throws -> [String: Any] {
+        #if targetEnvironment(simulator)
+        return [:]
+        #else
         switch accessPolicy {
         case .whenUnlockedThisDeviceOnly:
             return [
@@ -145,6 +148,7 @@ struct KeychainCredentialStore: CredentialStore {
                 kSecAttrAccessControl as String: accessControl
             ]
         }
+        #endif
     }
 
     private func applyAccessGroup(to query: [String: Any]) -> [String: Any] {
@@ -158,6 +162,9 @@ struct KeychainCredentialStore: CredentialStore {
     }
 
     private var accessGroup: String? {
+        #if targetEnvironment(simulator)
+        return nil
+        #else
         guard let bundleIdentifier = Bundle.main.bundleIdentifier else {
             return nil
         }
@@ -169,9 +176,6 @@ struct KeychainCredentialStore: CredentialStore {
             }
         }
 
-        #if targetEnvironment(simulator)
-        return "FAKETEAMID.\(bundleIdentifier)"
-        #else
         return nil
         #endif
     }

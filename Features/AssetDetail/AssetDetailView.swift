@@ -11,7 +11,6 @@ struct AssetDetailView: View {
     @State private var showsNews = false
     @State private var showsOptions = false
     @State private var newsSheetDetent: PresentationDetent = .fraction(Self.newsSheetCompactFraction)
-    @State private var optionsSheetDetent: PresentationDetent = .fraction(Self.optionsSheetCompactFraction)
     @State private var assetSharePayload: AssetSharePayload?
     @State private var positionSharePayload: AssetPositionSharePayload?
     @State private var tradeDestination: AssetTradeDestination?
@@ -155,7 +154,7 @@ struct AssetDetailView: View {
                 symbol: store.symbol,
                 displayName: store.displayName
             )
-            .presentationDetents([.fraction(Self.optionsSheetCompactFraction), .large], selection: $optionsSheetDetent)
+            .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
         .sheet(item: $assetSharePayload) { payload in
@@ -173,7 +172,6 @@ struct AssetDetailView: View {
     private static let topAnchorID = "asset-detail-top"
     private static let headerTitleRevealOffset: CGFloat = 56
     private static let newsSheetCompactFraction = 0.67
-    private static let optionsSheetCompactFraction = 0.72
 
     private func showSubmittedOrder(_: AlpacaOrder) {
         tradeDestination = nil
