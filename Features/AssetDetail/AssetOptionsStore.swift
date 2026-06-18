@@ -336,27 +336,7 @@ final class AssetOptionsStore {
     }
 
     private func rebuildExpirationDerivedState() {
-        let selectedExactExpiration: AssetOptionExpiration?
-        if case .exact(let expiration) = selectedExpiration {
-            selectedExactExpiration = expiration
-        } else {
-            selectedExactExpiration = nil
-        }
-
-        var quickOptions: [AssetOptionExpiration] = []
-        if let selectedExactExpiration {
-            quickOptions.append(selectedExactExpiration)
-        }
-
-        for expiration in expirationOptions where expiration != selectedExactExpiration {
-            guard quickOptions.count < Self.quickExpirationLimit else {
-                break
-            }
-
-            quickOptions.append(expiration)
-        }
-
-        quickExpirationOptions = quickOptions
+        quickExpirationOptions = Array(expirationOptions.prefix(Self.quickExpirationLimit))
 
         let groupedOptions = Dictionary(grouping: expirationOptions, by: \.year)
         expirationMenuGroups = groupedOptions.keys.sorted().map { year in

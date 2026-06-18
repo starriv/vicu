@@ -7,6 +7,7 @@ protocol AlpacaServicing: Sendable {
     func fetchAccountActivities(pageSize: Int, pageToken: String?, credentials: AlpacaCredentials) async throws -> AlpacaAccountActivitiesPage
     func fetchPositions(credentials: AlpacaCredentials) async throws -> [AlpacaPosition]
     func fetchOpenPosition(symbolOrAssetID: String, credentials: AlpacaCredentials) async throws -> AlpacaPosition?
+    func closeOpenPosition(symbolOrAssetID: String, credentials: AlpacaCredentials) async throws -> AlpacaOrder
     func fetchRecentOrders(credentials: AlpacaCredentials) async throws -> [AlpacaOrder]
     func fetchOrder(id: String, nested: Bool, credentials: AlpacaCredentials) async throws -> AlpacaOrder
     func cancelOrder(id: String, credentials: AlpacaCredentials) async throws
@@ -180,6 +181,10 @@ struct AlpacaClient: AlpacaServicing {
         } catch let error as APIClientError where error.statusCode == 404 {
             return nil
         }
+    }
+
+    func closeOpenPosition(symbolOrAssetID: String, credentials: AlpacaCredentials) async throws -> AlpacaOrder {
+        try await request(.closePosition(symbolOrAssetID: symbolOrAssetID), credentials: credentials)
     }
 
     func fetchRecentOrders(credentials: AlpacaCredentials) async throws -> [AlpacaOrder] {
@@ -1545,6 +1550,7 @@ private enum AlpacaEndpoint: Sendable {
     case optionContracts(underlyingSymbol: String, expirationDateGTE: String?, expirationDateLTE: String?, limit: Int, pageToken: String?)
     case positions
     case position(symbolOrAssetID: String)
+    case closePosition(symbolOrAssetID: String)
     case recentOrders
     case order(id: String, nested: Bool)
     case cancelOrder(id: String)
@@ -1577,7 +1583,7 @@ private enum AlpacaEndpoint: Sendable {
             "v2/options/contracts"
         case .positions:
             "v2/positions"
-        case .position(let symbolOrAssetID):
+        case .position(let symbolOrAssetID), .closePosition(let symbolOrAssetID):
             "v2/positions/\(Self.encodedPathSegment(symbolOrAssetID))"
         case .recentOrders, .submitOrder:
             "v2/orders"
@@ -1602,7 +1608,7 @@ private enum AlpacaEndpoint: Sendable {
             .patch
         case .updateWatchlist:
             .put
-        case .deleteWatchlist, .watchlistSymbol, .cancelOrder:
+        case .deleteWatchlist, .watchlistSymbol, .cancelOrder, .closePosition:
             .delete
         default:
             .get

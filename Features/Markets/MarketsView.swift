@@ -1402,6 +1402,7 @@ struct MarketListModePicker: View {
 
 struct MarketStatusCard: View {
     let overview: MarketOverview
+    var usesSkeletonStyle = false
 
     private var sessionSnapshot: MarketSessionSnapshot {
         MarketSessionSnapshot.current(for: overview)
@@ -1409,15 +1410,17 @@ struct MarketStatusCard: View {
 
     var body: some View {
         let session = sessionSnapshot.session
+        let sessionAccent = usesSkeletonStyle ? Color(.tertiarySystemFill) : session.tint
+        let sessionBackground = usesSkeletonStyle ? Color(.secondarySystemFill) : session.tint.opacity(0.16)
 
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top, spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(session.tint.opacity(0.16))
+                        .fill(sessionBackground)
                     Image(systemName: session.icon)
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(session.tint)
+                        .foregroundStyle(sessionAccent)
                 }
                 .frame(width: 36, height: 36)
 
@@ -1438,7 +1441,11 @@ struct MarketStatusCard: View {
                 NextMarketBoundaryBadge(label: nextMarketTimeLabel, time: nextMarketTime)
             }
 
-            MarketSessionTimelineView(timeline: sessionTimeline, selectedDate: nil)
+            MarketSessionTimelineView(
+                timeline: sessionTimeline,
+                selectedDate: nil,
+                usesSkeletonStyle: usesSkeletonStyle
+            )
                 .frame(height: 25)
 
             MarketIndexProxyPanel(overview: overview)

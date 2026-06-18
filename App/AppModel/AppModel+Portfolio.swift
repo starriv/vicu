@@ -238,6 +238,31 @@ extension AppModel {
     }
 
     @discardableResult
+    func closePosition(_ position: AlpacaPosition) async throws -> AlpacaOrder {
+        let symbolOrAssetID = closePositionIdentifier(for: position)
+        guard !symbolOrAssetID.isEmpty else {
+            throw APIClientError.underlying(L10n.PositionDetail.closeUnavailable(locale: appLanguage.locale))
+        }
+
+        guard let credentials else {
+            throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
+        }
+
+        let order = try await services.alpaca.closeOpenPosition(
+            symbolOrAssetID: symbolOrAssetID,
+            credentials: credentials
+        )
+        mergePortfolioOrder(order)
+        lastError = nil
+
+        Task { @MainActor [weak self] in
+            await self?.refresh()
+        }
+
+        return order
+    }
+
+    @discardableResult
     func replaceOrderPrice(_ order: AlpacaOrder, field: AlpacaOrderPriceField, priceText: String) async throws -> AlpacaOrder {
         guard order.supportsPriceReplacement else {
             throw APIClientError.underlying(L10n.Orders.actionNotReplaceable(locale: appLanguage.locale))
@@ -316,6 +341,15 @@ extension AppModel {
             removePortfolioOrder(id: oldID)
         }
         mergePortfolioOrder(order)
+    }
+
+    private func closePositionIdentifier(for position: AlpacaPosition) -> String {
+        let normalizedSymbol = position.symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if !normalizedSymbol.isEmpty {
+            return normalizedSymbol
+        }
+
+        return position.assetID?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
     private func removePortfolioOrder(id: String) {

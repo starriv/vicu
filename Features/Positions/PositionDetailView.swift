@@ -3,9 +3,11 @@ import SwiftUI
 struct PositionDetailView: View {
     @Environment(AppModel.self) private var app
     @Environment(AppToastCenter.self) private var toastCenter
+    @Environment(\.dismiss) private var dismiss
     @State private var position: AlpacaPosition?
     @State private var isLoading = false
     @State private var positionSharePayload: AssetPositionSharePayload?
+    @State private var closeConfirmation: PositionCloseConfirmationSnapshot?
 
     private let symbol: String
 
@@ -61,6 +63,14 @@ struct PositionDetailView: View {
         .refreshable {
             await loadPosition()
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let position {
+                PositionCloseActionBar {
+                    presentCloseConfirmation(for: position)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
         .task(id: symbol) {
             await loadPosition()
         }
@@ -68,6 +78,13 @@ struct PositionDetailView: View {
             AssetPositionShareSheet(payload: payload)
                 .presentationDetents([.height(680)])
                 .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $closeConfirmation) { snapshot in
+            PositionCloseConfirmationSheet(snapshot: snapshot) {
+                try await app.closePosition(snapshot.position)
+            } onClosed: { _ in
+                dismiss()
+            }
         }
     }
 
@@ -112,6 +129,17 @@ struct PositionDetailView: View {
         )
     }
 
+    private func presentCloseConfirmation(for position: AlpacaPosition) {
+        guard app.hasCredentials else {
+            toastCenter.showErrorMessage(L10n.Credentials.apiKeyRequired(locale: app.appLanguage.locale))
+            return
+        }
+
+        closeConfirmation = PositionCloseConfirmationSnapshot(
+            position: position
+        )
+    }
+
     private func loadPosition() async {
         guard app.hasCredentials else {
             toastCenter.showErrorMessage(L10n.Credentials.apiKeyRequired(locale: app.appLanguage.locale))
@@ -135,6 +163,285 @@ struct PositionDetailView: View {
         } catch {
             toastCenter.showError(error, locale: app.appLanguage.locale)
         }
+    }
+}
+
+private struct PositionCloseConfirmationSnapshot: Identifiable {
+    let id = UUID()
+    let position: AlpacaPosition
+
+    var symbol: String {
+        PositionDisplay.normalizedSymbol(position.symbol)
+    }
+}
+
+private struct PositionCloseActionBar: View {
+    @Environment(\.locale) private var locale
+
+    let action: () -> Void
+
+    var body: some View {
+        barContent
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 10)
+    }
+
+    @ViewBuilder
+    private var barContent: some View {
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: 0) {
+                closeButton(usesGlass: true)
+            }
+        } else {
+            closeButton(usesGlass: false)
+        }
+    }
+
+    @ViewBuilder
+    private func closeButton(usesGlass: Bool) -> some View {
+        let tint = AppTheme.ColorToken.negative
+        let button = Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.headline.weight(.semibold))
+
+                Text(L10n.PositionDetail.closeAction(locale: locale))
+                    .font(.headline.weight(.bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            .foregroundStyle(tint)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(L10n.PositionDetail.closeAction(locale: locale))
+
+        if usesGlass, #available(iOS 26.0, *) {
+            button
+                .glassEffect(.regular.tint(tint.opacity(0.22)).interactive(), in: .capsule)
+                .overlay {
+                    Capsule()
+                        .strokeBorder(tint.opacity(0.34), lineWidth: 0.75)
+                }
+        } else {
+            button
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay {
+                    Capsule()
+                        .strokeBorder(tint.opacity(0.30), lineWidth: 0.75)
+                }
+                .shadow(color: tint.opacity(0.10), radius: 16, y: 6)
+        }
+    }
+}
+
+private struct PositionCloseConfirmationSheet: View {
+    @Environment(AppToastCenter.self) private var toastCenter
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.locale) private var locale
+
+    let snapshot: PositionCloseConfirmationSnapshot
+    let onConfirm: () async throws -> AlpacaOrder
+    let onClosed: (AlpacaOrder) -> Void
+
+    @State private var isSubmitting = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+
+            VStack(spacing: 14) {
+                summaryCard
+                warningMessage
+                PositionCloseConfirmButton(
+                    title: L10n.PositionDetail.closeConfirmAction(locale: locale),
+                    submittingTitle: L10n.Trade.simpleSubmitting(locale: locale),
+                    isSubmitting: isSubmitting
+                ) {
+                    await submit()
+                }
+                .padding(.top, 2)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            .padding(.bottom, 20)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(AppTheme.ColorToken.pageBackground.ignoresSafeArea())
+        .presentationDetents([.height(350)])
+        .presentationDragIndicator(.hidden)
+        .interactiveDismissDisabled(isSubmitting)
+    }
+
+    private var header: some View {
+        VStack(spacing: 10) {
+            Capsule()
+                .fill(.tertiary)
+                .frame(width: 58, height: 5)
+                .padding(.top, 10)
+
+            HStack {
+                Button(L10n.Common.cancelText(locale: locale)) {
+                    dismiss()
+                }
+                .font(AppTypography.control)
+                .foregroundStyle(.secondary)
+                .disabled(isSubmitting)
+
+                Spacer(minLength: 12)
+
+                Text(L10n.PositionDetail.closeSheetTitle(locale: locale))
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+
+                Spacer(minLength: 12)
+
+                Color.clear
+                    .frame(width: 52, height: 1)
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 8)
+        }
+    }
+
+    private var summaryCard: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(snapshot.symbol)
+                        .font(.title3.weight(.semibold))
+                        .lineLimit(1)
+
+                    Text(PositionDisplay.sideText(snapshot.position.side, locale: locale))
+                        .font(AppTypography.detail.weight(.semibold))
+                        .foregroundStyle(PositionDisplay.sideTint(snapshot.position.side))
+                }
+
+                Spacer(minLength: 12)
+
+                AppPriceText(
+                    snapshot.position.marketValue,
+                    font: .title3.monospacedDigit().weight(.semibold),
+                    minimumScaleFactor: 0.76,
+                    notation: .compact
+                )
+                .foregroundStyle(.primary)
+            }
+            .padding(.vertical, 14)
+
+            Divider()
+
+            PositionCloseSummaryRow(
+                title: L10n.PositionDetail.quantity,
+                value: PositionDisplay.quantityText(
+                    snapshot.position.quantity,
+                    assetClass: snapshot.position.assetClass,
+                    symbol: snapshot.position.symbol,
+                    locale: locale
+                )
+            )
+        }
+        .padding(.horizontal, 18)
+        .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: AppTheme.CornerRadius.groupedSurface, style: .continuous))
+    }
+
+    private var warningMessage: some View {
+        Text(L10n.PositionDetail.closeSheetMessage(symbol: snapshot.symbol, locale: locale))
+            .font(AppTypography.detail)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 2)
+    }
+
+    private func submit() async {
+        guard !isSubmitting else {
+            return
+        }
+
+        isSubmitting = true
+
+        do {
+            let order = try await onConfirm()
+            dismiss()
+            showSuccessToastAfterDismissal()
+            onClosed(order)
+        } catch {
+            isSubmitting = false
+            toastCenter.showError(error, locale: locale)
+        }
+    }
+
+    private func showSuccessToastAfterDismissal() {
+        Task { @MainActor [toastCenter, symbol = snapshot.symbol, locale = locale] in
+            try? await Task.sleep(for: .milliseconds(320))
+            toastCenter.show(L10n.PositionDetail.closeSubmitted(symbol: symbol, locale: locale))
+        }
+    }
+}
+
+private struct PositionCloseSummaryRow: View {
+    let title: LocalizedStringKey
+    let value: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(title)
+                .font(.body)
+                .foregroundStyle(.secondary)
+
+            Spacer(minLength: 12)
+
+            Text(value)
+                .font(.body.monospacedDigit().weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+        }
+        .padding(.vertical, 13)
+    }
+}
+
+private struct PositionCloseConfirmButton: View {
+    let title: String
+    let submittingTitle: String
+    let isSubmitting: Bool
+    let action: () async -> Void
+
+    var body: some View {
+        Button {
+            Task { await action() }
+        } label: {
+            ZStack {
+                Text(title)
+                    .font(.headline.weight(.bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .opacity(isSubmitting ? 0 : 1)
+
+                if isSubmitting {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(.white)
+
+                        Text(submittingTitle)
+                            .font(.headline.weight(.bold))
+                    }
+                }
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .background(AppTheme.ColorToken.negative, in: Capsule())
+        .disabled(isSubmitting)
+        .accessibilityLabel(isSubmitting ? submittingTitle : title)
     }
 }
 

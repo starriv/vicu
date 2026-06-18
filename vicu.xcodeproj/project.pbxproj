@@ -78,6 +78,7 @@
 		0A00000000000000000001B0 /* Features/Positions/PositionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002B0 /* Features/Positions/PositionDetailView.swift */; };
 		0A00000000000000000001B1 /* Features/Positions/PositionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002B1 /* Features/Positions/PositionsView.swift */; };
 		0A00000000000000000001B2 /* Features/Positions/PositionCategorySupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002B2 /* Features/Positions/PositionCategorySupport.swift */; };
+		0A00000000000000000001B3 /* Features/Positions/PositionsShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002B3 /* Features/Positions/PositionsShareSheet.swift */; };
 		0A00000000000000000001C1 /* Shared/Utilities/ErrorCancellation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002C1 /* Shared/Utilities/ErrorCancellation.swift */; };
 		0A00000000000000000001C2 /* DesignSystem/Components/AppInfiniteScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002C2 /* DesignSystem/Components/AppInfiniteScrollView.swift */; };
 		0A00000000000000000001D0 /* Features/Trade/TradeOrderConfirmationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002D0 /* Features/Trade/TradeOrderConfirmationSheet.swift */; };
@@ -215,6 +216,7 @@
 		0A00000000000000000002B0 /* Features/Positions/PositionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Positions/PositionDetailView.swift; sourceTree = "<group>"; };
 		0A00000000000000000002B1 /* Features/Positions/PositionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Positions/PositionsView.swift; sourceTree = "<group>"; };
 		0A00000000000000000002B2 /* Features/Positions/PositionCategorySupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Positions/PositionCategorySupport.swift; sourceTree = "<group>"; };
+		0A00000000000000000002B3 /* Features/Positions/PositionsShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Positions/PositionsShareSheet.swift; sourceTree = "<group>"; };
 		0A00000000000000000002C1 /* Shared/Utilities/ErrorCancellation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/Utilities/ErrorCancellation.swift; sourceTree = "<group>"; };
 		0A00000000000000000002C2 /* DesignSystem/Components/AppInfiniteScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppInfiniteScrollView.swift; sourceTree = "<group>"; };
 		0A00000000000000000002D0 /* Features/Trade/TradeOrderConfirmationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Trade/TradeOrderConfirmationSheet.swift; sourceTree = "<group>"; };
@@ -331,6 +333,7 @@
 				0A00000000000000000002B0 /* Features/Positions/PositionDetailView.swift */,
 				0A00000000000000000002B1 /* Features/Positions/PositionsView.swift */,
 				0A00000000000000000002B2 /* Features/Positions/PositionCategorySupport.swift */,
+				0A00000000000000000002B3 /* Features/Positions/PositionsShareSheet.swift */,
 				0A0000000000000000000214 /* Features/Markets/MarketsView.swift */,
 				0A0000000000000000000504 /* Skeletons */,
 				0A0000000000000000000287 /* Features/Trade/TradeStore.swift */,
@@ -593,6 +596,7 @@
 				0A00000000000000000001B0 /* Features/Positions/PositionDetailView.swift in Sources */,
 				0A00000000000000000001B1 /* Features/Positions/PositionsView.swift in Sources */,
 				0A00000000000000000001B2 /* Features/Positions/PositionCategorySupport.swift in Sources */,
+				0A00000000000000000001B3 /* Features/Positions/PositionsShareSheet.swift in Sources */,
 				0A0000000000000000000192 /* DesignSystem/Components/MarketSessionTimelineView.swift in Sources */,
 				0A0000000000000000000114 /* Features/Markets/MarketsView.swift in Sources */,
 				0A0000000000000000000193 /* MarketsSkeletons.swift in Sources */,

@@ -6,6 +6,7 @@ struct OptionDetailView: View {
     @State private var store: OptionDetailStore
     @State private var chartSelection: AssetChartSelection?
     @State private var isChartScrubbing = false
+    @State private var tradeIntent: OrderPositionIntent?
 
     init(contractSymbol: String, initialSnapshot: AlpacaOptionSnapshot? = nil) {
         _store = State(initialValue: OptionDetailStore(contractSymbol: contractSymbol, initialSnapshot: initialSnapshot))
@@ -36,6 +37,21 @@ struct OptionDetailView: View {
             }
         }
         .background(Color(.systemBackground).ignoresSafeArea())
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if app.hasCredentials && store.hasInitialContent {
+                OptionDetailTradeBar { intent in
+                    tradeIntent = intent
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .navigationDestination(item: $tradeIntent) { intent in
+            OptionTradeView(
+                contractSymbol: store.descriptor.symbol,
+                initialIntent: intent,
+                initialSnapshotModel: store.snapshotModel
+            )
+        }
         .navigationTitle(store.descriptor.underlyingSymbol)
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -80,7 +96,6 @@ private struct OptionDetailContent: View {
                 isChartScrubbing: $isChartScrubbing
             )
             OptionQuoteSection(model: store.snapshotModel)
-            OptionTradeActionSection(store: store)
             OptionMetricsSection(title: store.snapshotModel.metricsTitle, metrics: store.snapshotModel.metrics)
             OptionMetricsSection(title: "Contract", metrics: store.snapshotModel.specs)
         }
@@ -195,8 +210,7 @@ private struct OptionChartSection: View {
                 .allowsHitTesting(!store.isLoadingChart)
 
                 if store.isLoadingChart {
-                    AssetPeriodChartSkeleton(
-                        mode: store.effectiveChartMode,
+                    OptionChartLoadingBackground(
                         tint: store.chartRenderModels.model(for: store.effectiveChartMode).periodTint
                     )
                     .transition(.opacity)
@@ -273,71 +287,103 @@ private struct OptionMetricsSection: View {
     }
 }
 
-private struct OptionTradeActionSection: View {
-    let store: OptionDetailStore
+private struct OptionDetailTradeBar: View {
+    let openTrade: (OrderPositionIntent) -> Void
 
     var body: some View {
-        AssetDetailSection(title: "Trade") {
-            HStack(spacing: 12) {
-                OptionTradeNavigationButton(
-                    title: "Buy",
-                    subtitle: "Open",
-                    tint: OrderSide.buy.tradeActionTint
-                ) {
-                    OptionTradeView(
-                        contractSymbol: store.descriptor.symbol,
-                        initialIntent: .buyToOpen,
-                        initialSnapshotModel: store.snapshotModel
-                    )
-                }
+        tradeContent
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 10)
+    }
 
-                OptionTradeNavigationButton(
-                    title: "Sell",
-                    subtitle: "Close",
-                    tint: OrderSide.sell.tradeActionTint
-                ) {
-                    OptionTradeView(
-                        contractSymbol: store.descriptor.symbol,
-                        initialIntent: .sellToClose,
-                        initialSnapshotModel: store.snapshotModel
-                    )
-                }
+    @ViewBuilder
+    private var tradeContent: some View {
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: 12) {
+                content(usesGlass: true)
             }
+        } else {
+            content(usesGlass: false)
         }
+    }
+
+    private func content(usesGlass: Bool) -> some View {
+        HStack(spacing: 12) {
+            OptionTradeIntentButton(
+                intent: .buyToOpen,
+                title: "Buy",
+                tint: OrderSide.buy.tradeActionTint,
+                usesGlass: usesGlass,
+                openTrade: openTrade
+            )
+
+            OptionTradeIntentButton(
+                intent: .sellToOpen,
+                title: "Sell",
+                tint: OrderSide.sell.tradeActionTint,
+                usesGlass: usesGlass,
+                openTrade: openTrade
+            )
+        }
+        .frame(height: 56)
     }
 }
 
-private struct OptionTradeNavigationButton<Destination: View>: View {
+private struct OptionTradeIntentButton: View {
+    let intent: OrderPositionIntent
     let title: String
-    let subtitle: String
     let tint: Color
-    let destination: () -> Destination
+    let usesGlass: Bool
+    let openTrade: (OrderPositionIntent) -> Void
 
     var body: some View {
-        NavigationLink(destination: destination) {
-            HStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(.headline.weight(.bold))
-
-                    Text(subtitle)
-                        .font(AppTypography.caption.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.82))
-                }
-
-                Spacer(minLength: 8)
-
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.white.opacity(0.82))
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 14)
-            .frame(height: 58)
-            .frame(maxWidth: .infinity)
-            .background(tint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        Button {
+            openTrade(intent)
+        } label: {
+            Text(title)
+                .font(.headline.weight(.bold))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .frame(height: 56)
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .modifier(OptionTradeIntentButtonGlassModifier(tint: tint, usesGlass: usesGlass))
+    }
+}
+
+private struct OptionTradeIntentButtonGlassModifier: ViewModifier {
+    let tint: Color
+    let usesGlass: Bool
+
+    func body(content: Content) -> some View {
+        if usesGlass, #available(iOS 26.0, *) {
+            content
+                .background {
+                    Capsule()
+                        .fill(tint.opacity(0.18))
+                }
+                .glassEffect(.regular.tint(tint.opacity(0.68)).interactive(), in: .capsule)
+                .overlay {
+                    Capsule()
+                        .strokeBorder(tint.opacity(0.46), lineWidth: 0.75)
+                }
+                .shadow(color: tint.opacity(0.18), radius: 10, y: 4)
+        } else {
+            content
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay {
+                    Capsule()
+                        .fill(tint.opacity(0.40))
+                }
+                .overlay {
+                    Capsule()
+                        .strokeBorder(tint.opacity(0.36), lineWidth: 0.75)
+                }
+                .shadow(color: tint.opacity(0.14), radius: 10, y: 4)
+        }
     }
 }
 
@@ -419,7 +465,7 @@ private struct OptionDetailSkeleton: View {
             }
 
             AssetSkeletonCapsule(width: 150, height: 48, fill: Color(.secondarySystemFill), cornerRadius: 16)
-            AssetPeriodChartSkeleton(mode: .line)
+            OptionChartLoadingBackground(tint: AppTheme.ColorToken.positive)
                 .frame(height: 300)
 
             LazyVGrid(columns: AssetDetailGrid.twoColumns, spacing: 12) {
@@ -435,6 +481,22 @@ private struct OptionDetailSkeleton: View {
             }
         }
         .redacted(reason: .placeholder)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct OptionChartLoadingBackground: View {
+    let tint: Color
+
+    var body: some View {
+        ZStack {
+            Color(.systemBackground)
+
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(tint.opacity(0.08))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }

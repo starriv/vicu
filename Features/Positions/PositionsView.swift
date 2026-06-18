@@ -5,6 +5,7 @@ struct PositionsView: View {
     @Environment(AppToastCenter.self) private var toastCenter
     @State private var selectedCategory: PositionAssetCategory?
     @State private var hasLoaded = false
+    @State private var positionsSharePayload: PositionsSharePayload?
 
     var body: some View {
         let snapshot = PositionCategorySnapshot(
@@ -13,6 +14,15 @@ struct PositionsView: View {
         )
 
         BasicLayout(L10n.Positions.title, style: .scroll(spacing: 18)) {
+            if !app.portfolio.positions.isEmpty {
+                PositionsShareHeaderButton {
+                    positionsSharePayload = PositionsSharePayload(
+                        positions: app.portfolio.positions,
+                        account: app.portfolio.account
+                    )
+                }
+            }
+        } content: {
             content(snapshot: snapshot)
         }
         .toolbar(.hidden, for: .tabBar)
@@ -33,6 +43,11 @@ struct PositionsView: View {
             }
 
             await refreshPositions()
+        }
+        .sheet(item: $positionsSharePayload) { payload in
+            PositionsShareSheet(payload: payload)
+                .presentationDetents([.height(720)])
+                .presentationDragIndicator(.visible)
         }
     }
 

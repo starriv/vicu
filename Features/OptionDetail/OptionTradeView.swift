@@ -9,6 +9,8 @@ struct OptionTradeView: View {
 
     @State private var store: OptionTradeStore
     @State private var confirmation: OptionTradeConfirmationSnapshot?
+    @State private var showsOrderIssue = false
+    @FocusState private var focusedInput: OptionTradeInputField?
 
     init(
         contractSymbol: String,
@@ -27,33 +29,46 @@ struct OptionTradeView: View {
             VStack(alignment: .leading, spacing: 20) {
                 OptionTradeContractHeader(store: store)
 
-                OptionTradeIntentSection(store: store)
-                OptionTradePermissionSection(store: store)
                 OptionTradeQuoteSection(store: store)
-                OptionTradeInputSection(store: store)
-                OptionTradeSummarySection(store: store, environment: app.environment)
-
-                if let statusMessage {
-                    OptionTradeStatusLine(message: statusMessage, isError: store.hasBlockingIssue)
-                }
+                OptionTradeInputSection(
+                    store: store,
+                    issueMessage: orderIssueMessage,
+                    focusedInput: $focusedInput
+                )
+                OptionTradeBuyingPowerSection(store: store)
+                OptionTradePermissionSection(store: store)
             }
             .padding(.horizontal, AppTheme.Spacing.pageHorizontal)
             .padding(.top, AppTheme.Spacing.pageTop)
             .padding(.bottom, 112)
         }
+        .scrollDismissesKeyboard(.interactively)
         .background(AppTheme.ColorToken.pageBackground.ignoresSafeArea())
         .navigationTitle("Option Order")
         .navigationBarTitleDisplayMode(.inline)
-        .safeAreaInset(edge: .bottom) {
-            OptionTradeBottomBar(
-                title: store.reviewButtonTitle,
-                tint: store.intent.side.tradeActionTint,
-                isLoading: store.isSubmitting,
-                isDimmed: !app.canUseAlpacaAPI || !store.validation.canSubmit
-            ) {
-                reviewOrder()
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+
+                Button("Done") {
+                    focusedInput = nil
+                }
             }
         }
+        .safeAreaInset(edge: .bottom) {
+            if focusedInput == nil {
+                OptionTradeBottomBar(
+                    title: store.reviewButtonTitle,
+                    tint: store.intent.side.tradeActionTint,
+                    isLoading: store.isSubmitting,
+                    isDimmed: !app.canUseAlpacaAPI || !store.validation.canSubmit
+                ) {
+                    reviewOrder()
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.18), value: focusedInput)
         .task {
             store.updateLocale(app.appLanguage.locale)
             await store.load(app: app, force: true)
@@ -67,6 +82,11 @@ struct OptionTradeView: View {
         .onChange(of: store.errorMessage) { _, message in
             showErrorMessage(message)
         }
+        .onChange(of: store.validation.canSubmit) { _, canSubmit in
+            if canSubmit {
+                showsOrderIssue = false
+            }
+        }
         .sheet(item: $confirmation) { snapshot in
             OptionTradeConfirmationSheet(snapshot: snapshot) {
                 await store.submit(app: app, snapshot: snapshot)
@@ -76,24 +96,37 @@ struct OptionTradeView: View {
         }
     }
 
-    private var statusMessage: String? {
-        store.message ?? store.validation.errors.first
+    private var orderIssueMessage: String? {
+        if let message = store.message {
+            return store.hasBuyingPowerIssue ? nil : message
+        }
+
+        guard showsOrderIssue else {
+            return nil
+        }
+
+        return store.firstNonBuyingPowerIssueMessage
     }
 
     private func reviewOrder() {
+        focusedInput = nil
         store.updateLocale(locale)
 
         guard app.canUseAlpacaAPI else {
+            showsOrderIssue = true
             store.message = L10n.Trade.addCredentialsBeforeOrder(locale: locale)
             return
         }
 
         let validation = store.validation
         guard validation.canSubmit else {
-            store.message = validation.errors.first
+            showsOrderIssue = true
+            store.message = nil
             return
         }
 
+        showsOrderIssue = false
+        store.message = nil
         confirmation = OptionTradeConfirmationSnapshot(store: store, environment: app.environment)
     }
 
@@ -106,10 +139,26 @@ struct OptionTradeView: View {
     }
 }
 
+private enum OptionTradeInputField: Hashable {
+    case contracts
+    case limitPrice
+}
+
+private extension TradeValidationIssueKind {
+    var isBuyingPowerIssue: Bool {
+        switch self {
+        case .buyExceedsBuyingPower, .shortExceedsBuyingPower:
+            true
+        case .generic, .missingInput, .sellExceedsPosition, .fractionalShortSaleUnsupported:
+            false
+        }
+    }
+}
+
 @MainActor
 @Observable
 final class OptionTradeStore {
-    static let supportedIntents: [OrderPositionIntent] = [.buyToOpen, .sellToClose]
+    static let supportedIntents: [OrderPositionIntent] = [.buyToOpen, .sellToOpen, .buyToClose, .sellToClose]
     static let contractMultiplier = Decimal(100)
 
     let contractSymbol: String
@@ -121,12 +170,18 @@ final class OptionTradeStore {
         }
     }
     var draft: OrderDraft {
-        didSet { refreshDerivedState() }
+        didSet {
+            message = nil
+            refreshDerivedState()
+        }
     }
     private(set) var account: AlpacaAccount? {
         didSet { refreshDerivedState() }
     }
     private(set) var position: AlpacaPosition? {
+        didSet { refreshDerivedState() }
+    }
+    private(set) var underlyingPosition: AlpacaPosition? {
         didSet { refreshDerivedState() }
     }
     private(set) var snapshot: AlpacaOptionSnapshot? {
@@ -261,7 +316,33 @@ final class OptionTradeStore {
     }
 
     var closableContracts: Decimal {
-        max(NumberParser.decimal(from: position?.quantityAvailable) ?? positionQuantity, 0)
+        switch intent {
+        case .sellToClose:
+            longContractsAvailable
+        case .buyToClose:
+            shortContractsAvailable
+        case .buyToOpen, .sellToOpen:
+            0
+        }
+    }
+
+    private var availableOptionQuantity: Decimal {
+        NumberParser.decimal(from: position?.quantityAvailable) ?? positionQuantity
+    }
+
+    private var longContractsAvailable: Decimal {
+        max(availableOptionQuantity, 0)
+    }
+
+    private var shortContractsAvailable: Decimal {
+        max(-availableOptionQuantity, 0)
+    }
+
+    private var underlyingSharesAvailable: Decimal {
+        let quantity = NumberParser.decimal(from: underlyingPosition?.quantityAvailable)
+            ?? NumberParser.decimal(from: underlyingPosition?.quantity)
+            ?? 0
+        return max(quantity, 0)
     }
 
     var requestedContracts: Int? {
@@ -300,9 +381,21 @@ final class OptionTradeStore {
         return permissionIssue != nil
     }
 
+    var hasBuyingPowerIssue: Bool {
+        validation.issues.contains { $0.kind.isBuyingPowerIssue }
+    }
+
+    var firstNonBuyingPowerIssueMessage: String? {
+        validation.issues.first { !$0.kind.isBuyingPowerIssue }?.message
+    }
+
     var reviewButtonTitle: String {
         if isSubmitting {
             return L10n.Trade.simpleSubmitting(locale: locale)
+        }
+
+        if hasBuyingPowerIssue {
+            return "Insufficient Buying Power"
         }
 
         return "Review \(intent.shortTitle)"
@@ -328,8 +421,7 @@ final class OptionTradeStore {
         [
             OptionTradePriceFillModel(source: .bid, price: bidPrice),
             OptionTradePriceFillModel(source: .mid, price: midPrice),
-            OptionTradePriceFillModel(source: .ask, price: askPrice),
-            OptionTradePriceFillModel(source: .last, price: lastPrice)
+            OptionTradePriceFillModel(source: .ask, price: askPrice)
         ].filter { $0.price != nil }
     }
 
@@ -354,6 +446,16 @@ final class OptionTradeStore {
             position = try await app.fetchOpenPosition(symbol: contractSymbol)
         } catch {
             firstError = firstError ?? error
+        }
+
+        if intent == .sellToOpen, descriptor.type == .call {
+            do {
+                underlyingPosition = try await app.fetchOpenPosition(symbol: descriptor.underlyingSymbol)
+            } catch {
+                firstError = firstError ?? error
+            }
+        } else {
+            underlyingPosition = nil
         }
 
         do {
@@ -427,13 +529,23 @@ final class OptionTradeStore {
         switch intent {
         case .buyToOpen:
             return optionsTradingLevel >= 2 ? nil : "Buying calls and puts requires options level 2."
-        case .sellToClose:
-            if optionsTradingLevel < 1 {
-                return "Closing option positions requires options trading access."
+        case .sellToOpen:
+            guard optionsTradingLevel >= 1 else {
+                return "Selling covered calls or cash-secured puts requires options level 1."
             }
-            return closableContracts > 0 ? nil : "No open contracts are available to close."
-        case .buyToClose, .sellToOpen:
-            return "\(intent.title) is not available in this screen."
+
+            switch descriptor.type {
+            case .call:
+                return nil
+            case .put:
+                return nil
+            case nil:
+                return "Option contract type is unavailable."
+            }
+        case .buyToClose:
+            return optionsTradingLevel >= 1 ? nil : "Closing short option positions requires options trading access."
+        case .sellToClose:
+            return optionsTradingLevel >= 1 ? nil : "Closing long option positions requires options trading access."
         }
     }
 
@@ -485,34 +597,131 @@ final class OptionTradeStore {
             issues.append(.generic("Order intent does not match the selected action."))
         }
 
-        if account == nil, !isLoading {
-            issues.append(.generic(L10n.Trade.contextNotLoaded(locale: locale)))
+        if account == nil {
+            issues.append(.generic(isLoading ? "Loading account permissions..." : L10n.Trade.contextNotLoaded(locale: locale)))
         }
 
         if let permissionIssue {
             issues.append(.generic(permissionIssue))
         }
 
-        if intent == .sellToClose,
-           let requestedContracts,
-           Decimal(requestedContracts) > closableContracts {
-            issues.append(TradeValidationIssue(
-                kind: .sellExceedsPosition,
-                message: "Sell to close quantity exceeds available contracts."
-            ))
-        }
-
-        if intent == .buyToOpen,
-           let estimatedNotional,
-           let optionsBuyingPower,
-           estimatedNotional > optionsBuyingPower {
-            issues.append(TradeValidationIssue(
-                kind: .buyExceedsBuyingPower,
-                message: L10n.Trade.buyExceedsBuyingPower(locale: locale)
-            ))
+        if let requestedContracts {
+            issues.append(contentsOf: optionIntentIssues(requestedContracts: requestedContracts))
         }
 
         return TradeValidationResult(issues: Self.unique(issues), warnings: [])
+    }
+
+    private func optionIntentIssues(requestedContracts: Int) -> [TradeValidationIssue] {
+        let requested = Decimal(requestedContracts)
+
+        switch intent {
+        case .buyToOpen:
+            guard let estimatedNotional else {
+                return []
+            }
+
+            return buyingPowerIssues(
+                requiredBuyingPower: estimatedNotional,
+                kind: .buyExceedsBuyingPower,
+                exceededMessage: L10n.Trade.buyExceedsBuyingPower(locale: locale)
+            )
+        case .sellToOpen:
+            return sellToOpenIssues(requestedContracts: requested)
+        case .buyToClose:
+            guard requested <= shortContractsAvailable else {
+                return [
+                    TradeValidationIssue(
+                        kind: .sellExceedsPosition,
+                        message: "Buy to close quantity exceeds available short contracts."
+                    )
+                ]
+            }
+
+            guard let estimatedNotional else {
+                return []
+            }
+
+            return buyingPowerIssues(
+                requiredBuyingPower: estimatedNotional,
+                kind: .buyExceedsBuyingPower,
+                exceededMessage: L10n.Trade.buyExceedsBuyingPower(locale: locale)
+            )
+        case .sellToClose:
+            guard requested <= longContractsAvailable else {
+                return [
+                    TradeValidationIssue(
+                        kind: .sellExceedsPosition,
+                        message: "Sell to close quantity exceeds available long contracts."
+                    )
+                ]
+            }
+
+            return []
+        }
+    }
+
+    private func sellToOpenIssues(requestedContracts: Decimal) -> [TradeValidationIssue] {
+        switch descriptor.type {
+        case .put:
+            guard let requirement = cashSecuredPutRequirement(requestedContracts: requestedContracts) else {
+                return [.generic("Unable to estimate the cash-secured put requirement.")]
+            }
+
+            return buyingPowerIssues(
+                requiredBuyingPower: requirement,
+                kind: .shortExceedsBuyingPower,
+                exceededMessage: "Cash-secured put requirement exceeds options buying power."
+            )
+        case .call:
+            let requiredShares = requestedContracts * Self.contractMultiplier
+            guard underlyingSharesAvailable >= requiredShares else {
+                return [
+                    TradeValidationIssue(
+                        kind: .sellExceedsPosition,
+                        message: "Covered call requires \(Self.displayWholeNumber(requiredShares)) available \(descriptor.underlyingSymbol) shares."
+                    )
+                ]
+            }
+
+            return []
+        case nil:
+            return [.generic("Option contract type is unavailable.")]
+        }
+    }
+
+    private func buyingPowerIssues(
+        requiredBuyingPower: Decimal,
+        kind: TradeValidationIssueKind,
+        exceededMessage: String
+    ) -> [TradeValidationIssue] {
+        guard account != nil else {
+            return []
+        }
+
+        guard let optionsBuyingPower else {
+            return [.generic("Options buying power is unavailable.")]
+        }
+
+        guard requiredBuyingPower <= optionsBuyingPower else {
+            return [
+                TradeValidationIssue(
+                    kind: kind,
+                    message: exceededMessage
+                )
+            ]
+        }
+
+        return []
+    }
+
+    private func cashSecuredPutRequirement(requestedContracts: Decimal) -> Decimal? {
+        guard descriptor.type == .put,
+              let strike = descriptor.strike else {
+            return nil
+        }
+
+        return Decimal(strike) * Self.contractMultiplier * requestedContracts
     }
 
     private func applyIntentToDraft() {
@@ -578,6 +787,13 @@ final class OptionTradeStore {
         var rounded = Decimal()
         NSDecimalRound(&rounded, &value, scale, .plain)
         return NumberText.trimTrailingZeros(NSDecimalNumber(decimal: rounded).stringValue)
+    }
+
+    private static func displayWholeNumber(_ value: Decimal) -> String {
+        var value = value
+        var rounded = Decimal()
+        NSDecimalRound(&rounded, &value, 0, .plain)
+        return NSDecimalNumber(decimal: rounded).stringValue
     }
 
     private static func unique(_ issues: [TradeValidationIssue]) -> [TradeValidationIssue] {
@@ -713,49 +929,97 @@ private struct OptionTradeContractHeader: View {
     }
 }
 
-private struct OptionTradeIntentSection: View {
-    @Bindable var store: OptionTradeStore
-
-    var body: some View {
-        AssetDetailSection(title: "Action") {
-            Picker("Action", selection: $store.intent) {
-                ForEach(OptionTradeStore.supportedIntents) { intent in
-                    Text(intent.shortTitle).tag(intent)
-                }
-            }
-            .pickerStyle(.segmented)
-            .disabled(store.isSubmitting)
-        }
-    }
-}
-
 private struct OptionTradePermissionSection: View {
     let store: OptionTradeStore
+    @State private var isExpanded = false
 
     var body: some View {
         AssetDetailSection(title: "Permissions") {
             VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 12) {
-                    OptionTradeSummaryTile(
-                        title: "Trading Level",
-                        value: store.optionsTradingLevelText,
-                        alignment: .leading
-                    )
-                    OptionTradeSummaryTile(
-                        title: "Approved Level",
-                        value: store.optionsApprovedLevelText,
-                        alignment: .leading
-                    )
-                }
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        isExpanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: statusIconName)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(statusTint)
+                            .frame(width: 24, height: 24)
 
-                Label(store.permissionStatusText, systemImage: store.hasPermissionIssue ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                    .font(AppTypography.detail.weight(.semibold))
-                    .foregroundStyle(store.hasPermissionIssue ? AppTheme.ColorToken.warning : AppTheme.ColorToken.positive)
-                    .fixedSize(horizontal: false, vertical: true)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(statusTitle)
+                                .font(AppTypography.rowTitle.weight(.semibold))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+
+                            Text(levelSummaryText)
+                                .font(AppTypography.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.76)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                        Image(systemName: "chevron.down")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.secondary)
+                            .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                if isExpanded {
+                    Divider()
+
+                    HStack(spacing: 12) {
+                        OptionTradeSummaryTile(
+                            title: "Trading Level",
+                            value: store.optionsTradingLevelText,
+                            alignment: .leading
+                        )
+                        OptionTradeSummaryTile(
+                            title: "Approved Level",
+                            value: store.optionsApprovedLevelText,
+                            alignment: .leading
+                        )
+                    }
+
+                    Label(store.permissionStatusText, systemImage: statusIconName)
+                        .font(AppTypography.detail.weight(.semibold))
+                        .foregroundStyle(statusTint)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             .padding(14)
             .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
+    }
+
+    private var statusTitle: String {
+        if store.account == nil {
+            return store.isLoading ? "Checking permissions" : "Permissions unavailable"
+        }
+
+        if store.hasPermissionIssue {
+            return "Action unavailable"
+        }
+
+        return "\(store.intent.shortTitle) available"
+    }
+
+    private var levelSummaryText: String {
+        "Trading \(store.optionsTradingLevelText) · Approved \(store.optionsApprovedLevelText)"
+    }
+
+    private var statusIconName: String {
+        store.hasPermissionIssue ? "exclamationmark.triangle.fill" : "checkmark.circle.fill"
+    }
+
+    private var statusTint: Color {
+        store.hasPermissionIssue ? AppTheme.ColorToken.warning : AppTheme.ColorToken.positive
     }
 }
 
@@ -791,57 +1055,90 @@ private struct OptionTradeQuoteSection: View {
 
 private struct OptionTradeInputSection: View {
     @Bindable var store: OptionTradeStore
+    let issueMessage: String?
+    let focusedInput: FocusState<OptionTradeInputField?>.Binding
 
     var body: some View {
         AssetDetailSection(title: "Limit Order") {
-            VStack(spacing: 0) {
-                OptionTradeInputRow(
-                    title: "Contracts",
-                    placeholder: "0",
-                    text: $store.draft.quantityText,
-                    keyboard: .numberPad
-                )
+            VStack(alignment: .leading, spacing: 12) {
+                if let issueMessage {
+                    OptionTradeIssueBanner(message: issueMessage)
+                }
 
-                Divider()
+                VStack(spacing: 0) {
+                    OptionTradeInputRow(
+                        title: "Contracts",
+                        placeholder: "0",
+                        text: $store.draft.quantityText,
+                        keyboard: .numberPad,
+                        field: .contracts,
+                        focusedInput: focusedInput
+                    )
 
-                OptionTradeInputRow(
-                    title: "Limit Price",
-                    placeholder: "0.00",
-                    prefix: "$",
-                    text: $store.draft.limitPriceText,
-                    keyboard: .decimalPad
-                )
-
-                if !store.priceFillModels.isEmpty {
                     Divider()
 
-                    LazyVGrid(columns: AssetDetailGrid.twoColumns, spacing: 10) {
-                        ForEach(store.priceFillModels) { item in
-                            Button {
+                    OptionTradeInputRow(
+                        title: "Limit Price",
+                        placeholder: "0.00",
+                        prefix: "$",
+                        text: $store.draft.limitPriceText,
+                        keyboard: .decimalPad,
+                        field: .limitPrice,
+                        focusedInput: focusedInput
+                    )
+
+                    if !store.priceFillModels.isEmpty {
+                        Divider()
+
+                        OptionTradePriceFillRow(
+                            items: store.priceFillModels,
+                            isDisabled: store.isSubmitting,
+                            select: { item in
+                                focusedInput.wrappedValue = nil
                                 store.selectPrice(item.source)
-                            } label: {
-                                HStack {
-                                    Text(item.title)
-                                    Spacer(minLength: 8)
-                                    Text(item.priceText)
-                                        .font(.caption.monospacedDigit().weight(.semibold))
-                                }
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.primary)
-                                .padding(.horizontal, 12)
-                                .frame(height: 36)
-                                .background(Color(.tertiarySystemGroupedBackground), in: Capsule())
                             }
-                            .buttonStyle(.plain)
-                            .disabled(store.isSubmitting)
-                        }
+                        )
+                        .padding(.top, 14)
                     }
-                    .padding(.top, 14)
+                }
+                .padding(14)
+                .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+        }
+    }
+}
+
+private struct OptionTradePriceFillRow: View {
+    let items: [OptionTradePriceFillModel]
+    let isDisabled: Bool
+    let select: (OptionTradePriceFillModel) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(items) { item in
+                    Button {
+                        select(item)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text(item.title)
+                                .foregroundStyle(.secondary)
+
+                            Text(item.priceText)
+                                .font(.caption.monospacedDigit().weight(.semibold))
+                                .foregroundStyle(.primary)
+                        }
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 12)
+                        .frame(height: 32)
+                        .background(Color(.tertiarySystemGroupedBackground), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isDisabled)
                 }
             }
-            .padding(14)
-            .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
+        .scrollClipDisabled()
     }
 }
 
@@ -851,6 +1148,8 @@ private struct OptionTradeInputRow: View {
     var prefix: String?
     @Binding var text: String
     let keyboard: UIKeyboardType
+    let field: OptionTradeInputField
+    let focusedInput: FocusState<OptionTradeInputField?>.Binding
 
     var body: some View {
         HStack(spacing: 14) {
@@ -868,6 +1167,7 @@ private struct OptionTradeInputRow: View {
 
                 TextField(placeholder, text: $text)
                     .keyboardType(keyboard)
+                    .focused(focusedInput, equals: field)
                     .multilineTextAlignment(.trailing)
                     .font(.title3.monospacedDigit().weight(.semibold))
                     .foregroundStyle(.primary)
@@ -879,49 +1179,49 @@ private struct OptionTradeInputRow: View {
     }
 }
 
-private struct OptionTradeSummarySection: View {
-    @Environment(\.locale) private var locale
-
+private struct OptionTradeBuyingPowerSection: View {
     let store: OptionTradeStore
-    let environment: TradeEnvironment
 
     var body: some View {
-        AssetDetailSection(title: "Summary") {
-            LazyVGrid(columns: AssetDetailGrid.twoColumns, spacing: 12) {
-                OptionTradeSummaryTile(
-                    title: store.estimatedNotionalTitle,
-                    value: AppFormatter.money(store.estimatedNotional, currencyCode: store.currencyCode)
-                )
-                OptionTradeSummaryTile(
-                    title: "Buying Power",
-                    value: AppFormatter.money(store.optionsBuyingPower, currencyCode: store.currencyCode)
-                )
-                OptionTradeSummaryTile(
-                    title: "Position",
-                    value: OptionTradeFormat.contracts(store.positionQuantity)
-                )
-                OptionTradeSummaryTile(
-                    title: "Available",
-                    value: OptionTradeFormat.contracts(store.closableContracts)
-                )
-                OptionTradeSummaryTile(
-                    title: "Order Type",
-                    value: "Limit"
-                )
-                OptionTradeSummaryTile(
-                    title: "Time in Force",
-                    value: "DAY"
-                )
-                OptionTradeSummaryTile(
-                    title: "Multiplier",
-                    value: "100"
-                )
-                OptionTradeSummaryTile(
-                    title: "Environment",
-                    value: environment.titleText(locale: locale)
-                )
-            }
+        VStack(spacing: 12) {
+            OptionTradeOrderAmountTile(
+                title: store.estimatedNotionalTitle,
+                value: AppFormatter.money(store.estimatedNotional, currencyCode: store.currencyCode),
+                tint: store.intent.side.tradeActionTint
+            )
+
+            OptionTradeSummaryTile(
+                title: "Buying Power",
+                value: AppFormatter.money(store.optionsBuyingPower, currencyCode: store.currencyCode)
+            )
         }
+    }
+}
+
+private struct OptionTradeOrderAmountTile: View {
+    let title: String
+    let value: String
+    let tint: Color
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(title)
+                .font(AppTypography.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+
+            Spacer(minLength: 12)
+
+            Text(value)
+                .font(.title3.monospacedDigit().weight(.semibold))
+                .foregroundStyle(tint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
@@ -963,14 +1263,13 @@ private struct OptionTradeSummaryTile: View {
     }
 }
 
-private struct OptionTradeStatusLine: View {
+private struct OptionTradeIssueBanner: View {
     let message: String
-    let isError: Bool
 
     var body: some View {
-        Label(message, systemImage: isError ? "exclamationmark.circle.fill" : "info.circle.fill")
+        Label(message, systemImage: "exclamationmark.circle.fill")
             .font(AppTypography.detail.weight(.semibold))
-            .foregroundStyle(isError ? AppTheme.ColorToken.warning : .secondary)
+            .foregroundStyle(AppTheme.ColorToken.warning)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(14)

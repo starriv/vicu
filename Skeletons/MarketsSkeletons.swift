@@ -3,7 +3,7 @@ import SwiftUI
 struct MarketOverviewSkeleton: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            MarketStatusCard(overview: .skeleton)
+            MarketStatusCard(overview: .skeleton, usesSkeletonStyle: true)
             MarketListModePicker(selection: .constant(.favorites))
             MarketSymbolSectionSkeleton(rowCount: 4)
         }

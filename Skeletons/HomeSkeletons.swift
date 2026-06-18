@@ -22,7 +22,7 @@ struct HomeHeroSkeleton: View {
 
                 Spacer(minLength: 8)
 
-                HomeSkeletonBlock(width: 74, height: 30, fill: Color(.secondarySystemFill), cornerRadius: 15)
+                HomeChartModePickerSkeleton()
             }
         }
         .padding(.top, 4)
@@ -91,32 +91,10 @@ struct HomeChartSkeleton: View {
                     )
                 )
 
-            HomeChartSkeletonGrid()
-                .stroke(Color(.tertiaryLabel).opacity(0.16), lineWidth: 1)
-                .padding(.vertical, 14)
-
             HomeChartSkeletonLine()
                 .stroke(AppTheme.ColorToken.brand.opacity(0.72), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-                .padding(.vertical, 18)
-
-            Circle()
-                .fill(AppTheme.ColorToken.brand.opacity(0.82))
-                .frame(width: 11, height: 11)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                .padding(.trailing, 22)
-                .padding(.bottom, 62)
-
-            VStack {
-                Spacer()
-
-                HStack(spacing: 18) {
-                    ForEach(0..<5, id: \.self) { index in
-                        HomeSkeletonBlock(width: [36, 44, 40, 50, 38][index], height: 7, fill: Color(.tertiarySystemFill), cornerRadius: 3.5)
-                    }
-                }
-                .padding(.bottom, 10)
-            }
         }
+        .padding(.vertical, 18)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
@@ -278,6 +256,12 @@ private struct HomeRangePickerSkeleton: View {
     }
 }
 
+private struct HomeChartModePickerSkeleton: View {
+    var body: some View {
+        HomeSkeletonBlock(width: 34, height: 30, fill: Color(.secondarySystemFill), cornerRadius: 15)
+    }
+}
+
 private struct HomeSkeletonSectionHeader: View {
     let titleWidth: CGFloat
     var countWidth: CGFloat? = nil
@@ -315,20 +299,6 @@ private struct HomeSkeletonBlock: View {
             .fill(fill)
             .frame(width: width, height: height)
             .frame(maxWidth: width == nil ? .infinity : nil)
-    }
-}
-
-private struct HomeChartSkeletonGrid: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-
-        for offset in [0.25, 0.5, 0.75] {
-            let y = rect.minY + rect.height * offset
-            path.move(to: CGPoint(x: rect.minX, y: y))
-            path.addLine(to: CGPoint(x: rect.maxX, y: y))
-        }
-
-        return path
     }
 }
 

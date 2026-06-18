@@ -364,6 +364,7 @@ enum L10n {
 
     enum Positions {
         static var title: LocalizedStringKey { "positions.title" }
+        static var share: LocalizedStringKey { "positions.share" }
         static var loading: LocalizedStringKey { "positions.loading" }
         static var sectionTitle: LocalizedStringKey { "positions.section_title" }
         static var emptyTitle: LocalizedStringKey { "positions.empty.title" }
@@ -381,6 +382,28 @@ enum L10n {
 
         static func viewAllAccessibility(count: Int, locale: Locale = .current) -> String {
             L10n.format("positions.view_all.accessibility_format", locale: locale, count)
+        }
+    }
+
+    enum PositionsShare {
+        static var title: LocalizedStringKey { "positions_share.title" }
+        static var previewAccessibility: LocalizedStringKey { "positions_share.preview_accessibility" }
+        static func sharePreviewTitle(count: Int, locale: Locale) -> String {
+            L10n.format("positions_share.preview_title_format", locale: locale, count)
+        }
+        static func portfolioSnapshot(locale: Locale) -> String { L10n.string("positions_share.portfolio_snapshot", locale: locale) }
+        static func allocation(locale: Locale) -> String { L10n.string("positions_share.allocation", locale: locale) }
+        static func holdings(locale: Locale) -> String { L10n.string("positions_share.holdings", locale: locale) }
+        static func assetCode(locale: Locale) -> String { L10n.string("positions_share.asset_code", locale: locale) }
+        static func entryPrice(locale: Locale) -> String { L10n.string("positions_share.entry_price", locale: locale) }
+        static func latestPrice(locale: Locale) -> String { L10n.string("positions_share.latest_price", locale: locale) }
+        static func unrealizedPL(locale: Locale) -> String { L10n.string("positions_share.unrealized_pl", locale: locale) }
+        static func morePositions(count: Int, locale: Locale) -> String {
+            L10n.format("positions_share.more_positions_format", locale: locale, count)
+        }
+        static func other(locale: Locale) -> String { L10n.string("positions_share.other", locale: locale) }
+        static func positionCount(count: Int, locale: Locale) -> String {
+            L10n.format("positions_share.position_count_format", locale: locale, count)
         }
     }
 
@@ -422,6 +445,30 @@ enum L10n {
 
         static func notFoundDescription(locale: Locale = .current) -> String {
             L10n.string("position_detail.not_found_description", locale: locale)
+        }
+
+        static func closeAction(locale: Locale = .current) -> String {
+            L10n.string("position_detail.close_action", locale: locale)
+        }
+
+        static func closeSheetTitle(locale: Locale = .current) -> String {
+            L10n.string("position_detail.close_sheet_title", locale: locale)
+        }
+
+        static func closeConfirmAction(locale: Locale = .current) -> String {
+            L10n.string("position_detail.close_confirm_action", locale: locale)
+        }
+
+        static func closeSheetMessage(symbol: String, locale: Locale = .current) -> String {
+            L10n.format("position_detail.close_sheet_message_format", locale: locale, symbol)
+        }
+
+        static func closeSubmitted(symbol: String, locale: Locale = .current) -> String {
+            L10n.format("position_detail.close_submitted_format", locale: locale, symbol)
+        }
+
+        static func closeUnavailable(locale: Locale = .current) -> String {
+            L10n.string("position_detail.close_unavailable", locale: locale)
         }
 
         static func long(locale: Locale = .current) -> String {

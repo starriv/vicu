@@ -113,19 +113,12 @@ private struct AssetOptionsFilterBar: View {
     private var expirationFilterRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                AssetOptionExpirationChip(
-                    title: AssetOptionExpirationFilter.all.title,
-                    isSelected: store.selectedExpiration == .all
-                ) {
-                    store.selectExpiration(.all)
-                }
-
-                ForEach(store.quickExpirationOptions) { expiration in
-                    AssetOptionExpirationChip(
+                ForEach(expirationPickerOptions) { expiration in
+                    AssetOptionExpirationMaterialChip(
                         title: expiration.title,
-                        isSelected: store.selectedExpiration == .exact(expiration)
+                        isSelected: store.selectedExpiration == expiration
                     ) {
-                        store.selectExpiration(.exact(expiration))
+                        store.selectExpiration(expiration)
                     }
                 }
 
@@ -136,45 +129,88 @@ private struct AssetOptionsFilterBar: View {
                 }
 
                 if store.shouldShowMoreExpirations {
-                    Menu {
-                        Button {
-                            store.selectExpiration(.all)
-                        } label: {
-                            Label("All expirations", systemImage: store.selectedExpiration == .all ? "checkmark" : "calendar")
-                        }
-
-                        ForEach(store.expirationMenuGroups) { group in
-                            Section(group.title) {
-                                ForEach(group.expirations) { expiration in
-                                    Button {
-                                        store.selectExpiration(.exact(expiration))
-                                    } label: {
-                                        Label(
-                                            expiration.menuTitle,
-                                            systemImage: store.selectedExpiration == .exact(expiration) ? "checkmark" : "calendar"
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 5) {
-                            Text("More")
-                            Image(systemName: "chevron.down")
-                                .font(.caption2.weight(.bold))
-                        }
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 12)
-                        .frame(height: 32)
-                        .background(Color(.tertiarySystemGroupedBackground), in: Capsule())
-                    }
-                    .buttonStyle(.plain)
+                    moreExpirationMenu
                 }
-
             }
+            .padding(.horizontal, AppTheme.Spacing.pageHorizontal)
             .padding(.vertical, 1)
         }
+        .padding(.horizontal, -AppTheme.Spacing.pageHorizontal)
+    }
+
+    private var expirationPickerOptions: [AssetOptionExpirationFilter] {
+        [.all] + store.quickExpirationOptions.map(AssetOptionExpirationFilter.exact)
+    }
+
+    private var moreExpirationMenu: some View {
+        Menu {
+            Button {
+                store.selectExpiration(.all)
+            } label: {
+                Label("All expirations", systemImage: store.selectedExpiration == .all ? "checkmark" : "calendar")
+            }
+
+            ForEach(store.expirationMenuGroups) { group in
+                Section(group.title) {
+                    ForEach(group.expirations) { expiration in
+                        Button {
+                            store.selectExpiration(.exact(expiration))
+                        } label: {
+                            Label(
+                                expiration.menuTitle,
+                                systemImage: store.selectedExpiration == .exact(expiration) ? "checkmark" : "calendar"
+                            )
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Text("More")
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.bold))
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 12)
+            .frame(height: 32)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(Color(.separator).opacity(0.08))
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct AssetOptionExpirationMaterialChip: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.footnote.weight(.semibold))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+                .foregroundStyle(isSelected ? AppTheme.ColorToken.brand : Color.secondary)
+                .frame(width: 42, height: 30)
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay {
+            Capsule()
+                .fill(isSelected ? AppTheme.ColorToken.brand.opacity(0.14) : Color.clear)
+        }
+        .overlay {
+            Capsule()
+                .strokeBorder(Color(.separator).opacity(isSelected ? 0.16 : 0.08), lineWidth: 0.75)
+        }
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -245,37 +281,6 @@ private struct AssetOptionsContent: View {
         }
         .refreshable {
             store.refreshAll(forceReload: true)
-        }
-    }
-}
-
-private struct AssetOptionExpirationChip: View {
-    let title: String
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(isSelected ? Color.white : Color.secondary)
-                .padding(.horizontal, 13)
-                .frame(height: 32)
-                .background(backgroundShape)
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-
-    @ViewBuilder
-    private var backgroundShape: some View {
-        if isSelected {
-            Capsule()
-                .fill(Color(.systemGray))
-        } else {
-            Capsule()
-                .fill(Color(.tertiarySystemGroupedBackground))
         }
     }
 }

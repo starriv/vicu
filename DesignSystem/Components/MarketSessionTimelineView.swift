@@ -89,17 +89,20 @@ struct MarketSessionTimelineView: View {
     let selectedDate: Date?
     let style: MarketSessionTimelineStyle
     let dotSize: CGFloat
+    let usesSkeletonStyle: Bool
 
     init(
         timeline: MarketSessionTimeline?,
         selectedDate: Date?,
         style: MarketSessionTimelineStyle = .bar,
-        dotSize: CGFloat = 9
+        dotSize: CGFloat = 9,
+        usesSkeletonStyle: Bool = false
     ) {
         self.timeline = timeline
         self.selectedDate = selectedDate
         self.style = style
         self.dotSize = dotSize
+        self.usesSkeletonStyle = usesSkeletonStyle
     }
 
     var body: some View {
@@ -137,24 +140,26 @@ struct MarketSessionTimelineView: View {
                             HStack(spacing: spacing) {
                                 ForEach(timeline.segments) { segment in
                                     Capsule()
-                                        .fill(segment.session.timelineTint)
+                                        .fill(segmentTint(for: segment))
                                         .frame(width: segmentWidth(segment, totalDuration: totalDuration, availableWidth: availableWidth))
                                 }
                             }
                             .frame(height: 5)
 
-                            Capsule()
-                                .fill(Color(.label).opacity(0.88))
-                                .frame(width: 3, height: 10)
-                                .offset(
-                                    x: markerOffset(
-                                        timeline,
-                                        totalDuration: totalDuration,
-                                        availableWidth: availableWidth,
-                                        spacing: spacing,
-                                        totalWidth: geometry.size.width
+                            if !usesSkeletonStyle {
+                                Capsule()
+                                    .fill(Color(.label).opacity(0.88))
+                                    .frame(width: 3, height: 10)
+                                    .offset(
+                                        x: markerOffset(
+                                            timeline,
+                                            totalDuration: totalDuration,
+                                            availableWidth: availableWidth,
+                                            spacing: spacing,
+                                            totalWidth: geometry.size.width
+                                        )
                                     )
-                                )
+                            }
                         }
                         .frame(height: 10)
                     }
@@ -173,7 +178,19 @@ struct MarketSessionTimelineView: View {
     }
 
     private var dotTint: Color {
-        timeline?.activeSession(for: selectedDate)?.timelineTint ?? Color(.tertiaryLabel)
+        if usesSkeletonStyle {
+            return Color(.secondarySystemFill)
+        }
+
+        return timeline?.activeSession(for: selectedDate)?.timelineTint ?? Color(.tertiaryLabel)
+    }
+
+    private func segmentTint(for segment: MarketSessionTimelineSegment) -> Color {
+        if usesSkeletonStyle {
+            return Color(.secondarySystemFill)
+        }
+
+        return segment.session.timelineTint
     }
 
     private var dotAccessibilityLabel: String {
