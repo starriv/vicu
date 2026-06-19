@@ -1313,7 +1313,12 @@ struct AlpacaClient: AlpacaServicing {
                 end: formatter.string(from: latestSession.end)
             ),
             emptyBarsFallbackInterval: nil,
-            sessionProgress: nil
+            sessionProgress: MarketSessionSchedule.progress(
+                for: latestSession,
+                in: sessionContext.calendar,
+                overnightDays: sessionContext.overnightCalendar,
+                at: referenceDate
+            )
         )
     }
 

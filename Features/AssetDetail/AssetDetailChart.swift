@@ -233,6 +233,8 @@ struct AssetPriceChart: View {
     @State private var overlayLabel: AssetChartOverlayLabel?
 
     private static let overlayHorizontalInset: CGFloat = 22
+    private static let oneDayDomainPaddingRatio = 0.012
+    private static let oneDayDomainPaddingRange = 0.5...1.5
 
     var body: some View {
         let currentPresentation = AssetChartPresentation(model: model, range: range)
@@ -454,10 +456,6 @@ struct AssetPriceChart: View {
     }
 
     private func visibleXDomain(for presentation: AssetChartPresentation) -> ClosedRange<Double> {
-        guard presentation.range != .oneDay else {
-            return presentation.model.xDomain
-        }
-
         let lower = presentation.model.xDomain.lowerBound
         let upper = presentation.model.xDomain.upperBound
         let span = upper - lower
@@ -465,8 +463,17 @@ struct AssetPriceChart: View {
             return presentation.model.xDomain
         }
 
-        let padding = max(span * 0.04, 0.35)
+        let padding = presentation.range == .oneDay
+            ? oneDayDomainPadding(for: span)
+            : max(span * 0.04, 0.35)
         return (lower - padding)...(upper + padding)
+    }
+
+    private func oneDayDomainPadding(for span: Double) -> Double {
+        min(
+            max(span * Self.oneDayDomainPaddingRatio, Self.oneDayDomainPaddingRange.lowerBound),
+            Self.oneDayDomainPaddingRange.upperBound
+        )
     }
 
     private func clearSelection() {

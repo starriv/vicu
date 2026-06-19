@@ -503,6 +503,7 @@ private struct AssetChartSection: View {
 
     private static let chartHeight: CGFloat = 330
     private static let timelineHeight: CGFloat = 24
+    private static let scrubTimelineClearance: CGFloat = 32
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -514,6 +515,7 @@ private struct AssetChartSection: View {
                     selection: $chartSelection,
                     isScrubbing: $isChartScrubbing
                 )
+                .padding(.bottom, chartBottomClearance)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .allowsHitTesting(!store.isLoadingChart)
 
@@ -522,6 +524,7 @@ private struct AssetChartSection: View {
                     tint: AppTheme.ColorToken.positive,
                     showsMockSeries: false
                 )
+                .padding(.bottom, chartBottomClearance)
                 .opacity(store.isLoadingChart ? 1 : 0)
                 .animation(.snappy(duration: 0.18), value: store.isLoadingChart)
                 .allowsHitTesting(false)
@@ -559,6 +562,10 @@ private struct AssetChartSection: View {
                 }
             }
         }
+    }
+
+    private var chartBottomClearance: CGFloat {
+        store.selectedRange == .oneDay ? Self.scrubTimelineClearance : 0
     }
 }
 

@@ -638,7 +638,7 @@ final class AssetDetailStore {
     }
 
     private var shouldRunSupplementalSnapshotRefresh: Bool {
-        feed == .overnight || sessionProgress != nil
+        feed == .overnight || hasActiveSessionProgress
     }
 
     private func shouldFetchSupplementalSnapshot(for request: AssetDetailSupplementalSnapshotRequest) -> Bool {
@@ -723,12 +723,12 @@ final class AssetDetailStore {
     }
 
     private var shouldPollLatestBar: Bool {
-        selectedRange == .oneDay && sessionProgress != nil
+        selectedRange == .oneDay && hasActiveSessionProgress
     }
 
     private func refreshLatestBarSoon() {
         guard selectedRange == .oneDay,
-              sessionProgress != nil,
+              hasActiveSessionProgress,
               let app else {
             return
         }
@@ -947,7 +947,17 @@ final class AssetDetailStore {
     }
 
     private func shouldCacheChart(for range: AssetChartRange) -> Bool {
-        !(range == .oneDay && sessionProgress != nil)
+        !(range == .oneDay && hasActiveSessionProgress)
+    }
+
+    private var hasActiveSessionProgress: Bool {
+        guard let sessionProgress else {
+            return false
+        }
+
+        return sessionProgress.intervals.contains { interval in
+            interval.contains(sessionProgress.referenceDate)
+        }
     }
 
     private func chartRenderInput(from sourceBars: [AlpacaMarketBar], for range: AssetChartRange) -> AssetChartRenderInput {
@@ -982,7 +992,10 @@ final class AssetDetailStore {
         let overnightBars = overnightChartBars(referenceBar: sourceBars.last)
         guard !overnightBars.isEmpty,
               let latestOvernightDate = AlpacaDateParser.date(overnightBars.last?.timestamp) else {
-            return AssetChartRenderInput(
+            return overnightFallbackChartRenderInput(
+                from: indexedSourceBars,
+                priceChangeBaseline: priceChangeBaseline
+            ) ?? AssetChartRenderInput(
                 bars: indexedSourceBars,
                 xDomain: nil,
                 priceChangeBaseline: priceChangeBaseline
@@ -1027,6 +1040,24 @@ final class AssetDetailStore {
         return AssetChartRenderInput(
             bars: sourceInputBars + overnightInputBars,
             xDomain: xDomain,
+            priceChangeBaseline: priceChangeBaseline
+        )
+    }
+
+    private func overnightFallbackChartRenderInput(
+        from sourceInputBars: [AssetChartInputBar],
+        priceChangeBaseline: Double?
+    ) -> AssetChartRenderInput? {
+        guard !sourceInputBars.isEmpty,
+              let interval = activeOvernightInterval(for: sessionProgress?.referenceDate ?? Date()) else {
+            return nil
+        }
+
+        let sourceCount = sourceInputBars.count
+        let totalUnits = oneDaySlotMetrics(for: interval.end, in: interval).totalUnits
+        return AssetChartRenderInput(
+            bars: sourceInputBars,
+            xDomain: 0...max(Double(sourceCount) + totalUnits, Double(sourceCount), 1),
             priceChangeBaseline: priceChangeBaseline
         )
     }
@@ -1123,6 +1154,18 @@ final class AssetDetailStore {
             return nil
         }
 
+        return oneDaySessionChartRenderInput(
+            from: sourceBars,
+            in: interval,
+            priceChangeBaseline: priceChangeBaseline
+        )
+    }
+
+    private func oneDaySessionChartRenderInput(
+        from sourceBars: [AlpacaMarketBar],
+        in interval: MarketSessionInterval,
+        priceChangeBaseline: Double?
+    ) -> AssetChartRenderInput? {
         let sessionInputBars = sourceBars.compactMap { bar -> AssetChartInputBar? in
             guard let barDate = AlpacaDateParser.date(bar.timestamp),
                   barDate >= interval.start,
