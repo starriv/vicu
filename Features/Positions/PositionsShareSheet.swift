@@ -20,6 +20,16 @@ struct PositionsSharePayload: Identifiable {
         Self.sum(positions.map(\.unrealizedPL))
     }
 
+    var totalUnrealizedPLPercent: Double? {
+        guard let totalUnrealizedPL,
+              let totalCostBasis = Self.sumAbsolute(positions.map(\.costBasis)),
+              totalCostBasis != 0 else {
+            return nil
+        }
+
+        return totalUnrealizedPL / totalCostBasis
+    }
+
     func visibleRows(limit: Int) -> [AlpacaPosition] {
         Array(
             positions
@@ -123,6 +133,15 @@ struct PositionsSharePayload: Identifiable {
 
     private static func sum(_ values: [String?]) -> Double? {
         let parsedValues = values.compactMap(NumberParser.double)
+        guard !parsedValues.isEmpty else {
+            return nil
+        }
+
+        return parsedValues.reduce(0, +)
+    }
+
+    private static func sumAbsolute(_ values: [String?]) -> Double? {
+        let parsedValues = values.compactMap(NumberParser.double).map(abs)
         guard !parsedValues.isEmpty else {
             return nil
         }
@@ -393,6 +412,10 @@ private struct PositionsShareCard: View {
         PositionDisplay.tint(for: payload.totalUnrealizedPL)
     }
 
+    private var totalUnrealizedPercentText: String? {
+        payload.totalUnrealizedPLPercent.map { AppFormatter.signedPercent($0) }
+    }
+
     var body: some View {
         ZStack {
             LinearGradient(
@@ -424,6 +447,7 @@ private struct PositionsShareCard: View {
                 PositionsShareMetric(
                     title: L10n.PositionsShare.unrealizedPL(locale: locale),
                     value: AppFormatter.signedCompactMoney(payload.totalUnrealizedPL, currencyCode: payload.currencyCode),
+                    secondaryValue: totalUnrealizedPercentText,
                     tint: totalUnrealizedTint,
                     style: style
                 )
@@ -589,6 +613,7 @@ private struct PositionsShareLegend: View {
 private struct PositionsShareMetric: View {
     let title: String
     let value: String
+    let secondaryValue: String?
     let tint: Color
     let style: PositionsShareCardStyle
 
@@ -600,7 +625,7 @@ private struct PositionsShareMetric: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.74)
 
-            Text(value)
+            Text(displayValue)
                 .font(.system(size: 25, weight: .black, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(tint)
@@ -615,6 +640,14 @@ private struct PositionsShareMetric: View {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(style.metricBorder)
         }
+    }
+
+    private var displayValue: String {
+        guard let secondaryValue else {
+            return value
+        }
+
+        return "\(value) \(secondaryValue)"
     }
 }
 

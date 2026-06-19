@@ -63,14 +63,6 @@ struct PositionDetailView: View {
         .refreshable {
             await loadPosition()
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if let position {
-                PositionCloseActionBar {
-                    presentCloseConfirmation(for: position)
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
         .task(id: symbol) {
             await loadPosition()
         }
@@ -98,6 +90,10 @@ struct PositionDetailView: View {
 
             ForEach(PositionDetailSectionModel.sections(for: position, locale: app.appLanguage.locale)) { section in
                 PositionDetailSection(section: section)
+            }
+
+            PositionCloseActionButton {
+                presentCloseConfirmation(for: position)
             }
         } else {
             ContentUnavailableView(
@@ -175,16 +171,14 @@ private struct PositionCloseConfirmationSnapshot: Identifiable {
     }
 }
 
-private struct PositionCloseActionBar: View {
+private struct PositionCloseActionButton: View {
     @Environment(\.locale) private var locale
 
     let action: () -> Void
 
     var body: some View {
         barContent
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 10)
+            .padding(.top, 2)
     }
 
     @ViewBuilder
