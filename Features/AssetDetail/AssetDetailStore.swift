@@ -285,6 +285,10 @@ final class AssetDetailStore {
         asset != nil && isTradable
     }
 
+    var hasShareableChartData: Bool {
+        shareChartRenderModel.points.count > 1 && !isLoadingChart
+    }
+
     func start(app: AppModel) {
         self.app = app
         bindSnapshotPipeline(app: app)
@@ -353,6 +357,38 @@ final class AssetDetailStore {
         }
     }
 
+    func waitForShareableChartData(maxAttempts: Int = 80) async -> Bool {
+        if hasShareableChartData {
+            return true
+        }
+
+        for _ in 0..<maxAttempts {
+            if Task.isCancelled {
+                return false
+            }
+
+            if let chartRenderTask {
+                await chartRenderTask.value
+            } else {
+                do {
+                    try await Task.sleep(nanoseconds: 100_000_000)
+                } catch {
+                    return false
+                }
+            }
+
+            if hasShareableChartData {
+                return true
+            }
+
+            if !isLoading, !isLoadingChart, errorMessage != nil {
+                return false
+            }
+        }
+
+        return hasShareableChartData
+    }
+
     func selectRange(_ range: AssetChartRange) {
         guard selectedRange != range else {
             return
@@ -397,6 +433,12 @@ final class AssetDetailStore {
 
     var effectiveChartMode: AssetChartMode {
         selectedRange == .oneDay ? .line : chartMode
+    }
+
+    private var shareChartRenderModel: AssetChartRenderModel {
+        let lineModel = chartRenderModels.line
+        let fallbackModel = chartRenderModels.model(for: effectiveChartMode)
+        return lineModel.points.isEmpty ? fallbackModel : lineModel
     }
 
     private func bindSnapshotPipeline(app: AppModel) {

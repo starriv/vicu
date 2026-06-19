@@ -12,6 +12,8 @@ struct AssetDetailView: View {
     @State private var showsOptions = false
     @State private var newsSheetDetent: PresentationDetent = .fraction(Self.newsSheetCompactFraction)
     @State private var assetSharePayload: AssetSharePayload?
+    @State private var assetSharePreparationTask: Task<Void, Never>?
+    @State private var isPreparingAssetShare = false
     @State private var positionSharePayload: AssetPositionSharePayload?
     @State private var tradeDestination: AssetTradeDestination?
 
@@ -78,10 +80,9 @@ struct AssetDetailView: View {
                 showsTitle: showsHeaderTitle,
                 connectionStatus: headerConnectionStatus,
                 isFavorite: app.isFavoriteMarketSymbol(store.symbol),
+                isPreparingShare: isPreparingAssetShare,
                 dismiss: { dismiss() },
-                share: {
-                    assetSharePayload = AssetSharePayload(store: store)
-                },
+                share: prepareAssetShare,
                 toggleFavorite: {
                     Task { await app.toggleFavoriteMarketSymbol(store.symbol) }
                 }
@@ -124,6 +125,8 @@ struct AssetDetailView: View {
             store.reload(app: app)
         }
         .onDisappear {
+            assetSharePreparationTask?.cancel()
+            assetSharePreparationTask = nil
             store.stop()
         }
         .sheet(isPresented: $showsQuoteHistory) {
@@ -202,6 +205,38 @@ struct AssetDetailView: View {
 
     private func showSubmittedOrder(_: AlpacaOrder) {
         tradeDestination = nil
+    }
+
+    private func prepareAssetShare() {
+        guard !isPreparingAssetShare else {
+            return
+        }
+
+        assetSharePreparationTask?.cancel()
+        assetSharePreparationTask = Task { @MainActor in
+            isPreparingAssetShare = true
+            defer {
+                isPreparingAssetShare = false
+                assetSharePreparationTask = nil
+            }
+
+            guard await store.waitForShareableChartData() else {
+                guard !Task.isCancelled else {
+                    return
+                }
+
+                toastCenter.showErrorMessage(
+                    L10n.AssetPositionShare.prepareFailed(locale: app.appLanguage.locale)
+                )
+                return
+            }
+
+            guard !Task.isCancelled else {
+                return
+            }
+
+            assetSharePayload = AssetSharePayload(store: store)
+        }
     }
 
     private func openTrade(_ side: OrderSide) {
@@ -693,6 +728,7 @@ private struct AssetDetailFixedHeader: View {
     let showsTitle: Bool
     let connectionStatus: AssetRealtimeConnectionStatus?
     let isFavorite: Bool
+    let isPreparingShare: Bool
     let dismiss: () -> Void
     let share: () -> Void
     let toggleFavorite: () -> Void
@@ -718,9 +754,8 @@ private struct AssetDetailFixedHeader: View {
             }
         } trailing: {
             HStack(spacing: 8) {
-                AppGlassIconButton(
-                    systemImage: "square.and.arrow.up",
-                    accessibilityLabel: L10n.Common.share,
+                AssetDetailHeaderShareButton(
+                    isPreparing: isPreparingShare,
                     action: share
                 )
 
@@ -734,6 +769,33 @@ private struct AssetDetailFixedHeader: View {
         }
         .animation(.smooth(duration: 0.18), value: showsTitle)
         .animation(.snappy(duration: 0.18), value: connectionStatus?.title)
+    }
+}
+
+private struct AssetDetailHeaderShareButton: View {
+    let isPreparing: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                if isPreparing {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(.primary)
+                } else {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.primary)
+                }
+            }
+            .frame(width: 44, height: 44)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isPreparing)
+        .modifier(AppGlassCircleModifier())
+        .accessibilityLabel(L10n.Common.share)
     }
 }
 
