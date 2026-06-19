@@ -353,10 +353,6 @@ struct MarketSearchView: View {
     @State private var defaultSearchSymbol = AppModel.searchPlaceholderFallbackSymbol
     @State private var searchPipeline = MarketSearchPipeline()
     @State private var assetDestination: MarketSearchAssetDestination?
-    @State private var seededDefaultSearchQuery: String?
-    @State private var hasUserEditedSearchQuery = false
-    @State private var isDefaultSearchQueryPendingSubmit = false
-    @State private var suppressedAutomaticSearchQuery: String?
     @State private var searchTextSelectionTrigger = 0
     @FocusState private var isSearchFocused: Bool
 
@@ -376,15 +372,7 @@ struct MarketSearchView: View {
     }
 
     private var isShowingSeededDefaultSearchQuery: Bool {
-        if isExternalQueryPendingSubmit && !normalizedQuery.isEmpty {
-            return true
-        }
-
-        guard let seededDefaultSearchQuery else {
-            return false
-        }
-
-        return isDefaultSearchQueryPendingSubmit && !normalizedQuery.isEmpty && normalizedQuery == seededDefaultSearchQuery
+        isExternalQueryPendingSubmit && !normalizedQuery.isEmpty
     }
 
     private var showsPopularContent: Bool {
@@ -428,7 +416,6 @@ struct MarketSearchView: View {
         }
         .task {
             bindSearchPipelineIfNeeded()
-            applyInitialDefaultSearchQueryIfNeeded()
             await app.refreshFavoriteMarketSymbols()
         }
         .task(id: popularSort) {
@@ -480,13 +467,6 @@ struct MarketSearchView: View {
     }
 
     private func updateQuery(_ newValue: String, isUserEdit: Bool = true) {
-        if isUserEdit {
-            hasUserEditedSearchQuery = true
-            isDefaultSearchQueryPendingSubmit = false
-            seededDefaultSearchQuery = nil
-            suppressedAutomaticSearchQuery = nil
-        }
-
         if usesExternalQuery {
             externalQuery = newValue
         } else {
@@ -519,52 +499,19 @@ struct MarketSearchView: View {
     }
 
     private func submitSearch() {
-        let submittedQuery = normalizedQuery.isEmpty ? defaultSearchSymbol : normalizedQuery
-        guard !submittedQuery.isEmpty else {
+        guard !normalizedQuery.isEmpty else {
             return
         }
 
-        if submittedQuery != query {
-            updateQuery(submittedQuery, isUserEdit: false)
+        if normalizedQuery != query {
+            updateQuery(normalizedQuery, isUserEdit: false)
         }
-        seededDefaultSearchQuery = nil
-        isDefaultSearchQueryPendingSubmit = false
-        suppressedAutomaticSearchQuery = nil
-        searchPipeline.submit(submittedQuery)
-    }
-
-    private func applyInitialDefaultSearchQueryIfNeeded() {
-        applyDefaultSearchQuery(defaultSearchSymbol, replacingExistingSeed: false)
-    }
-
-    private func applyDefaultSearchQuery(_ symbol: String, replacingExistingSeed: Bool) {
-        let defaultQuery = symbol.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !presentation.usesSystemSearchField, !defaultQuery.isEmpty else {
-            return
-        }
-
-        let shouldFillEmptyQuery = normalizedQuery.isEmpty && !hasUserEditedSearchQuery
-        let shouldReplaceSeededQuery = replacingExistingSeed
-            && isDefaultSearchQueryPendingSubmit
-            && normalizedQuery == seededDefaultSearchQuery
-        guard shouldFillEmptyQuery || shouldReplaceSeededQuery else {
-            return
-        }
-
-        updateQuery(defaultQuery, isUserEdit: false)
-        seededDefaultSearchQuery = defaultQuery
-        isDefaultSearchQueryPendingSubmit = true
-        suppressedAutomaticSearchQuery = defaultQuery
-        focusSearchField(selectAll: true)
+        searchPipeline.submit(normalizedQuery)
     }
 
     private func acceptSearchInputChange(_ newValue: String) {
         let normalizedValue = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !presentation.usesSystemSearchField else {
-            return
-        }
-
-        guard normalizedValue != suppressedAutomaticSearchQuery, !isShowingSeededDefaultSearchQuery else {
             return
         }
 
@@ -598,7 +545,7 @@ struct MarketSearchView: View {
         .padding(.top, 8)
         .padding(.bottom, 8)
         .onAppear {
-            applyInitialDefaultSearchQueryIfNeeded()
+            focusSearchField(selectAll: false)
         }
     }
 
@@ -635,7 +582,9 @@ struct MarketSearchView: View {
 
             MarketSearchTextField(
                 text: queryBinding,
+                placeholder: defaultSearchSymbol,
                 textColor: UIColor(searchTextColor),
+                placeholderColor: UIColor(searchPlaceholderColor),
                 tintColor: UIColor(AppTheme.ColorToken.brand),
                 isFocused: isSearchFocused,
                 selectAllTrigger: searchTextSelectionTrigger,
@@ -728,6 +677,10 @@ struct MarketSearchView: View {
         Color(.label)
     }
 
+    private var searchPlaceholderColor: Color {
+        Color(.placeholderText)
+    }
+
     private var clearButtonForeground: Color {
         colorScheme == .light ? Color(.label) : Color(.label)
     }
@@ -790,7 +743,6 @@ struct MarketSearchView: View {
         do {
             popularSymbols = try await app.fetchSearchPopularMarketSymbols(limit: 12, sort: popularSort)
             defaultSearchSymbol = AppModel.searchPlaceholderSymbol(from: popularSymbols)
-            applyDefaultSearchQuery(defaultSearchSymbol, replacingExistingSeed: true)
         } catch where error.isRequestCancellation {
             return
         } catch {
@@ -801,8 +753,13 @@ struct MarketSearchView: View {
     private func bindSearchPipelineIfNeeded() {
         searchPipeline.bind(
             hasCredentials: { app.hasCredentials },
-            search: { query in
-                try await app.searchMarketSymbols(query, limit: 20)
+            search: { query, forceRefresh, emit in
+                try await app.searchMarketSymbolsProgressively(
+                    query,
+                    limit: 20,
+                    forceRefresh: forceRefresh,
+                    emit: emit
+                )
             },
             apply: applySearchState
         )
@@ -816,11 +773,28 @@ struct MarketSearchView: View {
             isSearching = false
         case .searching(_):
             isSearching = true
+        case .cached(let query, let searchResults, let isFresh):
+            guard query == normalizedQuery else {
+                return
+            }
+
+            debugSearchRender("cached", query: query, count: searchResults.count)
+            results = searchResults
+            isSearching = !isFresh
+        case .partial(let query, let searchResults):
+            guard query == normalizedQuery else {
+                return
+            }
+
+            debugSearchRender("partial", query: query, count: searchResults.count)
+            results = searchResults
+            isSearching = true
         case .success(let query, let searchResults):
             guard query == normalizedQuery else {
                 return
             }
 
+            debugSearchRender("enriched", query: query, count: searchResults.count)
             results = searchResults
             isSearching = false
         case .failure(let query, let error):
@@ -828,10 +802,15 @@ struct MarketSearchView: View {
                 return
             }
 
-            results = []
             isSearching = false
             toastCenter.showError(error, locale: app.appLanguage.locale)
         }
+    }
+
+    private func debugSearchRender(_ stage: String, query: String, count: Int) {
+        #if DEBUG
+        print("[MarketSearch] render.\(stage) query=\(query) count=\(count)")
+        #endif
     }
 }
 
@@ -843,7 +822,9 @@ private struct MarketSearchAssetDestination: Identifiable, Hashable {
 
 private struct MarketSearchTextField: UIViewRepresentable {
     @Binding var text: String
+    let placeholder: String
     let textColor: UIColor
+    let placeholderColor: UIColor
     let tintColor: UIColor
     let isFocused: Bool
     let selectAllTrigger: Int
@@ -866,6 +847,7 @@ private struct MarketSearchTextField: UIViewRepresentable {
         textField.spellCheckingType = .no
         textField.adjustsFontForContentSizeCategory = true
         textField.text = text
+        textField.attributedPlaceholder = attributedPlaceholder
         textField.addTarget(
             context.coordinator,
             action: #selector(Coordinator.textDidChange(_:)),
@@ -897,7 +879,7 @@ private struct MarketSearchTextField: UIViewRepresentable {
         textField.textColor = textColor
         textField.tintColor = tintColor
         textField.font = Self.preferredFont
-        textField.attributedPlaceholder = nil
+        textField.attributedPlaceholder = attributedPlaceholder
 
         if isFocused, !textField.isFirstResponder {
             DispatchQueue.main.async {
@@ -922,6 +904,21 @@ private struct MarketSearchTextField: UIViewRepresentable {
     private static var preferredFont: UIFont {
         let baseFont = UIFont.systemFont(ofSize: 22, weight: .medium)
         return UIFontMetrics(forTextStyle: .title2).scaledFont(for: baseFont)
+    }
+
+    private var attributedPlaceholder: NSAttributedString? {
+        let normalizedPlaceholder = placeholder.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedPlaceholder.isEmpty else {
+            return nil
+        }
+
+        return NSAttributedString(
+            string: normalizedPlaceholder,
+            attributes: [
+                .font: Self.preferredFont,
+                .foregroundColor: placeholderColor
+            ]
+        )
     }
 
     final class Coordinator: NSObject, UITextFieldDelegate {
@@ -983,6 +980,8 @@ private final class MarketSearchPipeline {
     enum State {
         case idle
         case searching(String)
+        case cached(String, [MarketSearchResult], isFresh: Bool)
+        case partial(String, [MarketSearchResult])
         case success(String, [MarketSearchResult])
         case failure(String, Error)
     }
@@ -1001,12 +1000,12 @@ private final class MarketSearchPipeline {
     private var lastStartedQuery: String?
     private var lastStartedAt: Date?
     private var hasCredentials: (@MainActor () -> Bool)?
-    private var search: (@MainActor (String) async throws -> [MarketSearchResult])?
+    private var search: (@MainActor (String, Bool, @escaping @MainActor (MarketSearchLoadEvent) -> Void) async throws -> Void)?
     private var apply: (@MainActor (State) -> Void)?
 
     func bind(
         hasCredentials: @escaping @MainActor () -> Bool,
-        search: @escaping @MainActor (String) async throws -> [MarketSearchResult],
+        search: @escaping @MainActor (String, Bool, @escaping @MainActor (MarketSearchLoadEvent) -> Void) async throws -> Void,
         apply: @escaping @MainActor (State) -> Void
     ) {
         guard !isBound else {
@@ -1079,12 +1078,24 @@ private final class MarketSearchPipeline {
         apply(.searching(query))
         searchTask = Task { @MainActor in
             do {
-                let results = try await search(query)
+                try await search(query, force) { [weak self] event in
+                    guard !Task.isCancelled, self?.activeQuery == event.query else {
+                        return
+                    }
+
+                    switch event {
+                    case .cached(let eventQuery, let results, let isFresh):
+                        apply(.cached(eventQuery, results, isFresh: isFresh))
+                    case .partial(let eventQuery, let results):
+                        apply(.partial(eventQuery, results))
+                    case .enriched(let eventQuery, let results):
+                        apply(.success(eventQuery, results))
+                    }
+                }
                 try Task.checkCancellation()
                 if self.activeQuery == query {
                     self.activeQuery = nil
                 }
-                apply(.success(query, results))
             } catch where error.isRequestCancellation {
                 return
             } catch {
@@ -1185,6 +1196,8 @@ private struct MarketSearchPopularRow: View {
     @Environment(AppModel.self) private var app
 
     var body: some View {
+        let isFavorite = app.isFavoriteMarketSymbol(symbol.symbol)
+
         HStack(spacing: 14) {
             Button {
                 openAsset(symbol.symbol)
@@ -1221,9 +1234,9 @@ private struct MarketSearchPopularRow: View {
             Button {
                 Task { await app.toggleFavoriteMarketSymbol(symbol.symbol) }
             } label: {
-                Image(systemName: app.isFavoriteMarketSymbol(symbol.symbol) ? "heart.fill" : "heart")
+                Image(systemName: isFavorite ? "heart.fill" : "heart")
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(app.isFavoriteMarketSymbol(symbol.symbol) ? AppTheme.ColorToken.brand : AppTheme.ColorToken.icon)
+                    .foregroundStyle(isFavorite ? AppTheme.ColorToken.brand : AppTheme.ColorToken.icon)
                     .frame(width: 42, height: 42)
                     .background(Color(.tertiarySystemGroupedBackground), in: Circle())
                     .contentShape(Circle())
@@ -1241,6 +1254,8 @@ private struct MarketSearchResultRow: View {
     @Environment(AppModel.self) private var app
 
     var body: some View {
+        let isFavorite = app.isFavoriteMarketSymbol(result.symbol)
+
         HStack(spacing: 14) {
             Button {
                 openAsset(result.symbol)
@@ -1277,9 +1292,9 @@ private struct MarketSearchResultRow: View {
             Button {
                 Task { await app.toggleFavoriteMarketSymbol(result.symbol) }
             } label: {
-                Image(systemName: app.isFavoriteMarketSymbol(result.symbol) ? "heart.fill" : "heart")
+                Image(systemName: isFavorite ? "heart.fill" : "heart")
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(app.isFavoriteMarketSymbol(result.symbol) ? AppTheme.ColorToken.brand : AppTheme.ColorToken.icon)
+                    .foregroundStyle(isFavorite ? AppTheme.ColorToken.brand : AppTheme.ColorToken.icon)
                     .frame(width: 42, height: 42)
                     .background(Color(.tertiarySystemGroupedBackground), in: Circle())
                     .contentShape(Circle())

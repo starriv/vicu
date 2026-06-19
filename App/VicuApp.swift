@@ -25,7 +25,6 @@ private struct RootView: View {
     @State private var ordersNavigationPath: [OrdersRoute] = []
     @State private var searchSubmitID = 0
     @State private var isSearchQueryPendingSubmit = false
-    @State private var isSearchDefaultQueryPendingSubmit = false
     @State private var isSearchPresented = false
 
     var body: some View {
@@ -110,9 +109,9 @@ private struct RootView: View {
         }
         .tabBarMinimizeOnScrollIfAvailable()
         .task {
-            let symbol = await refreshSearchPlaceholderSymbol()
+            await refreshSearchPlaceholderSymbol()
             if app.selectedTab == .search {
-                activateSearchTab(defaultSymbol: symbol)
+                activateSearchTab()
             }
             openPendingOrderDetail(app.pendingOrderDetailRequest)
         }
@@ -126,8 +125,8 @@ private struct RootView: View {
             }
 
             Task {
-                let symbol = await refreshSearchPlaceholderSymbol()
-                activateSearchTab(defaultSymbol: symbol)
+                await refreshSearchPlaceholderSymbol()
+                activateSearchTab()
             }
         }
     }
@@ -151,48 +150,32 @@ private struct RootView: View {
         app.consumeOrderDetailRequest(request)
     }
 
-    private func refreshSearchPlaceholderSymbol() async -> String {
+    private func refreshSearchPlaceholderSymbol() async {
         let symbol = await app.fetchSearchPlaceholderSymbol()
         searchPlaceholderSymbol = symbol
-        return symbol
     }
 
-    private func activateSearchTab(defaultSymbol: String) {
-        let normalizedDefaultSymbol = defaultSymbol.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalizedDefaultSymbol.isEmpty else {
-            isSearchPresented = true
-            return
-        }
-
-        let normalizedSearchText = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if normalizedSearchText.isEmpty || isSearchDefaultQueryPendingSubmit {
-            updateSearchText(normalizedDefaultSymbol, isUserEdit: false)
-            isSearchQueryPendingSubmit = true
-            isSearchDefaultQueryPendingSubmit = true
-        }
-
+    private func activateSearchTab() {
         isSearchPresented = true
     }
 
     private func submitSearch() {
         let normalizedSearchText = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let submittedQuery = normalizedSearchText.isEmpty ? searchPlaceholderSymbol : normalizedSearchText
-        guard !submittedQuery.isEmpty else {
+        guard !normalizedSearchText.isEmpty else {
+            isSearchQueryPendingSubmit = false
             return
         }
 
-        if searchText != submittedQuery {
-            updateSearchText(submittedQuery, isUserEdit: false)
+        if searchText != normalizedSearchText {
+            updateSearchText(normalizedSearchText, isUserEdit: false)
         }
         isSearchQueryPendingSubmit = false
-        isSearchDefaultQueryPendingSubmit = false
         searchSubmitID += 1
     }
 
     private func updateSearchText(_ newValue: String, isUserEdit: Bool) {
         if isUserEdit, newValue != searchText {
             isSearchQueryPendingSubmit = !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            isSearchDefaultQueryPendingSubmit = false
         }
 
         searchText = newValue

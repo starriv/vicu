@@ -1,5 +1,25 @@
 import Foundation
 
+enum MarketSearchLoadEvent {
+    case cached(String, [MarketSearchResult], isFresh: Bool)
+    case partial(String, [MarketSearchResult])
+    case enriched(String, [MarketSearchResult])
+
+    var query: String {
+        switch self {
+        case .cached(let query, _, _), .partial(let query, _), .enriched(let query, _):
+            query
+        }
+    }
+
+    var results: [MarketSearchResult] {
+        switch self {
+        case .cached(_, let results, _), .partial(_, let results), .enriched(_, let results):
+            results
+        }
+    }
+}
+
 extension AppModel {
     func refreshFavoriteMarketSymbols(forceReload: Bool = true) async {
         guard let credentials else {
@@ -572,40 +592,120 @@ extension AppModel {
     }
 
     func searchMarketSymbols(_ query: String, limit: Int = 20) async throws -> [MarketSearchResult] {
+        var latestResults: [MarketSearchResult] = []
+        try await searchMarketSymbolsProgressively(query, limit: limit) { event in
+            latestResults = event.results
+        }
+        return latestResults
+    }
+
+    func searchMarketSymbolsProgressively(
+        _ query: String,
+        limit: Int = 20,
+        forceRefresh: Bool = false,
+        emit: @MainActor (MarketSearchLoadEvent) -> Void
+    ) async throws {
         guard let credentials else {
             throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
         }
 
         let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedQuery.isEmpty else {
-            return []
+            return
         }
 
+        let startedAt = Date()
+        Self.debugMarketSearchLatency("start", query: normalizedQuery, startedAt: startedAt)
         let cacheKey = SearchResultCacheKey(query: normalizedQuery.uppercased(), limit: limit)
+        let cachedEntry = searchResultCache[cacheKey]
+        let cachedResults = cachedEntry?.value
         if let cachedEntry = searchResultCache[cacheKey],
            Date().timeIntervalSince(cachedEntry.cachedAt) < searchResultCacheTTL {
-            return cachedEntry.value
+            Self.debugMarketSearchLatency(
+                "cache.fresh",
+                query: normalizedQuery,
+                startedAt: startedAt,
+                resultCount: cachedEntry.value.count
+            )
+            emit(.cached(normalizedQuery, cachedEntry.value, isFresh: true))
+            if !forceRefresh {
+                return
+            }
+        } else if let cachedEntry {
+            Self.debugMarketSearchLatency(
+                "cache.stale",
+                query: normalizedQuery,
+                startedAt: startedAt,
+                resultCount: cachedEntry.value.count
+            )
+            emit(.cached(normalizedQuery, cachedEntry.value, isFresh: false))
         }
 
         let assets = try await marketAssets(credentials: credentials)
+        try Task.checkCancellation()
+        Self.debugMarketSearchLatency(
+            "assets.ready",
+            query: normalizedQuery,
+            startedAt: startedAt,
+            resultCount: assets.count
+        )
         let matchedAssets = await Task.detached(priority: .userInitiated) {
             Self.rankMarketAssets(assets, query: normalizedQuery, limit: limit)
         }.value
+        try Task.checkCancellation()
+        Self.debugMarketSearchLatency(
+            "rank.done",
+            query: normalizedQuery,
+            startedAt: startedAt,
+            resultCount: matchedAssets.count
+        )
         let symbols = matchedAssets.map(\.symbol)
 
         guard !symbols.isEmpty else {
             searchResultCache[cacheKey] = TimedCacheEntry(value: [], cachedAt: Date())
-            return []
+            emit(.enriched(normalizedQuery, []))
+            return
         }
+
+        let cachedQuotesBySymbol: [String: MarketActiveSymbol] = (cachedResults ?? []).reduce(into: [:]) { quotesBySymbol, result in
+            guard let quote = result.quote else {
+                return
+            }
+
+            quotesBySymbol[normalizedMarketSymbol(result.symbol)] = quote
+        }
+        let partialResults = matchedAssets.map { asset in
+            MarketSearchResult(asset: asset, quote: cachedQuotesBySymbol[normalizedMarketSymbol(asset.symbol)])
+        }
+        Self.debugMarketSearchLatency(
+            "partial.emit",
+            query: normalizedQuery,
+            startedAt: startedAt,
+            resultCount: partialResults.count
+        )
+        emit(.partial(normalizedQuery, partialResults))
 
         let quotes = (try? await services.alpaca.fetchMarketSymbols(symbols: symbols, credentials: credentials)) ?? []
-        let quotesBySymbol = Dictionary(uniqueKeysWithValues: quotes.map { ($0.symbol, $0) })
+        try Task.checkCancellation()
+        let quotesBySymbol: [String: MarketActiveSymbol] = quotes.reduce(into: [:]) { quotesBySymbol, quote in
+            quotesBySymbol[normalizedMarketSymbol(quote.symbol)] = quote
+        }
 
         let results = matchedAssets.map { asset in
-            MarketSearchResult(asset: asset, quote: quotesBySymbol[asset.symbol])
+            let normalizedSymbol = normalizedMarketSymbol(asset.symbol)
+            return MarketSearchResult(
+                asset: asset,
+                quote: quotesBySymbol[normalizedSymbol] ?? cachedQuotesBySymbol[normalizedSymbol]
+            )
         }
         searchResultCache[cacheKey] = TimedCacheEntry(value: results, cachedAt: Date())
-        return results
+        Self.debugMarketSearchLatency(
+            "enriched.done",
+            query: normalizedQuery,
+            startedAt: startedAt,
+            resultCount: results.count
+        )
+        emit(.enriched(normalizedQuery, results))
     }
 
     func fetchSearchPopularMarketSymbols(limit: Int = 12, sort: MarketMostActiveSort = .volume) async throws -> [MarketActiveSymbol] {
@@ -776,6 +876,19 @@ extension AppModel {
             }
             .prefix(limit)
             .map(\.asset)
+    }
+
+    private nonisolated static func debugMarketSearchLatency(
+        _ stage: String,
+        query: String,
+        startedAt: Date,
+        resultCount: Int? = nil
+    ) {
+        #if DEBUG
+        let latency = max(0, Int((Date().timeIntervalSince(startedAt) * 1_000).rounded()))
+        let count = resultCount.map { " count=\($0)" } ?? ""
+        print("[MarketSearch] \(stage) query=\(query) latency=\(latency)ms\(count)")
+        #endif
     }
 
     func resetFavoriteMarketSymbols() {
