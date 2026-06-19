@@ -139,6 +139,7 @@ private extension MarketOverview {
     static let skeleton = MarketOverview(
         clock: AlpacaMarketClock(
             timestamp: "2026-06-15T01:30:00-04:00",
+            isMarketDay: true,
             isOpen: false,
             nextOpen: "2026-06-15T04:00:00-04:00",
             nextClose: "2026-06-15T04:00:00-04:00",

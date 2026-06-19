@@ -867,10 +867,6 @@ struct AlpacaClient: AlpacaServicing {
                     credentials: credentials
                 )
             }
-            guard bars.count < 2 else {
-                fallbackBarsTask.cancel()
-                return (bars, context)
-            }
 
             let fallbackBars = await fallbackBarsTask.value ?? []
             guard !fallbackBars.isEmpty else {
@@ -1234,11 +1230,13 @@ struct AlpacaClient: AlpacaServicing {
         let formatter = AlpacaMarketDataEndpoint.makeStockDataDateFormatter()
 
         if allowsActiveSession,
+           let activeSession = sessionContext.activeSession,
            let activeInterval = MarketSessionSchedule.activeInterval(
             at: referenceDate,
             in: sessionContext.calendar,
             overnightDays: sessionContext.overnightCalendar
-           ) {
+           ),
+           activeInterval.session == activeSession {
             if activeInterval.session == .overnight {
                 guard let latestSession = MarketSessionSchedule.latestRegularInterval(
                     before: referenceDate,
@@ -1331,12 +1329,16 @@ struct AlpacaClient: AlpacaServicing {
             credentials: credentials,
             debugSymbol: "current"
         )
+        guard let activeSession = sessionContext.activeSession else {
+            return CurrentStockDataContext(feed: defaultFeed, activeSession: nil)
+        }
 
         guard let activeInterval = MarketSessionSchedule.activeInterval(
             at: sessionContext.referenceDate,
             in: sessionContext.calendar,
             overnightDays: sessionContext.overnightCalendar
-        ) else {
+        ),
+              activeInterval.session == activeSession else {
             return CurrentStockDataContext(feed: defaultFeed, activeSession: nil)
         }
 
@@ -1409,6 +1411,7 @@ struct AlpacaClient: AlpacaServicing {
         let calendarResponse = try await calendarResponseRequest
         let sessionContext = AssetChartSessionContext(
             referenceDate: referenceDate,
+            activeSession: clock.activeSession,
             calendar: calendarResponse.calendar,
             overnightCalendar: await overnightCalendarRequest
         )
@@ -1965,6 +1968,7 @@ private struct CurrentStockDataContext: Sendable {
 
 private struct AssetChartSessionContext: Sendable {
     let referenceDate: Date
+    let activeSession: MarketSessionKind?
     let calendar: [AlpacaCalendarDay]
     let overnightCalendar: [AlpacaCalendarDay]
 }

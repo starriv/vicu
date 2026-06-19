@@ -55,16 +55,10 @@ struct AssetDetailView: View {
                 .padding(.top, AppTheme.Spacing.pageTop)
                 .padding(.bottom, AppTheme.Spacing.pageBottom + (store.canShowTradeActions ? 88 : 0))
             }
-            .onScrollGeometryChange(for: Bool.self) { geometry in
-                geometry.contentOffset.y > Self.headerTitleRevealOffset
-            } action: { _, value in
-                guard showsHeaderTitle != value else {
-                    return
-                }
-
-                withAnimation(.snappy(duration: 0.22)) {
-                    showsHeaderTitle = value
-                }
+            .onScrollGeometryChange(for: AssetDetailHeaderRevealRegion.self) { geometry in
+                Self.headerRevealRegion(for: geometry.contentOffset.y)
+            } action: { _, region in
+                updateHeaderTitleVisibility(for: region)
             }
             .onAppear {
                 proxy.scrollTo(Self.topAnchorID, anchor: .top)
@@ -171,7 +165,40 @@ struct AssetDetailView: View {
 
     private static let topAnchorID = "asset-detail-top"
     private static let headerTitleRevealOffset: CGFloat = 56
+    private static let headerTitleHideOffset: CGFloat = 18
     private static let newsSheetCompactFraction = 0.67
+
+    private static func headerRevealRegion(for offset: CGFloat) -> AssetDetailHeaderRevealRegion {
+        if offset >= headerTitleRevealOffset {
+            return .visible
+        }
+
+        if offset <= headerTitleHideOffset {
+            return .hidden
+        }
+
+        return .hold
+    }
+
+    private func updateHeaderTitleVisibility(for region: AssetDetailHeaderRevealRegion) {
+        let nextValue: Bool?
+        switch region {
+        case .hidden:
+            nextValue = false
+        case .hold:
+            nextValue = nil
+        case .visible:
+            nextValue = true
+        }
+
+        guard let nextValue, showsHeaderTitle != nextValue else {
+            return
+        }
+
+        withAnimation(.easeOut(duration: 0.16)) {
+            showsHeaderTitle = nextValue
+        }
+    }
 
     private func showSubmittedOrder(_: AlpacaOrder) {
         tradeDestination = nil
@@ -203,6 +230,12 @@ struct AssetDetailView: View {
     private var headerConnectionStatus: AssetRealtimeConnectionStatus? {
         store.headerConnectionStatus
     }
+}
+
+private enum AssetDetailHeaderRevealRegion: Equatable {
+    case hidden
+    case hold
+    case visible
 }
 
 private extension View {
@@ -457,7 +490,7 @@ private struct AssetPriceHeroSection: View {
                         label: store.selectedRange.performanceLabel,
                         isPositive: periodChange.isPositive
                     )
-                } else if !(store.selectedRange == .oneDay && store.extendedSession == .overnight) {
+                } else if !(store.selectedRange == .oneDay && store.activeExtendedSession == .overnight) {
                     AssetPriceChangeLine(
                         change: store.todayPriceChange,
                         percent: store.todayPercentChange,
@@ -473,7 +506,7 @@ private struct AssetPriceHeroSection: View {
                     AssetPriceChangeLine(
                         change: store.extendedPriceChange,
                         percent: store.extendedPercentChange,
-                        label: extendedSession.title,
+                        label: store.extendedSessionTitle ?? extendedSession.title,
                         isPositive: store.isExtendedPositive
                     )
                 } else {

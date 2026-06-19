@@ -69,7 +69,16 @@ final class AssetDetailStore {
     }
 
     var currentPrice: Double? {
-        latestTrade?.price ?? dailyBar?.close ?? bars.last?.close
+        if hasActiveSessionProgress || hasRecentMarketData,
+           let latestTradePrice = latestTrade?.price {
+            return latestTradePrice
+        }
+
+        if let completedExtendedTradingPrice {
+            return completedExtendedTradingPrice.price
+        }
+
+        return dailyBar?.close ?? bars.last?.close ?? latestTrade?.price
     }
 
     var coreSessionPrice: Double? {
@@ -127,12 +136,30 @@ final class AssetDetailStore {
         )
     }
 
-    var extendedSession: AssetExtendedTradingSession? {
-        guard let eventDate = lastEventDate else {
+    var activeExtendedSession: AssetExtendedTradingSession? {
+        guard let activeExtendedSession = activeReferenceInterval()?.session.extendedTradingSession,
+              let eventDate = lastEventDate,
+              Self.extendedTradingSession(for: eventDate) == activeExtendedSession else {
             return nil
         }
 
-        return Self.extendedTradingSession(for: eventDate)
+        return activeExtendedSession
+    }
+
+    var completedExtendedSession: AssetExtendedTradingSession? {
+        completedExtendedTradingPrice?.session
+    }
+
+    var extendedSession: AssetExtendedTradingSession? {
+        activeExtendedSession ?? completedExtendedSession
+    }
+
+    var extendedSessionTitle: String? {
+        if let activeExtendedSession {
+            return activeExtendedSession.title
+        }
+
+        return completedExtendedSession?.completedTitle
     }
 
     var extendedPriceChange: Double? {
@@ -158,6 +185,20 @@ final class AssetDetailStore {
 
     var isExtendedPositive: Bool {
         (extendedPriceChange ?? 0) >= 0
+    }
+
+    private var completedExtendedTradingPrice: (session: AssetExtendedTradingSession, price: Double)? {
+        guard !hasActiveSessionProgress,
+              let sessionProgress,
+              let latestTradePrice = latestTrade?.price,
+              Self.hasValidMarketPrice(latestTradePrice),
+              let latestTradeDate = AlpacaDateParser.date(latestTrade?.timestamp),
+              let interval = completedExtendedInterval(containing: latestTradeDate, in: sessionProgress),
+              let session = interval.session.extendedTradingSession else {
+            return nil
+        }
+
+        return (session, latestTradePrice)
     }
 
     var bidPrice: Double? {
@@ -1430,7 +1471,9 @@ final class AssetDetailStore {
     private func activeNonOvernightInterval(for date: Date?) -> MarketSessionInterval? {
         let intervals = sessionProgress?.intervals.filter { $0.session != .overnight } ?? []
         if let date,
-           let containingDate = intervals.first(where: { $0.contains(date) }) {
+           let containingDate = intervals.filter({ interval in
+               interval.start <= date && date <= interval.end
+           }).min(by: sessionIntervalPrioritySort) {
             return containingDate
         }
 
@@ -1440,6 +1483,28 @@ final class AssetDetailStore {
         }
 
         return nil
+    }
+
+    private func completedExtendedInterval(
+        containing date: Date,
+        in progress: MarketSessionProgress
+    ) -> MarketSessionInterval? {
+        progress.intervals
+            .filter { interval in
+                interval.session.extendedTradingSession != nil
+                    && interval.start <= date
+                    && date <= interval.end
+                    && interval.end <= progress.referenceDate
+            }
+            .min(by: sessionIntervalPrioritySort)
+    }
+
+    private func sessionIntervalPrioritySort(_ lhs: MarketSessionInterval, _ rhs: MarketSessionInterval) -> Bool {
+        if lhs.session.activePriority == rhs.session.activePriority {
+            return lhs.start < rhs.start
+        }
+
+        return lhs.session.activePriority < rhs.session.activePriority
     }
 
     private func overnightChartBars(referenceBar: AlpacaMarketBar?) -> [AlpacaMarketBar] {
@@ -2001,6 +2066,32 @@ enum AssetExtendedTradingSession: Equatable, Sendable {
             "After-hours"
         case .overnight:
             "Overnight"
+        }
+    }
+
+    var completedTitle: String {
+        switch self {
+        case .preMarket:
+            "Last pre-market"
+        case .afterHours:
+            "Last after-hours"
+        case .overnight:
+            "Last overnight"
+        }
+    }
+}
+
+private extension MarketSessionKind {
+    var extendedTradingSession: AssetExtendedTradingSession? {
+        switch self {
+        case .overnight:
+            .overnight
+        case .preMarket:
+            .preMarket
+        case .afterHours:
+            .afterHours
+        case .regular:
+            nil
         }
     }
 }

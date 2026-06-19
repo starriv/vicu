@@ -1014,6 +1014,7 @@ private struct AlpacaMarketClockPayload: Decodable, Sendable {
     func clock() -> AlpacaMarketClock {
         AlpacaMarketClock(
             timestamp: timestamp,
+            isMarketDay: isMarketDay,
             isOpen: phase == "open",
             nextOpen: nextOpen,
             nextClose: nextClose,
@@ -1032,11 +1033,40 @@ private struct AlpacaClockMarket: Decodable, Sendable {
 
 struct AlpacaMarketClock: Sendable {
     let timestamp: String?
+    let isMarketDay: Bool
     let isOpen: Bool
     let nextOpen: String?
     let nextClose: String?
     let phase: String?
     let phaseUntil: String?
+
+    var activeSession: MarketSessionKind? {
+        guard isMarketDay, let phase else {
+            return nil
+        }
+
+        let normalizedPhase = phase
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+
+        if isOpen || normalizedPhase == "open" {
+            return .regular
+        }
+
+        if normalizedPhase.contains("overnight") {
+            return .overnight
+        }
+
+        if normalizedPhase.contains("pre") {
+            return .preMarket
+        }
+
+        if normalizedPhase.contains("post") || normalizedPhase.contains("after") {
+            return .afterHours
+        }
+
+        return nil
+    }
 }
 
 enum AlpacaDateParser {
