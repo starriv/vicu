@@ -1280,12 +1280,7 @@ enum AlpacaMarketDataFeed: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
 
     var streamPath: String {
-        switch self {
-        case .iex, .sip, .delayedSIP:
-            "v2/\(rawValue)"
-        case .boats, .overnight:
-            "v1beta1/\(rawValue)"
-        }
+        APIPaths.AlpacaStreams.marketDataStreamPath(feed: self)
     }
 }
 

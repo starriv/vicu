@@ -27,7 +27,7 @@ final class AlpacaActivityStreamClient: AlpacaActivityStreaming, @unchecked Send
 
     init(
         session: URLSession = URLSession(configuration: .vicuEventStream),
-        activityPath: String = "v2beta1/events/activities"
+        activityPath: String = APIPaths.AlpacaStreams.activityEvents
     ) {
         self.session = session
         self.activityPath = activityPath
@@ -206,7 +206,7 @@ final class AlpacaTradeEventStreamClient: AlpacaTradeEventStreaming, @unchecked 
 
     init(
         session: URLSession = URLSession(configuration: .vicuEventStream),
-        tradeEventPath: String = "v2beta1/events/trades"
+        tradeEventPath: String = APIPaths.AlpacaStreams.tradeEvents
     ) {
         self.session = session
         self.tradeEventPath = tradeEventPath

@@ -241,6 +241,12 @@ private struct MarketTitleActions: View {
             .accessibilityLabel(L10n.Markets.searchTitle)
 
             Menu {
+                NavigationLink {
+                    WatchlistsView()
+                } label: {
+                    Label(L10n.Watchlists.title, systemImage: AppIcon.Market.watchlists)
+                }
+
                 Button {
                     refresh()
                 } label: {

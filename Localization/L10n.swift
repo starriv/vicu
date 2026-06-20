@@ -807,6 +807,79 @@ enum L10n {
         static var apiNotConnectedDescription: LocalizedStringKey { "markets.api_not_connected_description" }
     }
 
+    enum Watchlists {
+        static var title: LocalizedStringKey { "watchlists.title" }
+        static var actionsTitle: LocalizedStringKey { "watchlists.actions.title" }
+        static var createTitle: LocalizedStringKey { "watchlists.create.title" }
+        static var editTitle: LocalizedStringKey { "watchlists.edit.title" }
+        static var createAction: LocalizedStringKey { "watchlists.create.action" }
+        static var saveAction: LocalizedStringKey { "watchlists.save.action" }
+        static var deleteAction: LocalizedStringKey { "watchlists.delete.action" }
+        static var reorderAction: LocalizedStringKey { "watchlists.reorder.action" }
+        static var reorderDoneAction: LocalizedStringKey { "watchlists.reorder.done_action" }
+        static var deleteConfirmTitle: LocalizedStringKey { "watchlists.delete.confirm.title" }
+        static var nameTitle: LocalizedStringKey { "watchlists.name.title" }
+        static var namePlaceholder: LocalizedStringKey { "watchlists.name.placeholder" }
+        static var symbolsTitle: LocalizedStringKey { "watchlists.symbols.title" }
+        static var symbolsPlaceholder: LocalizedStringKey { "watchlists.symbols.placeholder" }
+        static var symbolsFooter: LocalizedStringKey { "watchlists.symbols.footer" }
+        static var assetsTitle: LocalizedStringKey { "watchlists.assets.title" }
+        static var currentAssetsTitle: LocalizedStringKey { "watchlists.current_assets.title" }
+        static var availableAssetsTitle: LocalizedStringKey { "watchlists.available_assets.title" }
+        static var assetSearchPrompt: LocalizedStringKey { "watchlists.asset_search.prompt" }
+        static var symbolTitle: LocalizedStringKey { "watchlists.symbol.title" }
+        static var symbolPlaceholder: LocalizedStringKey { "watchlists.symbol.placeholder" }
+        static var addSymbolTitle: LocalizedStringKey { "watchlists.add_symbol.title" }
+        static var addSymbolAction: LocalizedStringKey { "watchlists.add_symbol.action" }
+        static var removeSymbolAction: LocalizedStringKey { "watchlists.remove_symbol.action" }
+        static var emptyTitle: LocalizedStringKey { "watchlists.empty.title" }
+        static var emptyDescription: LocalizedStringKey { "watchlists.empty.description" }
+        static var noAssetsTitle: LocalizedStringKey { "watchlists.no_assets.title" }
+        static var noAssetsDescription: LocalizedStringKey { "watchlists.no_assets.description" }
+        static var missingTitle: LocalizedStringKey { "watchlists.missing.title" }
+        static var missingDescription: LocalizedStringKey { "watchlists.missing.description" }
+
+        static func assetCount(_ count: Int, locale: Locale) -> String {
+            L10n.format("watchlists.asset_count_format", locale: locale, count)
+        }
+
+        static func createdToast(name: String, locale: Locale) -> String {
+            L10n.format("watchlists.toast.created_format", locale: locale, name)
+        }
+
+        static func updatedToast(name: String, locale: Locale) -> String {
+            L10n.format("watchlists.toast.updated_format", locale: locale, name)
+        }
+
+        static func deletedToast(name: String, locale: Locale) -> String {
+            L10n.format("watchlists.toast.deleted_format", locale: locale, name)
+        }
+
+        static func symbolAddedToast(symbol: String, locale: Locale) -> String {
+            L10n.format("watchlists.toast.symbol_added_format", locale: locale, symbol)
+        }
+
+        static func symbolRemovedToast(symbol: String, locale: Locale) -> String {
+            L10n.format("watchlists.toast.symbol_removed_format", locale: locale, symbol)
+        }
+
+        static func deleteConfirmMessage(name: String, locale: Locale) -> String {
+            L10n.format("watchlists.delete.confirm.message_format", locale: locale, name)
+        }
+
+        static func duplicateSymbol(symbol: String, locale: Locale) -> String {
+            L10n.format("watchlists.duplicate_symbol_format", locale: locale, symbol)
+        }
+
+        static func invalidSymbol(locale: Locale) -> String {
+            L10n.string("watchlists.invalid_symbol", locale: locale)
+        }
+
+        static func nameRequired(locale: Locale) -> String {
+            L10n.string("watchlists.name.required", locale: locale)
+        }
+    }
+
     enum Orders {
         static var title: LocalizedStringKey { "orders.title" }
         static var recentTitle: LocalizedStringKey { "orders.recent.title" }

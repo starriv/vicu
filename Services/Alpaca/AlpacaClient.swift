@@ -15,7 +15,7 @@ protocol AlpacaServicing: Sendable {
     func fetchMarketOverview(credentials: AlpacaCredentials) async throws -> MarketOverview
     func fetchMarketIndexQuotes(feed: AlpacaMarketDataFeed, credentials: AlpacaCredentials) async throws -> [MarketIndexQuote]
     func fetchMarketCalendar(market: String, start: String, end: String, credentials: AlpacaCredentials) async throws -> [AlpacaCalendarDay]
-    func fetchMarketAssets(credentials: AlpacaCredentials) async throws -> [AlpacaAsset]
+    func fetchAssets(assetClass: String?, credentials: AlpacaCredentials) async throws -> [AlpacaAsset]
     func fetchAsset(symbolOrAssetID: String, credentials: AlpacaCredentials) async throws -> AlpacaAsset
     func fetchAssetDetail(
         symbol: String,
@@ -117,9 +117,14 @@ protocol AlpacaServicing: Sendable {
     func submitOrder(_ draft: OrderDraft, clientOrderID: String?, credentials: AlpacaCredentials) async throws -> AlpacaOrder
 }
 
+extension AlpacaServicing {
+    func fetchMarketAssets(credentials: AlpacaCredentials) async throws -> [AlpacaAsset] {
+        try await fetchAssets(assetClass: "us_equity", credentials: credentials)
+    }
+}
+
 struct AlpacaClient: AlpacaServicing {
     private static let logger = Logger(subsystem: "com.starriv.vicu", category: "AlpacaClient")
-    private static let marketDataBaseURL = URL(string: "https://data.alpaca.markets")!
     private static let assetChartSessionContextCacheTTL: TimeInterval = 45
     private static let optionHistoricalDataDelay: TimeInterval = 15 * 60
     private static let assetChartSessionContextCache = AssetChartSessionContextCache()
@@ -141,10 +146,22 @@ struct AlpacaClient: AlpacaServicing {
         ("BRK.B", "Berkshire Hathaway Inc.")
     ]
 
-    private let apiClient: any APIClient
+    private let tradingClient: any AlpacaTradingRequesting
+    private let marketDataClient: any AlpacaMarketDataRequesting
 
     init(apiClient: any APIClient = URLSessionAPIClient()) {
-        self.apiClient = apiClient
+        self.init(
+            tradingClient: AlpacaTradingClient(apiClient: apiClient),
+            marketDataClient: AlpacaMarketDataClient(apiClient: apiClient)
+        )
+    }
+
+    init(
+        tradingClient: any AlpacaTradingRequesting,
+        marketDataClient: any AlpacaMarketDataRequesting
+    ) {
+        self.tradingClient = tradingClient
+        self.marketDataClient = marketDataClient
     }
 
     func testConnection(credentials: AlpacaCredentials) async throws {
@@ -325,8 +342,8 @@ struct AlpacaClient: AlpacaServicing {
         )) ?? []
     }
 
-    func fetchMarketAssets(credentials: AlpacaCredentials) async throws -> [AlpacaAsset] {
-        try await request(.assets, credentials: credentials)
+    func fetchAssets(assetClass: String?, credentials: AlpacaCredentials) async throws -> [AlpacaAsset] {
+        try await request(.assets(assetClass: assetClass), credentials: credentials)
     }
 
     func fetchAsset(symbolOrAssetID: String, credentials: AlpacaCredentials) async throws -> AlpacaAsset {
@@ -1065,22 +1082,7 @@ struct AlpacaClient: AlpacaServicing {
         body: Data? = nil,
         credentials: AlpacaCredentials
     ) async throws -> Response {
-        return try await apiClient.send(
-            APIRequest(
-                baseURL: credentials.environment.baseURL,
-                path: endpoint.path,
-                method: endpoint.method,
-                queryItems: endpoint.queryItems,
-                body: body,
-                retryPolicy: endpoint.method == .get && body == nil ? .alpacaGET : .none,
-                requestInterceptors: [
-                    AlpacaAuthenticationInterceptor(credentials: credentials)
-                ],
-                responseInterceptors: [
-                    AlpacaErrorResponseInterceptor()
-                ]
-            )
-        )
+        try await tradingClient.send(endpoint, body: body, credentials: credentials)
     }
 
     private func normalizedSymbols(_ symbols: [String]) -> [String] {
@@ -1104,21 +1106,7 @@ struct AlpacaClient: AlpacaServicing {
         _ endpoint: AlpacaMarketDataEndpoint,
         credentials: AlpacaCredentials
     ) async throws -> Response {
-        return try await apiClient.send(
-            APIRequest(
-                baseURL: Self.marketDataBaseURL,
-                path: endpoint.path,
-                method: .get,
-                queryItems: endpoint.queryItems,
-                retryPolicy: .marketDataGET,
-                requestInterceptors: [
-                    AlpacaAuthenticationInterceptor(credentials: credentials)
-                ],
-                responseInterceptors: [
-                    AlpacaErrorResponseInterceptor()
-                ]
-            )
-        )
+        try await marketDataClient.send(endpoint, credentials: credentials)
     }
 
     private static func indexQuote(
@@ -1548,410 +1536,6 @@ struct AlpacaClient: AlpacaServicing {
     }()
 }
 
-private enum AlpacaEndpoint: Sendable {
-    case account
-    case accountActivities(pageSize: Int, pageToken: String?)
-    case assets
-    case asset(symbolOrAssetID: String)
-    case marketClock
-    case marketCalendar(market: String, start: String, end: String)
-    case optionContracts(underlyingSymbol: String, expirationDateGTE: String?, expirationDateLTE: String?, limit: Int, pageToken: String?)
-    case positions
-    case position(symbolOrAssetID: String)
-    case closePosition(symbolOrAssetID: String)
-    case recentOrders
-    case order(id: String, nested: Bool)
-    case cancelOrder(id: String)
-    case replaceOrder(id: String)
-    case watchlists
-    case createWatchlist
-    case watchlist(id: String)
-    case updateWatchlist(id: String)
-    case deleteWatchlist(id: String)
-    case addSymbolToWatchlist(id: String)
-    case watchlistSymbol(id: String, symbol: String)
-    case portfolioHistory(range: PortfolioHistoryRange, accountCreatedAt: String?)
-    case submitOrder
-
-    var path: String {
-        switch self {
-        case .account:
-            "v2/account"
-        case .accountActivities:
-            "v2/account/activities"
-        case .assets:
-            "v2/assets"
-        case .asset(let symbolOrAssetID):
-            "v2/assets/\(Self.encodedPathSegment(symbolOrAssetID))"
-        case .marketClock:
-            "v3/clock"
-        case .marketCalendar(let market, _, _):
-            "v3/calendar/\(Self.encodedPathSegment(market))"
-        case .optionContracts:
-            "v2/options/contracts"
-        case .positions:
-            "v2/positions"
-        case .position(let symbolOrAssetID), .closePosition(let symbolOrAssetID):
-            "v2/positions/\(Self.encodedPathSegment(symbolOrAssetID))"
-        case .recentOrders, .submitOrder:
-            "v2/orders"
-        case .order(let id, _), .cancelOrder(let id), .replaceOrder(let id):
-            "v2/orders/\(Self.encodedPathSegment(id))"
-        case .watchlists, .createWatchlist:
-            "v2/watchlists"
-        case .watchlist(let id), .updateWatchlist(let id), .deleteWatchlist(let id), .addSymbolToWatchlist(let id):
-            "v2/watchlists/\(id)"
-        case .watchlistSymbol(let id, let symbol):
-            "v2/watchlists/\(id)/\(symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased())"
-        case .portfolioHistory:
-            "v2/account/portfolio/history"
-        }
-    }
-
-    var method: HTTPMethod {
-        switch self {
-        case .submitOrder, .createWatchlist, .addSymbolToWatchlist:
-            .post
-        case .replaceOrder:
-            .patch
-        case .updateWatchlist:
-            .put
-        case .deleteWatchlist, .watchlistSymbol, .cancelOrder, .closePosition:
-            .delete
-        default:
-            .get
-        }
-    }
-
-    var queryItems: [URLQueryItem] {
-        switch self {
-        case .accountActivities(let pageSize, let pageToken):
-            var items = [
-                URLQueryItem(name: "direction", value: "desc"),
-                URLQueryItem(name: "page_size", value: String(pageSize))
-            ]
-
-            if let pageToken, !pageToken.isEmpty {
-                items.append(URLQueryItem(name: "page_token", value: pageToken))
-            }
-
-            return items
-        case .assets:
-            return [
-                URLQueryItem(name: "status", value: "active"),
-                URLQueryItem(name: "asset_class", value: "us_equity")
-            ]
-        case .marketClock:
-            return [
-                URLQueryItem(name: "markets", value: "NYSE,NASDAQ")
-            ]
-        case .marketCalendar(_, let start, let end):
-            return [
-                URLQueryItem(name: "start", value: start),
-                URLQueryItem(name: "end", value: end)
-            ]
-        case .optionContracts(let underlyingSymbol, let expirationDateGTE, let expirationDateLTE, let limit, let pageToken):
-            var items = [
-                URLQueryItem(name: "underlying_symbols", value: underlyingSymbol),
-                URLQueryItem(name: "status", value: "active"),
-                URLQueryItem(name: "limit", value: String(limit))
-            ]
-
-            if let expirationDateGTE, !expirationDateGTE.isEmpty {
-                items.append(URLQueryItem(name: "expiration_date_gte", value: expirationDateGTE))
-            }
-
-            if let expirationDateLTE, !expirationDateLTE.isEmpty {
-                items.append(URLQueryItem(name: "expiration_date_lte", value: expirationDateLTE))
-            }
-
-            if let pageToken, !pageToken.isEmpty {
-                items.append(URLQueryItem(name: "page_token", value: pageToken))
-            }
-
-            return items
-        case .recentOrders:
-            return [
-                URLQueryItem(name: "status", value: "all"),
-                URLQueryItem(name: "limit", value: "50"),
-                URLQueryItem(name: "direction", value: "desc")
-            ]
-        case .order(_, let nested):
-            return nested ? [URLQueryItem(name: "nested", value: "true")] : []
-        case .portfolioHistory(let range, let accountCreatedAt):
-            return range.queryItems(accountCreatedAt: accountCreatedAt)
-        default:
-            return []
-        }
-    }
-
-    private static func encodedPathSegment(_ value: String) -> String {
-        var allowedCharacters = CharacterSet.urlPathAllowed
-        allowedCharacters.remove(charactersIn: "/")
-        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmedValue.addingPercentEncoding(withAllowedCharacters: allowedCharacters) ?? trimmedValue
-    }
-}
-
-private enum AlpacaMarketDataEndpoint: Sendable {
-    case stockSnapshots(symbols: [String], feed: AlpacaMarketDataFeed)
-    case stockLatestTrade(symbol: String, feed: AlpacaMarketDataFeed)
-    case stockLatestQuotes(symbols: [String], feed: AlpacaMarketDataFeed)
-    case stockLatestBars(symbols: [String], feed: AlpacaMarketDataFeed)
-    case stockQuotes(symbol: String, feed: AlpacaMarketDataFeed, interval: StockDataInterval, limit: Int, pageToken: String?, sort: AlpacaSortDirection)
-    case stockBars(symbol: String, range: AssetChartRange, feed: AlpacaMarketDataFeed, interval: StockDataInterval?)
-    case optionChain(underlyingSymbol: String, feed: AlpacaOptionFeed, type: AlpacaOptionContractType?, expirationDate: String?, limit: Int, pageToken: String?)
-    case optionSnapshots(symbols: [String], feed: AlpacaOptionFeed, limit: Int, pageToken: String?)
-    case optionBars(symbol: String, range: AssetChartRange, feed: AlpacaOptionFeed, interval: StockDataInterval, limit: Int, pageToken: String?, sort: AlpacaSortDirection)
-    case optionTrades(symbol: String, feed: AlpacaOptionFeed, interval: StockDataInterval, limit: Int, pageToken: String?, sort: AlpacaSortDirection)
-    case optionLatestTrades(symbols: [String], feed: AlpacaOptionFeed)
-    case news(symbols: [String], interval: NewsDataInterval, limit: Int, pageToken: String?, sort: AlpacaSortDirection, includeContent: Bool)
-    case stockMovers(top: Int)
-    case mostActiveStocks(top: Int, sort: MarketMostActiveSort)
-
-    var path: String {
-        switch self {
-        case .stockSnapshots:
-            "v2/stocks/snapshots"
-        case .stockLatestTrade(let symbol, _):
-            "v2/stocks/\(Self.encodedPathSegment(symbol))/trades/latest"
-        case .stockLatestQuotes:
-            "v2/stocks/quotes/latest"
-        case .stockLatestBars:
-            "v2/stocks/bars/latest"
-        case .stockQuotes:
-            "v2/stocks/quotes"
-        case .stockBars:
-            "v2/stocks/bars"
-        case .optionChain(let underlyingSymbol, _, _, _, _, _):
-            "v1beta1/options/snapshots/\(Self.encodedPathSegment(underlyingSymbol))"
-        case .optionSnapshots:
-            "v1beta1/options/snapshots"
-        case .optionBars:
-            "v1beta1/options/bars"
-        case .optionTrades:
-            "v1beta1/options/trades"
-        case .optionLatestTrades:
-            "v1beta1/options/trades/latest"
-        case .news:
-            "v1beta1/news"
-        case .stockMovers:
-            "v1beta1/screener/stocks/movers"
-        case .mostActiveStocks:
-            "v1beta1/screener/stocks/most-actives"
-        }
-    }
-
-    var queryItems: [URLQueryItem] {
-        switch self {
-        case .stockSnapshots(let symbols, let feed):
-            return [
-                URLQueryItem(name: "symbols", value: symbols.joined(separator: ",")),
-                URLQueryItem(name: "feed", value: feed.rawValue),
-                URLQueryItem(name: "currency", value: "USD")
-            ]
-        case .stockLatestTrade(_, let feed):
-            return [
-                URLQueryItem(name: "feed", value: feed.rawValue),
-                URLQueryItem(name: "currency", value: "USD")
-            ]
-        case .stockLatestQuotes(let symbols, let feed):
-            return [
-                URLQueryItem(name: "symbols", value: symbols.joined(separator: ",")),
-                URLQueryItem(name: "feed", value: feed.rawValue),
-                URLQueryItem(name: "currency", value: "USD")
-            ]
-        case .stockLatestBars(let symbols, let feed):
-            return [
-                URLQueryItem(name: "symbols", value: symbols.joined(separator: ",")),
-                URLQueryItem(name: "feed", value: feed.rawValue),
-                URLQueryItem(name: "currency", value: "USD")
-            ]
-        case .stockQuotes(let symbol, let feed, let interval, let limit, let pageToken, let sort):
-            var items = [
-                URLQueryItem(name: "symbols", value: symbol),
-                URLQueryItem(name: "start", value: interval.start),
-                URLQueryItem(name: "end", value: interval.end),
-                URLQueryItem(name: "limit", value: String(limit)),
-                URLQueryItem(name: "feed", value: Self.quotesFeedValue(feed)),
-                URLQueryItem(name: "currency", value: "USD"),
-                URLQueryItem(name: "sort", value: sort.rawValue)
-            ]
-
-            if let pageToken, !pageToken.isEmpty {
-                items.append(URLQueryItem(name: "page_token", value: pageToken))
-            }
-
-            return items
-        case .stockBars(let symbol, let range, let feed, let intervalOverride):
-            let interval = intervalOverride ?? Self.dateInterval(for: range)
-            return [
-                URLQueryItem(name: "symbols", value: symbol),
-                URLQueryItem(name: "timeframe", value: range.timeframe),
-                URLQueryItem(name: "start", value: interval.start),
-                URLQueryItem(name: "end", value: interval.end),
-                URLQueryItem(name: "limit", value: String(range.requestLimit)),
-                URLQueryItem(name: "adjustment", value: "all"),
-                URLQueryItem(name: "feed", value: Self.barsFeedValue(feed)),
-                URLQueryItem(name: "currency", value: "USD"),
-                URLQueryItem(name: "sort", value: "asc")
-            ]
-        case .optionChain(_, let feed, let type, let expirationDate, let limit, let pageToken):
-            var items = [
-                URLQueryItem(name: "feed", value: feed.rawValue),
-                URLQueryItem(name: "limit", value: String(limit))
-            ]
-
-            if let type {
-                items.append(URLQueryItem(name: "type", value: type.rawValue))
-            }
-
-            if let expirationDate, !expirationDate.isEmpty {
-                items.append(URLQueryItem(name: "expiration_date", value: expirationDate))
-            }
-
-            if let pageToken, !pageToken.isEmpty {
-                items.append(URLQueryItem(name: "page_token", value: pageToken))
-            }
-
-            return items
-        case .optionSnapshots(let symbols, let feed, let limit, let pageToken):
-            var items = [
-                URLQueryItem(name: "symbols", value: symbols.joined(separator: ",")),
-                URLQueryItem(name: "feed", value: feed.rawValue),
-                URLQueryItem(name: "limit", value: String(limit))
-            ]
-
-            if let pageToken, !pageToken.isEmpty {
-                items.append(URLQueryItem(name: "page_token", value: pageToken))
-            }
-
-            return items
-        case .optionBars(let symbol, let range, _, let interval, let limit, let pageToken, let sort):
-            var items = [
-                URLQueryItem(name: "symbols", value: symbol),
-                URLQueryItem(name: "timeframe", value: range.timeframe),
-                URLQueryItem(name: "start", value: interval.start),
-                URLQueryItem(name: "end", value: interval.end),
-                URLQueryItem(name: "limit", value: String(limit)),
-                URLQueryItem(name: "sort", value: sort.rawValue)
-            ]
-
-            if let pageToken, !pageToken.isEmpty {
-                items.append(URLQueryItem(name: "page_token", value: pageToken))
-            }
-
-            return items
-        case .optionTrades(let symbol, _, let interval, let limit, let pageToken, let sort):
-            var items = [
-                URLQueryItem(name: "symbols", value: symbol),
-                URLQueryItem(name: "start", value: interval.start),
-                URLQueryItem(name: "end", value: interval.end),
-                URLQueryItem(name: "limit", value: String(limit)),
-                URLQueryItem(name: "sort", value: sort.rawValue)
-            ]
-
-            if let pageToken, !pageToken.isEmpty {
-                items.append(URLQueryItem(name: "page_token", value: pageToken))
-            }
-
-            return items
-        case .optionLatestTrades(let symbols, let feed):
-            return [
-                URLQueryItem(name: "symbols", value: symbols.joined(separator: ",")),
-                URLQueryItem(name: "feed", value: feed.rawValue)
-            ]
-        case .news(let symbols, let interval, let limit, let pageToken, let sort, let includeContent):
-            var items = [
-                URLQueryItem(name: "symbols", value: symbols.joined(separator: ",")),
-                URLQueryItem(name: "limit", value: String(limit)),
-                URLQueryItem(name: "sort", value: sort.rawValue),
-                URLQueryItem(name: "include_content", value: includeContent ? "true" : "false")
-            ]
-
-            if let start = interval.start, !start.isEmpty {
-                items.append(URLQueryItem(name: "start", value: start))
-            }
-
-            if let end = interval.end, !end.isEmpty {
-                items.append(URLQueryItem(name: "end", value: end))
-            }
-
-            if let pageToken, !pageToken.isEmpty {
-                items.append(URLQueryItem(name: "page_token", value: pageToken))
-            }
-
-            return items
-        case .stockMovers(let top):
-            return [
-                URLQueryItem(name: "top", value: String(top))
-            ]
-        case .mostActiveStocks(let top, let sort):
-            return [
-                URLQueryItem(name: "by", value: sort.rawValue),
-                URLQueryItem(name: "top", value: String(top))
-            ]
-        }
-    }
-
-    private static func barsFeedValue(_ feed: AlpacaMarketDataFeed) -> String {
-        switch feed {
-        case .delayedSIP:
-            "sip"
-        case .overnight:
-            "boats"
-        default:
-            feed.rawValue
-        }
-    }
-
-    private static func quotesFeedValue(_ feed: AlpacaMarketDataFeed) -> String {
-        switch feed {
-        case .delayedSIP:
-            "sip"
-        case .overnight:
-            "iex"
-        default:
-            feed.rawValue
-        }
-    }
-
-    private static func encodedPathSegment(_ value: String) -> String {
-        var allowedCharacters = CharacterSet.urlPathAllowed
-        allowedCharacters.remove(charactersIn: "/")
-        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmedValue.addingPercentEncoding(withAllowedCharacters: allowedCharacters) ?? trimmedValue
-    }
-
-    private static func dateInterval(for range: AssetChartRange, now: Date = Date()) -> StockDataInterval {
-        let startDate = range.startDate(now: now)
-        let formatter = makeStockDataDateFormatter()
-        return StockDataInterval(
-            start: formatter.string(from: startDate),
-            end: formatter.string(from: now)
-        )
-    }
-
-    static func makeStockDataDateFormatter() -> ISO8601DateFormatter {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [
-            .withInternetDateTime,
-            .withColonSeparatorInTimeZone
-        ]
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        return formatter
-    }
-}
-
-private struct StockDataInterval: Sendable {
-    let start: String
-    let end: String
-}
-
-private struct NewsDataInterval: Sendable {
-    let start: String?
-    let end: String?
-}
 
 private struct AssetChartDataContext: Sendable {
     let feed: AlpacaMarketDataFeed
@@ -2003,40 +1587,5 @@ private actor AssetChartSessionContextCache {
 
     func store(_ context: AssetChartSessionContext, for key: AssetChartSessionContextCacheKey) {
         entries[key] = AssetChartSessionContextCacheEntry(context: context, cachedAt: Date())
-    }
-}
-
-private struct AlpacaAuthenticationInterceptor: APIRequestInterceptor {
-    let credentials: AlpacaCredentials
-
-    func adapt(_ request: URLRequest) async throws -> URLRequest {
-        var request = request
-        request.setValue(credentials.keyID, forHTTPHeaderField: "APCA-API-KEY-ID")
-        request.setValue(credentials.secretKey, forHTTPHeaderField: "APCA-API-SECRET-KEY")
-        return request
-    }
-}
-
-private struct AlpacaErrorResponseInterceptor: APIResponseInterceptor {
-    func intercept(_ context: APIResponseContext) async throws -> APIResponseContext {
-        guard !(200..<300).contains(context.response.statusCode) else {
-            return context
-        }
-
-        if let alpacaError = try? JSONDecoder().decode(AlpacaErrorResponse.self, from: context.data),
-           let message = alpacaError.resolvedMessage {
-            throw APIClientError.requestFailed(statusCode: context.response.statusCode, message: message)
-        }
-
-        return context
-    }
-}
-
-private struct AlpacaErrorResponse: Decodable {
-    let code: String?
-    let message: String?
-
-    var resolvedMessage: String? {
-        APIErrorMessageSanitizer.displayMessage(message ?? code)
     }
 }

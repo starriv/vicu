@@ -130,21 +130,12 @@ struct AppNotificationPreferences: Codable, Equatable, Sendable {
         return true
     }
 
-    static func load(from userDefaults: UserDefaults = .standard) -> AppNotificationPreferences {
-        guard let data = userDefaults.data(forKey: storageKey),
-              let preferences = try? JSONDecoder().decode(AppNotificationPreferences.self, from: data) else {
-            return .default
-        }
-
-        return preferences
+    static func load(from store: any AppConfigurationStoring) -> AppNotificationPreferences {
+        store.value(for: AppConfigurationKeys.Notifications.preferences)
     }
 
-    func save(to userDefaults: UserDefaults = .standard) {
-        guard let data = try? JSONEncoder().encode(self) else {
-            return
-        }
-
-        userDefaults.set(data, forKey: Self.storageKey)
+    func save(to store: any AppConfigurationStoring) {
+        store.setValue(self, for: AppConfigurationKeys.Notifications.preferences)
     }
 
     private enum CodingKeys: String, CodingKey {

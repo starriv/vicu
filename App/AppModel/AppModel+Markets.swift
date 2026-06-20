@@ -71,10 +71,10 @@ extension AppModel {
                 favoriteMarketSymbols.remove(at: index)
                 favoriteMarketAssetBySymbol.removeValue(forKey: normalizedSymbol)
                 favoriteMarketQuotesBySymbol.removeValue(forKey: normalizedSymbol)
-                updatedWatchlist = try await services.alpaca.removeSymbol(normalizedSymbol, fromWatchlist: watchlist.id, credentials: credentials)
+                updatedWatchlist = try await services.watchlists.removeSymbol(normalizedSymbol, fromWatchlist: watchlist.id, credentials: credentials)
             } else {
                 favoriteMarketSymbols.append(normalizedSymbol)
-                updatedWatchlist = try await services.alpaca.addSymbol(normalizedSymbol, toWatchlist: watchlist.id, credentials: credentials)
+                updatedWatchlist = try await services.watchlists.addSymbol(normalizedSymbol, toWatchlist: watchlist.id, credentials: credentials)
             }
 
             favoritesWatchlist = updatedWatchlist
@@ -103,7 +103,7 @@ extension AppModel {
             throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
         }
 
-        let overview = try await services.alpaca.fetchMarketOverview(credentials: credentials)
+        let overview = try await services.markets.fetchMarketOverview(credentials: credentials)
         cachedMarketOverview = overview
         return overview
     }
@@ -113,7 +113,7 @@ extension AppModel {
             throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
         }
 
-        return try await services.alpaca.fetchMarketIndexQuotes(feed: feed, credentials: credentials)
+        return try await services.markets.fetchMarketIndexQuotes(feed: feed, credentials: credentials)
     }
 
     func fetchAssetDetailSnapshot(
@@ -125,7 +125,7 @@ extension AppModel {
             throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
         }
 
-        return try await services.alpaca.fetchAssetDetail(
+        return try await services.markets.fetchAssetDetail(
             symbol: symbol,
             range: range,
             feed: feed,
@@ -142,7 +142,7 @@ extension AppModel {
             return try await fetchResolvedAssetSnapshot(symbol: symbol, feed: feed).snapshot
         }
 
-        return try await services.alpaca.fetchStockSnapshot(symbol: symbol, feed: feed, credentials: credentials)
+        return try await services.markets.fetchStockSnapshot(symbol: symbol, feed: feed, credentials: credentials)
     }
 
     func fetchResolvedAssetSnapshot(
@@ -153,7 +153,7 @@ extension AppModel {
             throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
         }
 
-        return try await services.alpaca.fetchCurrentStockSnapshot(
+        return try await services.markets.fetchCurrentStockSnapshot(
             symbol: symbol,
             feed: feed,
             credentials: credentials
@@ -168,7 +168,7 @@ extension AppModel {
             throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
         }
 
-        return try await services.alpaca.fetchLatestStockBar(
+        return try await services.markets.fetchLatestStockBar(
             symbol: symbol,
             feed: feed,
             credentials: credentials
@@ -188,7 +188,7 @@ extension AppModel {
             throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
         }
 
-        return try await services.alpaca.fetchHistoricalStockQuotes(
+        return try await services.markets.fetchHistoricalStockQuotes(
             symbol: symbol,
             feed: feed,
             start: start,
@@ -232,7 +232,7 @@ extension AppModel {
             return cachedEntry.value
         }
 
-        let page = try await services.alpaca.fetchOptionChain(
+        let page = try await services.markets.fetchOptionChain(
             symbol: normalizedSymbol,
             feed: .indicative,
             type: type,
@@ -276,7 +276,7 @@ extension AppModel {
         var pageToken: String?
 
         repeat {
-            let page = try await services.alpaca.fetchOptionContracts(
+            let page = try await services.markets.fetchOptionContracts(
                 symbol: normalizedSymbol,
                 expirationDateGTE: startDate,
                 expirationDateLTE: endDate,
@@ -322,7 +322,7 @@ extension AppModel {
             return cachedEntry.value
         }
 
-        let page = try await services.alpaca.fetchOptionSnapshots(
+        let page = try await services.markets.fetchOptionSnapshots(
             symbols: [normalizedSymbol],
             feed: .indicative,
             limit: 1,
@@ -354,7 +354,7 @@ extension AppModel {
             return cachedEntry.value
         }
 
-        let trades = try await services.alpaca.fetchLatestOptionTrades(
+        let trades = try await services.markets.fetchLatestOptionTrades(
             symbols: [normalizedSymbol],
             feed: .indicative,
             credentials: credentials
@@ -405,7 +405,7 @@ extension AppModel {
         )
         #endif
 
-        let page = try await services.alpaca.fetchOptionBars(
+        let page = try await services.markets.fetchOptionBars(
             symbol: normalizedSymbol,
             range: range,
             feed: .indicative,
@@ -453,7 +453,7 @@ extension AppModel {
             return cachedEntry.value
         }
 
-        let page = try await services.alpaca.fetchOptionTrades(
+        let page = try await services.markets.fetchOptionTrades(
             symbol: normalizedSymbol,
             range: range,
             feed: .indicative,
@@ -496,7 +496,7 @@ extension AppModel {
             return cachedEntry.value
         }
 
-        let page = try await services.alpaca.fetchNews(
+        let page = try await services.markets.fetchNews(
             symbols: [normalizedSymbol],
             start: start,
             end: nil,
@@ -518,7 +518,7 @@ extension AppModel {
             return nil
         }
 
-        return try await services.alpaca.fetchOpenPosition(
+        return try await services.trade.fetchOpenPosition(
             symbolOrAssetID: normalizedSymbol,
             credentials: credentials
         )
@@ -551,12 +551,12 @@ extension AppModel {
             throw APIClientError.underlying(L10n.Order.missingSymbol(locale: appLanguage.locale))
         }
 
-        async let accountRequest = services.alpaca.fetchAccount(credentials: credentials)
-        async let positionRequest = services.alpaca.fetchOpenPosition(
+        async let accountRequest = services.trade.fetchAccount(credentials: credentials)
+        async let positionRequest = services.trade.fetchOpenPosition(
             symbolOrAssetID: normalizedSymbol,
             credentials: credentials
         )
-        async let assetRequest = services.alpaca.fetchAsset(symbolOrAssetID: normalizedSymbol, credentials: credentials)
+        async let assetRequest = services.markets.fetchAsset(symbolOrAssetID: normalizedSymbol, credentials: credentials)
 
         let (account, position, asset) = try await (
             accountRequest,
@@ -584,7 +584,7 @@ extension AppModel {
             throw APIClientError.underlying(L10n.Order.missingSymbol(locale: appLanguage.locale))
         }
 
-        return try await services.alpaca.fetchCurrentStockSnapshot(
+        return try await services.markets.fetchCurrentStockSnapshot(
             symbol: normalizedSymbol,
             feed: feed,
             credentials: credentials
@@ -685,7 +685,7 @@ extension AppModel {
         )
         emit(.partial(normalizedQuery, partialResults))
 
-        let quotes = (try? await services.alpaca.fetchMarketSymbols(symbols: symbols, credentials: credentials)) ?? []
+        let quotes = (try? await services.markets.fetchMarketSymbols(symbols: symbols, credentials: credentials)) ?? []
         try Task.checkCancellation()
         let quotesBySymbol: [String: MarketActiveSymbol] = quotes.reduce(into: [:]) { quotesBySymbol, quote in
             quotesBySymbol[normalizedMarketSymbol(quote.symbol)] = quote
@@ -719,7 +719,7 @@ extension AppModel {
             return Array(searchPopularSymbolsCache.prefix(limit))
         }
 
-        let rankedSymbols = try await services.alpaca.fetchMostActiveMarketSymbols(top: limit, sort: sort, credentials: credentials)
+        let rankedSymbols = try await services.markets.fetchMostActiveMarketSymbols(top: limit, sort: sort, credentials: credentials)
         let symbols = Self.normalizedMarketSymbols(rankedSymbols.map(\.symbol))
         guard !symbols.isEmpty else {
             searchPopularSymbolsCache[sort] = []
@@ -727,7 +727,7 @@ extension AppModel {
             return []
         }
 
-        async let quotesRequest = services.alpaca.fetchMarketSymbols(symbols: symbols, credentials: credentials)
+        async let quotesRequest = services.markets.fetchMarketSymbols(symbols: symbols, credentials: credentials)
         async let assetsRequest = marketAssets(credentials: credentials)
 
         let quotes = (try? await quotesRequest) ?? []
@@ -782,7 +782,7 @@ extension AppModel {
             return marketAssetCache
         }
 
-        let fetchedAssets = try await services.alpaca.fetchMarketAssets(credentials: credentials)
+        let fetchedAssets = try await services.markets.fetchMarketAssets(credentials: credentials)
         let assets = fetchedAssets.filter { asset in
             asset.symbol.isEmpty == false && asset.status?.lowercased() == "active"
         }
@@ -797,17 +797,17 @@ extension AppModel {
             return favoritesWatchlist
         }
 
-        let watchlists = try await services.alpaca.fetchWatchlists(credentials: credentials)
+        let watchlists = try await services.watchlists.fetchWatchlists(credentials: credentials)
         if let existingWatchlist = watchlists.first(where: { watchlist in
             watchlist.name.caseInsensitiveCompare(Self.favoritesWatchlistName) == .orderedSame
         }) {
-            let loadedWatchlist = try await services.alpaca.fetchWatchlist(id: existingWatchlist.id, credentials: credentials)
+            let loadedWatchlist = try await services.watchlists.fetchWatchlist(id: existingWatchlist.id, credentials: credentials)
             let normalizedNameWatchlist = try await normalizeFavoritesWatchlistNameIfNeeded(loadedWatchlist, credentials: credentials)
             favoritesWatchlist = normalizedNameWatchlist
             return normalizedNameWatchlist
         }
 
-        let createdWatchlist = try await services.alpaca.createWatchlist(
+        let createdWatchlist = try await services.watchlists.createWatchlist(
             name: Self.favoritesWatchlistName,
             symbols: [],
             credentials: credentials
@@ -824,7 +824,7 @@ extension AppModel {
             return watchlist
         }
 
-        return try await services.alpaca.updateWatchlist(
+        return try await services.watchlists.updateWatchlist(
             id: watchlist.id,
             name: Self.favoritesWatchlistName,
             symbols: watchlist.symbols,
@@ -832,7 +832,7 @@ extension AppModel {
         )
     }
 
-    private nonisolated static func rankMarketAssets(_ assets: [AlpacaAsset], query: String, limit: Int) -> [AlpacaAsset] {
+    nonisolated static func rankMarketAssets(_ assets: [AlpacaAsset], query: String, limit: Int) -> [AlpacaAsset] {
         let normalizedQuery = query.uppercased()
         let nameQuery = query.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
 
@@ -903,6 +903,8 @@ extension AppModel {
     func resetMarketSearchCaches() {
         marketAssetCache = nil
         marketAssetCacheDate = nil
+        watchlistAssetCache = nil
+        watchlistAssetCacheDate = nil
         searchPopularSymbolsCache = [:]
         searchPopularSymbolsCacheDate = [:]
         searchResultCache = [:]
@@ -960,7 +962,7 @@ extension AppModel {
         }
 
         for symbol in missingSymbols {
-            guard let asset = try? await services.alpaca.fetchAsset(symbolOrAssetID: symbol, credentials: credentials) else {
+            guard let asset = try? await services.markets.fetchAsset(symbolOrAssetID: symbol, credentials: credentials) else {
                 continue
             }
 
@@ -980,7 +982,7 @@ extension AppModel {
         }
 
         do {
-            let quotes = try await services.alpaca.fetchMarketSymbols(
+            let quotes = try await services.markets.fetchMarketSymbols(
                 symbols: favoriteMarketSymbols,
                 credentials: credentials
             )

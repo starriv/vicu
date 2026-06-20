@@ -156,7 +156,7 @@ struct DefaultAPIErrorHandler: APIErrorHandling {
     }
 }
 
-enum APIClientError: LocalizedError, Equatable {
+enum APIClientError: LocalizedError, Equatable, Sendable {
     case invalidURL
     case invalidResponse
     case emptyResponse

@@ -28,7 +28,7 @@ final class AlpacaStockStreamClient: AlpacaStockStreaming, @unchecked Sendable {
 
     init(
         session: URLSession = URLSession(configuration: .vicuWebSocket),
-        baseURL: URL = URL(string: "wss://stream.data.alpaca.markets")!
+        baseURL: URL = APIPaths.AlpacaStreams.marketDataBaseURL
     ) {
         self.session = session
         self.baseURL = baseURL

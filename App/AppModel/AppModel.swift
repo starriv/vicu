@@ -12,7 +12,7 @@ final class AppModel {
     var pendingOrderDetailRequest: OrderDetailNavigationRequest?
     var environment: TradeEnvironment = .paper {
         didSet {
-            UserDefaults.standard.set(environment.rawValue, forKey: TradeEnvironment.storageKey)
+            services.configurationStore.setValue(environment, for: AppConfigurationKeys.App.tradeEnvironment)
         }
     }
     var hasCredentials = false
@@ -21,27 +21,30 @@ final class AppModel {
     var connectionDiagnostics: ConnectionDiagnostics?
     var appearanceMode: AppearanceMode = .system {
         didSet {
-            UserDefaults.standard.set(appearanceMode.rawValue, forKey: AppearanceMode.storageKey)
+            services.configurationStore.setValue(appearanceMode, for: AppConfigurationKeys.App.appearanceMode)
         }
     }
     var appLanguage: AppLanguage = .system {
         didSet {
-            UserDefaults.standard.set(appLanguage.rawValue, forKey: AppLanguage.storageKey)
+            services.configurationStore.setValue(appLanguage, for: AppConfigurationKeys.App.appLanguage)
         }
     }
     var notificationPreferences: AppNotificationPreferences = .default {
         didSet {
-            notificationPreferences.save()
+            notificationPreferences.save(to: services.configurationStore)
         }
     }
     var logoDevAPIKey: String = "" {
         didSet {
-            UserDefaults.standard.set(logoDevAPIKey, forKey: Self.logoDevAPIKeyStorageKey)
+            services.configurationStore.setValue(logoDevAPIKey, for: AppConfigurationKeys.Integrations.logoDevAPIKey)
         }
     }
     var isLogoDevEnabled = false {
         didSet {
-            UserDefaults.standard.set(isLogoDevEnabled, forKey: Self.logoDevEnabledStorageKey)
+            services.configurationStore.setValue(
+                isLogoDevEnabled,
+                for: AppConfigurationKeys.Integrations.isLogoDevEnabled
+            )
         }
     }
     var favoriteMarketSymbols: [String] = []
@@ -54,16 +57,17 @@ final class AppModel {
     var lastError: String?
     var credentialMessage: String?
 
-    @ObservationIgnored private static let logoDevAPIKeyStorageKey = "logoDevAPIKey"
-    @ObservationIgnored private static let logoDevEnabledStorageKey = "logoDevEnabled"
     @ObservationIgnored static let favoritesWatchlistName = "favorites"
     @ObservationIgnored let services: AppServices
     @ObservationIgnored var credentials: AlpacaCredentials?
     @ObservationIgnored var verifiedCredentialFingerprint: String?
     @ObservationIgnored var marketAssetCache: [AlpacaAsset]?
     @ObservationIgnored var marketAssetCacheDate: Date?
+    @ObservationIgnored var watchlistAssetCache: [AlpacaAsset]?
+    @ObservationIgnored var watchlistAssetCacheDate: Date?
     @ObservationIgnored var favoritesWatchlist: AlpacaWatchlist?
     @ObservationIgnored let marketAssetCacheTTL: TimeInterval = 60 * 60
+    @ObservationIgnored let watchlistAssetCacheTTL: TimeInterval = 60 * 60
     @ObservationIgnored var searchPopularSymbolsCache: [MarketMostActiveSort: [MarketActiveSymbol]] = [:]
     @ObservationIgnored var searchPopularSymbolsCacheDate: [MarketMostActiveSort: Date] = [:]
     @ObservationIgnored let searchPopularSymbolsCacheTTL: TimeInterval = 60
@@ -97,24 +101,13 @@ final class AppModel {
 
     init(services: AppServices = .live) {
         self.services = services
-        if let rawEnvironment = UserDefaults.standard.string(forKey: TradeEnvironment.storageKey),
-           let environment = TradeEnvironment(rawValue: rawEnvironment) {
-            self.environment = environment
-        }
-
-        if let rawAppearanceMode = UserDefaults.standard.string(forKey: AppearanceMode.storageKey),
-           let appearanceMode = AppearanceMode(rawValue: rawAppearanceMode) {
-            self.appearanceMode = appearanceMode
-        }
-
-        if let rawAppLanguage = UserDefaults.standard.string(forKey: AppLanguage.storageKey),
-           let appLanguage = AppLanguage(rawValue: rawAppLanguage) {
-            self.appLanguage = appLanguage
-        }
-
-        self.logoDevAPIKey = UserDefaults.standard.string(forKey: Self.logoDevAPIKeyStorageKey) ?? ""
-        self.isLogoDevEnabled = UserDefaults.standard.bool(forKey: Self.logoDevEnabledStorageKey)
-        self.notificationPreferences = AppNotificationPreferences.load()
+        let configurationStore = services.configurationStore
+        self.environment = configurationStore.value(for: AppConfigurationKeys.App.tradeEnvironment)
+        self.appearanceMode = configurationStore.value(for: AppConfigurationKeys.App.appearanceMode)
+        self.appLanguage = configurationStore.value(for: AppConfigurationKeys.App.appLanguage)
+        self.logoDevAPIKey = configurationStore.value(for: AppConfigurationKeys.Integrations.logoDevAPIKey)
+        self.isLogoDevEnabled = configurationStore.value(for: AppConfigurationKeys.Integrations.isLogoDevEnabled)
+        self.notificationPreferences = AppNotificationPreferences.load(from: configurationStore)
 
         if let notificationCenter = services.appNotifier as? AppNotificationCenter {
             notificationCenter.setResponseHandler { [weak self] route in

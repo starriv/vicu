@@ -10,7 +10,8 @@ extension AppModel {
             return
         }
 
-        let alpaca = services.alpaca
+        let portfolioService = services.portfolio
+        let ordersService = services.orders
         let historyRange = portfolio.historyRange
         let accountCreatedAt = portfolio.account?.createdAt
         var didReceiveValue = false
@@ -26,7 +27,7 @@ extension AppModel {
         await withTaskGroup(of: PortfolioRefreshResult.self) { group in
             group.addTask {
                 do {
-                    return .account(try await alpaca.fetchAccount(credentials: activeCredentials))
+                    return .account(try await portfolioService.fetchAccount(credentials: activeCredentials))
                 } catch {
                     return .failure(.init(segment: .account, error: error))
                 }
@@ -34,7 +35,7 @@ extension AppModel {
 
             group.addTask {
                 do {
-                    return .positions(try await alpaca.fetchPositions(credentials: activeCredentials))
+                    return .positions(try await portfolioService.fetchPositions(credentials: activeCredentials))
                 } catch {
                     return .failure(.init(segment: .positions, error: error))
                 }
@@ -42,7 +43,7 @@ extension AppModel {
 
             group.addTask {
                 do {
-                    return .orders(try await alpaca.fetchRecentOrders(credentials: activeCredentials))
+                    return .orders(try await ordersService.fetchRecentOrders(credentials: activeCredentials))
                 } catch {
                     return .failure(.init(segment: .orders, error: error))
                 }
@@ -52,7 +53,7 @@ extension AppModel {
                 do {
                     return .history(
                         range: historyRange,
-                        try await alpaca.fetchPortfolioHistory(
+                        try await portfolioService.fetchPortfolioHistory(
                             range: historyRange,
                             accountCreatedAt: accountCreatedAt,
                             credentials: activeCredentials
@@ -129,8 +130,8 @@ extension AppModel {
         defer { portfolio.isRefreshing = false }
 
         do {
-            async let accountRequest = services.alpaca.fetchAccount(credentials: activeCredentials)
-            async let positionsRequest = services.alpaca.fetchPositions(credentials: activeCredentials)
+            async let accountRequest = services.portfolio.fetchAccount(credentials: activeCredentials)
+            async let positionsRequest = services.portfolio.fetchPositions(credentials: activeCredentials)
             let (account, positions) = try await (accountRequest, positionsRequest)
             guard isCurrentCredentialContext(activeCredentials) else {
                 return
@@ -177,7 +178,7 @@ extension AppModel {
         defer { portfolio.isLoadingHistory = false }
 
         do {
-            let history = try await services.alpaca.fetchPortfolioHistory(
+            let history = try await services.portfolio.fetchPortfolioHistory(
                 range: portfolio.historyRange,
                 accountCreatedAt: portfolio.account?.createdAt,
                 credentials: credentials
@@ -196,7 +197,7 @@ extension AppModel {
             throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
         }
 
-        let account = try await services.alpaca.fetchAccount(credentials: credentials)
+        let account = try await services.home.fetchAccount(credentials: credentials)
         portfolio.applyAccount(account)
         return account
     }
@@ -206,7 +207,7 @@ extension AppModel {
             throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
         }
 
-        return try await services.alpaca.fetchAccountActivities(
+        return try await services.home.fetchAccountActivities(
             pageSize: pageSize,
             pageToken: pageToken,
             credentials: credentials
@@ -218,7 +219,7 @@ extension AppModel {
             throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
         }
 
-        let order = try await services.alpaca.fetchOrder(id: orderID, nested: true, credentials: credentials)
+        let order = try await services.orders.fetchOrder(id: orderID, nested: true, credentials: credentials)
         mergePortfolioOrder(order)
         return order
     }
@@ -232,7 +233,7 @@ extension AppModel {
             throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
         }
 
-        try await services.alpaca.cancelOrder(id: order.id, credentials: credentials)
+        try await services.orders.cancelOrder(id: order.id, credentials: credentials)
         lastError = nil
         await refresh()
     }
@@ -248,7 +249,7 @@ extension AppModel {
             throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
         }
 
-        let order = try await services.alpaca.closeOpenPosition(
+        let order = try await services.portfolio.closeOpenPosition(
             symbolOrAssetID: symbolOrAssetID,
             credentials: credentials
         )
@@ -273,7 +274,7 @@ extension AppModel {
         let replacedOrder: AlpacaOrder
 
         if let credentials {
-            replacedOrder = try await services.alpaca.replaceOrder(id: order.id, request: request, credentials: credentials)
+            replacedOrder = try await services.orders.replaceOrder(id: order.id, request: request, credentials: credentials)
         } else {
             throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
         }
@@ -291,7 +292,7 @@ extension AppModel {
         }
 
         do {
-            let submittedOrder = try await services.alpaca.submitOrder(
+            let submittedOrder = try await services.trade.submitOrder(
                 draft,
                 clientOrderID: clientOrderID,
                 credentials: credentials

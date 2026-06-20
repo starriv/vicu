@@ -277,8 +277,14 @@ extension AppModel {
             recentActivityRefIDs.remove(removedRefID)
         }
 
-        UserDefaults.standard.set(event.eventID, forKey: activityEventStorageKey("last_event_id", credentials: activeCredentials))
-        UserDefaults.standard.set(recentActivityRefIDOrder, forKey: activityEventStorageKey("recent_ref_ids", credentials: activeCredentials))
+        services.configurationStore.setValue(
+            event.eventID,
+            for: AppConfigurationKeys.Realtime.activityLastEventID(credentials: activeCredentials)
+        )
+        services.configurationStore.setValue(
+            recentActivityRefIDOrder,
+            for: AppConfigurationKeys.Realtime.recentActivityRefIDs(credentials: activeCredentials)
+        )
     }
 
     private func hasProcessedTradeEvent(
@@ -303,50 +309,42 @@ extension AppModel {
         }
 
         if let cursorID = event.cursorID {
-            UserDefaults.standard.set(cursorID, forKey: tradeEventStorageKey("last_event_id", credentials: activeCredentials))
+            services.configurationStore.setValue(
+                cursorID,
+                for: AppConfigurationKeys.Realtime.tradeLastEventID(credentials: activeCredentials)
+            )
         }
-        UserDefaults.standard.set(recentTradeEventIDOrder, forKey: tradeEventStorageKey("recent_event_ids", credentials: activeCredentials))
+        services.configurationStore.setValue(
+            recentTradeEventIDOrder,
+            for: AppConfigurationKeys.Realtime.recentTradeEventIDs(credentials: activeCredentials)
+        )
     }
 
     private func loadRecentActivityRefIDs(credentials activeCredentials: AlpacaCredentials) {
-        let refIDs = UserDefaults.standard.stringArray(
-            forKey: activityEventStorageKey("recent_ref_ids", credentials: activeCredentials)
-        ) ?? []
+        let refIDs = services.configurationStore.value(
+            for: AppConfigurationKeys.Realtime.recentActivityRefIDs(credentials: activeCredentials)
+        )
         recentActivityRefIDOrder = Array(refIDs.suffix(recentActivityRefLimit))
         recentActivityRefIDs = Set(recentActivityRefIDOrder)
     }
 
     private func loadRecentTradeEventIDs(credentials activeCredentials: AlpacaCredentials) {
-        let eventIDs = UserDefaults.standard.stringArray(
-            forKey: tradeEventStorageKey("recent_event_ids", credentials: activeCredentials)
-        ) ?? []
+        let eventIDs = services.configurationStore.value(
+            for: AppConfigurationKeys.Realtime.recentTradeEventIDs(credentials: activeCredentials)
+        )
         recentTradeEventIDOrder = Array(eventIDs.suffix(recentTradeEventLimit))
         recentTradeEventIDs = Set(recentTradeEventIDOrder)
     }
 
     private func lastActivityEventID(credentials activeCredentials: AlpacaCredentials) -> String? {
-        UserDefaults.standard.string(forKey: activityEventStorageKey("last_event_id", credentials: activeCredentials))
+        services.configurationStore.optionalValue(
+            for: AppConfigurationKeys.Realtime.activityLastEventID(credentials: activeCredentials)
+        )
     }
 
     private func lastTradeEventID(credentials activeCredentials: AlpacaCredentials) -> String? {
-        UserDefaults.standard.string(forKey: tradeEventStorageKey("last_event_id", credentials: activeCredentials))
-    }
-
-    private func activityEventStorageKey(_ name: String, credentials activeCredentials: AlpacaCredentials) -> String {
-        [
-            "alpaca.activity",
-            name,
-            activeCredentials.environment.rawValue,
-            activeCredentials.keyID
-        ].joined(separator: ".")
-    }
-
-    private func tradeEventStorageKey(_ name: String, credentials activeCredentials: AlpacaCredentials) -> String {
-        [
-            "alpaca.trade_event",
-            name,
-            activeCredentials.environment.rawValue,
-            activeCredentials.keyID
-        ].joined(separator: ".")
+        services.configurationStore.optionalValue(
+            for: AppConfigurationKeys.Realtime.tradeLastEventID(credentials: activeCredentials)
+        )
     }
 }

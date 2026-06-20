@@ -360,7 +360,7 @@ extension AppModel {
         let startedAt = Date()
 
         do {
-            try await services.alpaca.testConnection(credentials: credentials)
+            try await services.credentialConnection.testConnection(credentials: credentials)
             if isCurrentCredentialOperation(generation, environment: credentials.environment) {
                 recordConnectionDiagnostics(
                     credentials: credentials,

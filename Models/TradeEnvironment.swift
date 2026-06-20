@@ -30,13 +30,13 @@ enum TradeEnvironment: String, CaseIterable, Codable, Identifiable, Sendable {
     var baseURL: URL {
         switch self {
         case .paper:
-            URL(string: "https://paper-api.alpaca.markets")!
+            APIPaths.AlpacaTrading.paperBaseURL
         case .live:
-            URL(string: "https://api.alpaca.markets")!
+            APIPaths.AlpacaTrading.liveBaseURL
         }
     }
 
     var accountEndpoint: String {
-        baseURL.appendingPathComponent("v2/account").absoluteString
+        baseURL.appendingPathComponent(APIPaths.AlpacaTrading.account).absoluteString
     }
 }

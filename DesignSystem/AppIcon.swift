@@ -76,6 +76,7 @@ enum AppIcon {
         static let overnight = "moon.fill"
         static let closed = "pause.fill"
         static let favorites = "star.fill"
+        static let watchlists = "star.square.on.square"
         static let popular = "flame.fill"
         static let search = "magnifyingglass"
         static let more = "ellipsis"
