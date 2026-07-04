@@ -227,8 +227,8 @@ extension AppModel {
         )
 
         if !forceReload,
-           let cachedEntry = optionChainPageCache[cacheKey],
-           Date().timeIntervalSince(cachedEntry.cachedAt) < optionChainPageCacheTTL {
+           let cachedEntry = optionCache.chainPageCache[cacheKey],
+           Date().timeIntervalSince(cachedEntry.cachedAt) < optionCache.chainPageCacheTTL {
             return cachedEntry.value
         }
 
@@ -241,7 +241,7 @@ extension AppModel {
             pageToken: pageToken,
             credentials: credentials
         )
-        optionChainPageCache[cacheKey] = TimedCacheEntry(value: page, cachedAt: Date())
+        optionCache.chainPageCache[cacheKey] = TimedCacheEntry(value: page, cachedAt: Date())
         return page
     }
 
@@ -267,8 +267,8 @@ extension AppModel {
         )
 
         if !forceReload,
-           let cachedEntry = optionExpirationCache[cacheKey],
-           Date().timeIntervalSince(cachedEntry.cachedAt) < optionExpirationCacheTTL {
+           let cachedEntry = optionCache.expirationCache[cacheKey],
+           Date().timeIntervalSince(cachedEntry.cachedAt) < optionCache.expirationCacheTTL {
             return cachedEntry.value
         }
 
@@ -295,7 +295,7 @@ extension AppModel {
         } while pageToken != nil
 
         let sortedExpirations = expirations.sorted()
-        optionExpirationCache[cacheKey] = TimedCacheEntry(
+        optionCache.expirationCache[cacheKey] = TimedCacheEntry(
             value: sortedExpirations,
             cachedAt: Date()
         )
@@ -317,8 +317,8 @@ extension AppModel {
 
         let cacheKey = OptionSnapshotCacheKey(symbol: normalizedSymbol)
         if !forceReload,
-           let cachedEntry = optionSnapshotCache[cacheKey],
-           Date().timeIntervalSince(cachedEntry.cachedAt) < optionSnapshotCacheTTL {
+           let cachedEntry = optionCache.snapshotCache[cacheKey],
+           Date().timeIntervalSince(cachedEntry.cachedAt) < optionCache.snapshotCacheTTL {
             return cachedEntry.value
         }
 
@@ -330,7 +330,7 @@ extension AppModel {
             credentials: credentials
         )
         let snapshot = page.snapshots.first { $0.contractSymbol == normalizedSymbol } ?? page.snapshots.first
-        optionSnapshotCache[cacheKey] = TimedCacheEntry(value: snapshot, cachedAt: Date())
+        optionCache.snapshotCache[cacheKey] = TimedCacheEntry(value: snapshot, cachedAt: Date())
         return snapshot
     }
 
@@ -349,8 +349,8 @@ extension AppModel {
 
         let cacheKey = OptionLatestTradeCacheKey(symbol: normalizedSymbol)
         if !forceReload,
-           let cachedEntry = optionLatestTradeCache[cacheKey],
-           Date().timeIntervalSince(cachedEntry.cachedAt) < optionLatestTradeCacheTTL {
+           let cachedEntry = optionCache.latestTradeCache[cacheKey],
+           Date().timeIntervalSince(cachedEntry.cachedAt) < optionCache.latestTradeCacheTTL {
             return cachedEntry.value
         }
 
@@ -360,7 +360,7 @@ extension AppModel {
             credentials: credentials
         )
         let trade = trades[normalizedSymbol] ?? trades.values.first
-        optionLatestTradeCache[cacheKey] = TimedCacheEntry(value: trade, cachedAt: Date())
+        optionCache.latestTradeCache[cacheKey] = TimedCacheEntry(value: trade, cachedAt: Date())
         return trade
     }
 
@@ -389,8 +389,8 @@ extension AppModel {
         )
 
         if !forceReload,
-           let cachedEntry = optionBarsPageCache[cacheKey],
-           Date().timeIntervalSince(cachedEntry.cachedAt) < optionBarsPageCacheTTL {
+           let cachedEntry = optionCache.barsPageCache[cacheKey],
+           Date().timeIntervalSince(cachedEntry.cachedAt) < optionCache.barsPageCacheTTL {
             #if DEBUG
             print(
                 "[OptionChart][AppModel] cache-hit symbol=\(normalizedSymbol) range=\(range.title) bars=\(cachedEntry.value.bars.count) nextPageToken=\(cachedEntry.value.nextPageToken ?? "nil") first={\(cachedEntry.value.bars.first?.debugSummary ?? "nil")} last={\(cachedEntry.value.bars.last?.debugSummary ?? "nil")}"
@@ -419,7 +419,7 @@ extension AppModel {
             "[OptionChart][AppModel] fetched symbol=\(normalizedSymbol) range=\(range.title) bars=\(page.bars.count) nextPageToken=\(page.nextPageToken ?? "nil") first={\(page.bars.first?.debugSummary ?? "nil")} last={\(page.bars.last?.debugSummary ?? "nil")}"
         )
         #endif
-        optionBarsPageCache[cacheKey] = TimedCacheEntry(value: page, cachedAt: Date())
+        optionCache.barsPageCache[cacheKey] = TimedCacheEntry(value: page, cachedAt: Date())
         return page
     }
 
@@ -448,8 +448,8 @@ extension AppModel {
         )
 
         if !forceReload,
-           let cachedEntry = optionTradesPageCache[cacheKey],
-           Date().timeIntervalSince(cachedEntry.cachedAt) < optionTradesPageCacheTTL {
+           let cachedEntry = optionCache.tradesPageCache[cacheKey],
+           Date().timeIntervalSince(cachedEntry.cachedAt) < optionCache.tradesPageCacheTTL {
             return cachedEntry.value
         }
 
@@ -462,7 +462,7 @@ extension AppModel {
             sort: .desc,
             credentials: credentials
         )
-        optionTradesPageCache[cacheKey] = TimedCacheEntry(value: page, cachedAt: Date())
+        optionCache.tradesPageCache[cacheKey] = TimedCacheEntry(value: page, cachedAt: Date())
         return page
     }
 
@@ -909,12 +909,12 @@ extension AppModel {
         searchPopularSymbolsCacheDate = [:]
         searchResultCache = [:]
         newsPageCache = [:]
-        optionChainPageCache = [:]
-        optionExpirationCache = [:]
-        optionSnapshotCache = [:]
-        optionLatestTradeCache = [:]
-        optionBarsPageCache = [:]
-        optionTradesPageCache = [:]
+        optionCache.chainPageCache = [:]
+        optionCache.expirationCache = [:]
+        optionCache.snapshotCache = [:]
+        optionCache.latestTradeCache = [:]
+        optionCache.barsPageCache = [:]
+        optionCache.tradesPageCache = [:]
     }
 
     private static let optionExpirationPageSize = 10_000

@@ -78,18 +78,7 @@ final class AppModel: AssetDetailServicing {
     @ObservationIgnored let searchResultCacheTTL: TimeInterval = 20
     @ObservationIgnored var newsPageCache: [NewsPageCacheKey: TimedCacheEntry<AlpacaNewsPage>] = [:]
     @ObservationIgnored let newsPageCacheTTL: TimeInterval = 45
-    @ObservationIgnored var optionChainPageCache: [OptionChainPageCacheKey: TimedCacheEntry<AlpacaOptionChainPage>] = [:]
-    @ObservationIgnored let optionChainPageCacheTTL: TimeInterval = 20
-    @ObservationIgnored var optionExpirationCache: [OptionExpirationCacheKey: TimedCacheEntry<[String]>] = [:]
-    @ObservationIgnored let optionExpirationCacheTTL: TimeInterval = 5 * 60
-    @ObservationIgnored var optionSnapshotCache: [OptionSnapshotCacheKey: TimedCacheEntry<AlpacaOptionSnapshot?>] = [:]
-    @ObservationIgnored let optionSnapshotCacheTTL: TimeInterval = 15
-    @ObservationIgnored var optionLatestTradeCache: [OptionLatestTradeCacheKey: TimedCacheEntry<AlpacaOptionTrade?>] = [:]
-    @ObservationIgnored let optionLatestTradeCacheTTL: TimeInterval = 15
-    @ObservationIgnored var optionBarsPageCache: [OptionBarsPageCacheKey: TimedCacheEntry<AlpacaOptionBarsPage>] = [:]
-    @ObservationIgnored let optionBarsPageCacheTTL: TimeInterval = 45
-    @ObservationIgnored var optionTradesPageCache: [OptionTradesPageCacheKey: TimedCacheEntry<AlpacaOptionTradesPage>] = [:]
-    @ObservationIgnored let optionTradesPageCacheTTL: TimeInterval = 30
+    @ObservationIgnored let optionCache = OptionDataCache()
     @ObservationIgnored var credentialOperationGeneration = 0
     @ObservationIgnored var activityStreamDisposable: Disposable?
     @ObservationIgnored var activityStreamCredentials: AlpacaCredentials?
