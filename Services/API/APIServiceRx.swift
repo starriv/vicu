@@ -1,6 +1,7 @@
 import Foundation
 import RxSwift
 
+// @unchecked Sendable: immutable single closure captured in let; no mutable state
 private final class ServiceRxSingleEmitter<Value: Sendable>: @unchecked Sendable {
     private let single: (SingleEvent<Value>) -> Void
 

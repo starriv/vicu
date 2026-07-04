@@ -23,8 +23,44 @@ struct SQLiteRow: Sendable {
 
         return data
     }
+
+    func string(_ column: String) -> String? {
+        guard case .text(let text) = values[column] else {
+            return nil
+        }
+
+        return text
+    }
+
+    func double(_ column: String) -> Double? {
+        switch values[column] {
+        case .real(let value):
+            value
+        case .integer(let value):
+            Double(value)
+        default:
+            nil
+        }
+    }
+
+    func int(_ column: String) -> Int? {
+        guard case .integer(let value) = values[column] else {
+            return nil
+        }
+
+        return Int(value)
+    }
+
+    func int64(_ column: String) -> Int64? {
+        guard case .integer(let value) = values[column] else {
+            return nil
+        }
+
+        return value
+    }
 }
 
+// @unchecked Sendable: handle access guarded by NSLock + sqlite SQLITE_OPEN_FULLMUTEX
 final class SQLiteDatabase: @unchecked Sendable {
     private let lock = NSLock()
     private var handle: OpaquePointer?
@@ -48,6 +84,13 @@ final class SQLiteDatabase: @unchecked Sendable {
             sqlite3_close(openedHandle)
             throw SQLiteDatabaseError.openFailed(message)
         }
+
+        #if os(iOS)
+        try? fileManager.setAttributes(
+            [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+            ofItemAtPath: fileURL.path
+        )
+        #endif
 
         handle = openedHandle
         try executeRaw("PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;")

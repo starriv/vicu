@@ -116,13 +116,13 @@ struct AssetDetailView: View {
             )
         }
         .task {
-            store.start(app: app)
+            store.start(service: app)
         }
         .onChange(of: store.errorMessage) { _, message in
             showErrorMessage(message)
         }
         .refreshable {
-            store.reload(app: app)
+            store.reload(service: app)
         }
         .onDisappear {
             assetSharePreparationTask?.cancel()
@@ -322,7 +322,7 @@ private struct InteractivePopGestureRestorer: UIViewControllerRepresentable {
         }
 
         func restoreInteractivePopGesture() {
-            DispatchQueue.main.async { [weak self] in
+            Task { @MainActor [weak self] in
                 self?.coordinator?.attach(to: self?.navigationController)
             }
         }

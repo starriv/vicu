@@ -4,7 +4,7 @@ import RxSwift
 
 @MainActor
 @Observable
-final class AppModel {
+final class AppModel: AssetDetailServicing {
     nonisolated static let searchPlaceholderFallbackSymbol = "AAPL"
 
     var selectedTab: AppTab = .home
@@ -51,6 +51,9 @@ final class AppModel {
     var favoriteMarketAssetBySymbol: [String: AlpacaAsset] = [:]
     var favoriteMarketQuotesBySymbol: [String: MarketActiveSymbol] = [:]
     var cachedMarketOverview: MarketOverview?
+    var isMarketOverviewFromStaleCache = false
+    var pageCacheScopeID: String?
+    var pageCacheRevision = 0
     var isLoadingFavoriteMarketSymbols = false
     var favoriteMarketSymbolsError: String?
     var portfolio = PortfolioState()
@@ -138,5 +141,9 @@ final class AppModel {
 
     var trimmedLogoDevAPIKey: String {
         logoDevAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var preferredLocale: Locale {
+        appLanguage.locale
     }
 }

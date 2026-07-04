@@ -94,8 +94,8 @@ struct URLSessionAPIClient: APIClient {
             throw APIClientError.emptyResponse
         }
 
-        if Response.self == EmptyAPIResponse.self {
-            return EmptyAPIResponse() as! Response
+        if let emptyResponse = EmptyAPIResponse() as? Response {
+            return emptyResponse
         }
 
         do {

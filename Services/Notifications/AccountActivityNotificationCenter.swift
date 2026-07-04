@@ -153,6 +153,7 @@ protocol AppNotifying: Sendable {
     func notify(tradeEvent event: AlpacaTradeEvent, locale: Locale, preferences: AppNotificationPreferences) async
 }
 
+// @unchecked Sendable: mutable state (hasPrepared, responseHandler) mutated only on MainActor
 final class AppNotificationCenter: NSObject, AppNotifying, UNUserNotificationCenterDelegate, @unchecked Sendable {
     static let shared = AppNotificationCenter()
 

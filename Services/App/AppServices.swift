@@ -20,6 +20,7 @@ struct AppServices: Sendable {
     let appNotifier: any AppNotifying
     let credentialStore: any CredentialStore
     let configurationStore: any AppConfigurationStoring
+    let pageCache: any PageCacheStoring
 
     init(
         alpaca: any AlpacaServicing,
@@ -37,7 +38,8 @@ struct AppServices: Sendable {
         credentialStore: any CredentialStore,
         // Default evaluates at call site — opens SQLite and runs migration.
         // Tests should pass MemoryAppConfigurationStore() explicitly to avoid disk I/O.
-        configurationStore: any AppConfigurationStoring = AppConfigurationStoreFactory.live()
+        configurationStore: any AppConfigurationStoring = AppConfigurationStoreFactory.live(),
+        pageCache: any PageCacheStoring = PageCacheStoreFactory.live()
     ) {
         self.alpaca = alpaca
         self.home = home ?? HomeService(alpaca: alpaca)
@@ -53,6 +55,7 @@ struct AppServices: Sendable {
         self.appNotifier = appNotifier
         self.credentialStore = credentialStore
         self.configurationStore = configurationStore
+        self.pageCache = pageCache
     }
 
     static var live: AppServices {

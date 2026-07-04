@@ -11,6 +11,7 @@ struct VicuApp: App {
                 .environment(appModel)
                 .environment(toastCenter)
                 .task {
+                    AppImagePipeline.makeShared()
                     await appModel.bootstrap()
                 }
         }
@@ -94,6 +95,9 @@ private struct RootView: View {
                         switch route {
                         case .asset(let symbol):
                             AssetDetailView(symbol: symbol)
+                                .onAppear {
+                                    finishSearchAssetNavigation(symbol)
+                                }
                         }
                     }
                 }
@@ -156,6 +160,11 @@ private struct RootView: View {
     }
 
     private func activateSearchTab() {
+        guard searchNavigationPath.isEmpty else {
+            isSearchPresented = false
+            return
+        }
+
         isSearchPresented = true
     }
 
@@ -188,6 +197,14 @@ private struct RootView: View {
         }
 
         searchNavigationPath.append(.asset(normalizedSymbol))
+    }
+
+    private func finishSearchAssetNavigation(_ symbol: String) {
+        guard searchNavigationPath.contains(.asset(symbol)) else {
+            return
+        }
+
+        isSearchPresented = false
     }
 }
 

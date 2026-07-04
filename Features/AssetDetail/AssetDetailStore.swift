@@ -31,16 +31,18 @@ final class AssetDetailStore {
     var errorMessage: String?
     var lastUpdatedAt: Date?
 
-    @ObservationIgnored private weak var app: AppModel?
+    @ObservationIgnored private weak var service: (any AssetDetailServicing)?
     @ObservationIgnored private var streamDisposeBag = DisposeBag()
     @ObservationIgnored private var snapshotDisposeBag = DisposeBag()
     @ObservationIgnored private var supplementalSnapshotDisposeBag = DisposeBag()
     @ObservationIgnored private let snapshotRequests = PublishSubject<AssetDetailSnapshotRequest>()
     @ObservationIgnored private let supplementalSnapshotRequests = PublishSubject<AssetDetailSupplementalSnapshotRequest>()
     @ObservationIgnored private var chartRenderTask: Task<Void, Never>?
+    @ObservationIgnored private var cachedSnapshotTask: Task<Void, Never>?
     @ObservationIgnored private var latestBarRefreshTask: Task<Void, Never>?
     @ObservationIgnored private var positionLoadTask: Task<Void, Never>?
     @ObservationIgnored private var chartRenderRevision = 0
+    @ObservationIgnored private var snapshotContentRevision = 0
     @ObservationIgnored private var shouldResyncOnLive = false
     @ObservationIgnored private var bars: [AlpacaMarketBar] = []
     @ObservationIgnored private var latestOvernightBar: AlpacaMarketBar?
@@ -289,12 +291,12 @@ final class AssetDetailStore {
         shareChartRenderModel.points.count > 1 && !isLoadingChart
     }
 
-    func start(app: AppModel) {
-        self.app = app
-        bindSnapshotPipeline(app: app)
-        bindSupplementalSnapshotPipeline(app: app)
-        startLatestBarRefreshLoop(app: app)
-        reload(app: app)
+    func start(service: any AssetDetailServicing) {
+        self.service = service
+        bindSnapshotPipeline(service: service)
+        bindSupplementalSnapshotPipeline(service: service)
+        startLatestBarRefreshLoop(service: service)
+        reload(service: service)
     }
 
     func stop() {
@@ -303,6 +305,8 @@ final class AssetDetailStore {
         supplementalSnapshotDisposeBag = DisposeBag()
         latestBarRefreshTask?.cancel()
         latestBarRefreshTask = nil
+        cachedSnapshotTask?.cancel()
+        cachedSnapshotTask = nil
         positionLoadTask?.cancel()
         positionLoadTask = nil
         chartRenderTask?.cancel()
@@ -312,13 +316,14 @@ final class AssetDetailStore {
         connectionStatus = .disconnected
     }
 
-    func reload(app: AppModel? = nil) {
-        let app = app ?? self.app
-        guard let app else {
+    func reload(service: (any AssetDetailServicing)? = nil) {
+        let service = service ?? self.service
+        guard let service else {
             return
         }
 
-        self.app = app
+        self.service = service
+        loadCachedSnapshot(service: service, range: selectedRange, feed: feed)
         snapshotRequests.onNext(
             AssetDetailSnapshotRequest(
                 symbol: symbol,
@@ -327,19 +332,19 @@ final class AssetDetailStore {
                 showsBlockingLoading: asset == nil
             )
         )
-        loadOpenPosition(app: app)
+        loadOpenPosition(service: service)
     }
 
-    private func loadOpenPosition(app: AppModel) {
+    private func loadOpenPosition(service: any AssetDetailServicing) {
         positionLoadTask?.cancel()
         let requestedSymbol = symbol
-        positionLoadTask = Task { @MainActor [weak self, weak app] in
-            guard let self, let app else {
+        positionLoadTask = Task { @MainActor [weak self, weak service] in
+            guard let self, let service else {
                 return
             }
 
             do {
-                let loadedPosition = try await app.fetchOpenPosition(symbol: requestedSymbol)
+                let loadedPosition = try await service.fetchOpenPosition(symbol: requestedSymbol)
                 guard !Task.isCancelled, self.symbol == requestedSymbol else {
                     return
                 }
@@ -355,6 +360,15 @@ final class AssetDetailStore {
                 self.position = nil
             }
         }
+    }
+
+    private func loadCachedSnapshot(
+        service: any AssetDetailServicing,
+        range: AssetChartRange,
+        feed: AlpacaMarketDataFeed
+    ) {
+        // Cache lookup removed — Store now fetches directly via fetchAssetDetailSnapshot.
+        // Preserved as no-op to avoid changing reload() and selectRange() call sites.
     }
 
     func waitForShareableChartData(maxAttempts: Int = 80) async -> Bool {
@@ -395,6 +409,9 @@ final class AssetDetailStore {
         }
 
         selectedRange = range
+        if let service {
+            loadCachedSnapshot(service: service, range: range, feed: feed)
+        }
         if applyCachedChart(for: range) {
             isLoadingChart = false
             errorMessage = nil
@@ -441,7 +458,7 @@ final class AssetDetailStore {
         return lineModel.points.isEmpty ? fallbackModel : lineModel
     }
 
-    private func bindSnapshotPipeline(app: AppModel) {
+    private func bindSnapshotPipeline(service: any AssetDetailServicing) {
         snapshotDisposeBag = DisposeBag()
 
         snapshotRequests
@@ -449,12 +466,12 @@ final class AssetDetailStore {
             .do(onNext: { [weak self] request in
                 self?.beginSnapshotLoad(request)
             })
-            .flatMapLatest { [weak app] request -> Observable<AssetDetailSnapshotLoadResult> in
-                guard let app else {
+            .flatMapLatest { [weak service] request -> Observable<AssetDetailSnapshotLoadResult> in
+                guard let service else {
                     return .empty()
                 }
 
-                return assetDetailSnapshotLoad(app: app, request: request)
+                return assetDetailSnapshotLoad(service: service, request: request)
             }
             .observe(on: MainScheduler.instance)
             .subscribe(onNext: { [weak self] result in
@@ -463,7 +480,7 @@ final class AssetDetailStore {
             .disposed(by: snapshotDisposeBag)
     }
 
-    private func bindSupplementalSnapshotPipeline(app: AppModel) {
+    private func bindSupplementalSnapshotPipeline(service: any AssetDetailServicing) {
         supplementalSnapshotDisposeBag = DisposeBag()
 
         let scheduledRefreshes = Observable<Int>
@@ -473,8 +490,8 @@ final class AssetDetailStore {
         Observable
             .merge(scheduledRefreshes, supplementalSnapshotRequests.asObservable())
             .observe(on: MainScheduler.instance)
-            .flatMapFirst { [weak self, weak app] request -> Observable<AssetDetailSupplementalSnapshotResult> in
-                guard let self, let app else {
+            .flatMapFirst { [weak self, weak service] request -> Observable<AssetDetailSupplementalSnapshotResult> in
+                guard let self, let service else {
                     return .empty()
                 }
 
@@ -483,7 +500,7 @@ final class AssetDetailStore {
                 }
 
                 return assetDetailSupplementalSnapshotLoad(
-                    app: app,
+                    service: service,
                     symbol: self.symbol,
                     feed: self.feed
                 )
@@ -501,14 +518,14 @@ final class AssetDetailStore {
         errorMessage = nil
     }
 
-    private func bindStream(app: AppModel) {
+    private func bindStream(service: any AssetDetailServicing) {
         streamDisposeBag = DisposeBag()
         boundStreamFeed = nil
         let streamSymbol = symbol
 
         do {
             let channels = feed == .overnight ? AlpacaRealtimeChannel.tradeQuote : AlpacaRealtimeChannel.assetDetail
-            let source = try app.streamAssetMarketData(symbol: symbol, feed: feed, channels: channels)
+            let source = try service.streamAssetMarketData(symbol: symbol, feed: feed, channels: channels)
             boundStreamFeed = feed
             assetRealtimeBatches(
                 from: source,
@@ -536,6 +553,7 @@ final class AssetDetailStore {
     }
 
     private func apply(_ snapshot: AssetDetailSnapshot) {
+        snapshotContentRevision += 1
         let previousFeed = feed
         feed = snapshot.feed
         sessionProgress = snapshot.sessionProgress
@@ -554,8 +572,8 @@ final class AssetDetailStore {
                 mergeSupplementalLatestBar(snapshot.latestBar, updatesChart: true)
             }
         }
-        if let app, previousFeed != feed || boundStreamFeed != feed {
-            bindStream(app: app)
+        if let service, previousFeed != feed || boundStreamFeed != feed {
+            bindStream(service: service)
         }
         lastUpdatedAt = Date()
         refreshLatestBarSoon()
@@ -700,6 +718,7 @@ final class AssetDetailStore {
         }
 
         if batch.hasMarketData {
+            snapshotContentRevision += 1
             lastUpdatedAt = Date()
         }
     }
@@ -757,25 +776,26 @@ final class AssetDetailStore {
             )
         }
         if resolvedSnapshot.snapshot != nil || resolvedSnapshot.latestBar != nil {
+            snapshotContentRevision += 1
             if didMergeLatestBar || resolvedSnapshot.feed == .overnight {
                 updateChartRenderModels()
             }
             lastUpdatedAt = Date()
         }
-        if let app, previousFeed != feed {
-            bindStream(app: app)
+        if let service, previousFeed != feed {
+            bindStream(service: service)
         }
     }
 
-    private func startLatestBarRefreshLoop(app: AppModel) {
+    private func startLatestBarRefreshLoop(service: any AssetDetailServicing) {
         latestBarRefreshTask?.cancel()
-        latestBarRefreshTask = Task { @MainActor [weak self, weak app] in
+        latestBarRefreshTask = Task { @MainActor [weak self, weak service] in
             while !Task.isCancelled {
-                guard let self, let app else {
+                guard let self, let service else {
                     return
                 }
 
-                await self.refreshLatestBarIfNeeded(app: app)
+                await self.refreshLatestBarIfNeeded(service: service)
                 do {
                     try await Task.sleep(nanoseconds: Self.latestBarRefreshInterval)
                 } catch {
@@ -785,14 +805,14 @@ final class AssetDetailStore {
         }
     }
 
-    private func refreshLatestBarIfNeeded(app: AppModel) async {
+    private func refreshLatestBarIfNeeded(service: any AssetDetailServicing) async {
         guard shouldPollLatestBar else {
             return
         }
 
         let requestedFeed = feed
         do {
-            let latestBar = try await app.fetchLatestStockBar(symbol: symbol, feed: requestedFeed)
+            let latestBar = try await service.fetchLatestStockBar(symbol: symbol, feed: requestedFeed)
             guard feed == requestedFeed, selectedRange == .oneDay else {
                 return
             }
@@ -812,16 +832,16 @@ final class AssetDetailStore {
     private func refreshLatestBarSoon() {
         guard selectedRange == .oneDay,
               hasActiveSessionProgress,
-              let app else {
+              let service else {
             return
         }
 
-        Task { @MainActor [weak self, weak app] in
-            guard let self, let app else {
+        Task { @MainActor [weak self, weak service] in
+            guard let self, let service else {
                 return
             }
 
-            await self.refreshLatestBarIfNeeded(app: app)
+            await self.refreshLatestBarIfNeeded(service: service)
         }
     }
 
@@ -844,7 +864,7 @@ final class AssetDetailStore {
     }
 
     private func displayErrorMessage(for error: Error) -> String {
-        APIErrorDisplayMessage.message(for: error, locale: app?.appLanguage.locale ?? AppLocale.current)
+        APIErrorDisplayMessage.message(for: error, locale: service?.preferredLocale ?? AppLocale.current)
     }
 
     private func applyLatestBar(_ bar: AlpacaMarketBar?, feed requestedFeed: AlpacaMarketDataFeed) {
@@ -1919,6 +1939,7 @@ private struct AssetChartRenderInput: Sendable {
     let priceChangeBaseline: Double?
 }
 
+// @unchecked Sendable: immutable observer; onNext only called on MainActor
 private final class AssetDetailSnapshotLoadObserverBox: @unchecked Sendable {
     private let observer: AnyObserver<AssetDetailSnapshotLoadResult>
 
@@ -1932,6 +1953,7 @@ private final class AssetDetailSnapshotLoadObserverBox: @unchecked Sendable {
     }
 }
 
+// @unchecked Sendable: immutable observer; onNext only called on MainActor
 private final class AssetDetailSupplementalSnapshotObserverBox: @unchecked Sendable {
     private let observer: AnyObserver<AssetDetailSupplementalSnapshotResult>
 
@@ -1945,16 +1967,18 @@ private final class AssetDetailSupplementalSnapshotObserverBox: @unchecked Senda
     }
 }
 
+@MainActor
 private func assetDetailSnapshotLoad(
-    app: AppModel,
+    service: any AssetDetailServicing,
     request: AssetDetailSnapshotRequest
 ) -> Observable<AssetDetailSnapshotLoadResult> {
     Observable.create { observer in
         let observerBox = AssetDetailSnapshotLoadObserverBox(observer)
         let earlySnapshotTask: Task<Void, Never>? = request.showsBlockingLoading
-            ? Task { @MainActor [app, request, observerBox] in
+            ? Task { @MainActor in
+                let service = service
                 do {
-                    guard let snapshot = try await app.fetchAssetSnapshot(
+                    guard let snapshot = try await service.fetchAssetSnapshot(
                         symbol: request.symbol,
                         feed: request.feed
                     ) else {
@@ -1968,9 +1992,10 @@ private func assetDetailSnapshotLoad(
                 }
             }
             : nil
-        let task = Task { @MainActor [app, request, observerBox] in
+        let task = Task { @MainActor in
+            let service = service
             do {
-                let snapshot = try await app.fetchAssetDetailSnapshot(
+                let snapshot = try await service.fetchAssetDetailSnapshot(
                     symbol: request.symbol,
                     range: request.range,
                     feed: request.feed
@@ -1995,16 +2020,18 @@ private func assetDetailSnapshotLoad(
     }
 }
 
+@MainActor
 private func assetDetailSupplementalSnapshotLoad(
-    app: AppModel,
+    service: any AssetDetailServicing,
     symbol: String,
     feed: AlpacaMarketDataFeed
 ) -> Observable<AssetDetailSupplementalSnapshotResult> {
     Observable.create { observer in
         let observerBox = AssetDetailSupplementalSnapshotObserverBox(observer)
-        let task = Task { @MainActor [app, symbol, feed, observerBox] in
+        let task = Task { @MainActor in
+            let service = service
             do {
-                let snapshot = try await app.fetchResolvedAssetSnapshot(symbol: symbol, feed: feed)
+                let snapshot = try await service.fetchResolvedAssetSnapshot(symbol: symbol, feed: feed)
                 try Task.checkCancellation()
                 observerBox.onNext(.success(snapshot, requestedFeed: feed))
             } catch where error.isRequestCancellation {

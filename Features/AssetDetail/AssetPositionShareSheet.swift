@@ -410,7 +410,7 @@ private struct AssetPositionShareCardStyle {
     }
 }
 
-private struct AssetPositionSharePerformance {
+struct AssetPositionSharePerformance {
     let amount: Double?
     let percent: Double?
 
@@ -425,6 +425,33 @@ private struct AssetPositionSharePerformance {
             ?? calculatedIntradayPercent(position: position)
 
         return AssetPositionSharePerformance(amount: amount, percent: percent)
+    }
+
+    static func unrealized(position: AlpacaPosition) -> AssetPositionSharePerformance {
+        let amount = NumberParser.double(from: position.unrealizedPL)
+            ?? calculatedUnrealizedAmount(position: position)
+        let percent = NumberParser.double(from: position.unrealizedPLPC)
+            ?? calculatedUnrealizedPercent(position: position)
+
+        return AssetPositionSharePerformance(amount: amount, percent: percent)
+    }
+
+    private static func calculatedUnrealizedAmount(position: AlpacaPosition) -> Double? {
+        let marketValue = NumberParser.double(from: position.marketValue)
+        let costBasis = NumberParser.double(from: position.costBasis)
+        guard let marketValue, let costBasis else {
+            return nil
+        }
+        return marketValue - costBasis
+    }
+
+    private static func calculatedUnrealizedPercent(position: AlpacaPosition) -> Double? {
+        guard let costBasis = NumberParser.double(from: position.costBasis),
+              costBasis != 0,
+              let amount = calculatedUnrealizedAmount(position: position) else {
+            return nil
+        }
+        return amount / costBasis
     }
 
     private static func calculatedIntradayAmount(position: AlpacaPosition) -> Double? {

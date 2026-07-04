@@ -1,3 +1,4 @@
+import NukeUI
 import SwiftUI
 
 struct SymbolLogoView: View {
@@ -10,15 +11,14 @@ struct SymbolLogoView: View {
     var body: some View {
         Group {
             if shouldUseLogoDev {
-                AsyncImage(url: logoURL) { phase in
-                    switch phase {
-                    case .success(let image):
+                LazyImage(url: logoURL) { state in
+                    if let image = state.image {
                         logoContainer {
                             image
                                 .resizable()
                                 .scaledToFill()
                         }
-                    default:
+                    } else {
                         generatedBadge
                     }
                 }

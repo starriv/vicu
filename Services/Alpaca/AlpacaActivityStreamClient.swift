@@ -16,6 +16,7 @@ protocol AlpacaTradeEventStreaming: Sendable {
     ) -> Observable<AlpacaTradeEvent>
 }
 
+// @unchecked Sendable: immutable after init (session, activityPath are let); no mutable state
 final class AlpacaActivityStreamClient: AlpacaActivityStreaming, @unchecked Sendable {
     static let shared = AlpacaActivityStreamClient()
 
@@ -195,6 +196,7 @@ final class AlpacaActivityStreamClient: AlpacaActivityStreaming, @unchecked Send
     }
 }
 
+// @unchecked Sendable: immutable after init (session, tradeEventPath are let); no mutable state
 final class AlpacaTradeEventStreamClient: AlpacaTradeEventStreaming, @unchecked Sendable {
     static let shared = AlpacaTradeEventStreamClient()
 
@@ -374,6 +376,7 @@ final class AlpacaTradeEventStreamClient: AlpacaTradeEventStreaming, @unchecked 
     }
 }
 
+// @unchecked Sendable: immutable observer captured in let; no mutable state
 private final class AlpacaActivityEventObserver: @unchecked Sendable {
     private let observer: AnyObserver<AlpacaActivityEvent>
 
@@ -394,6 +397,7 @@ private final class AlpacaActivityEventObserver: @unchecked Sendable {
     }
 }
 
+// @unchecked Sendable: immutable observer captured in let; no mutable state
 private final class AlpacaTradeEventObserver: @unchecked Sendable {
     private let observer: AnyObserver<AlpacaTradeEvent>
 

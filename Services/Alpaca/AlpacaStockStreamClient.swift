@@ -18,6 +18,7 @@ extension AlpacaStockStreaming {
     }
 }
 
+// @unchecked Sendable: streamSessions dict guarded by NSLock
 final class AlpacaStockStreamClient: AlpacaStockStreaming, @unchecked Sendable {
     static let shared = AlpacaStockStreamClient()
 
@@ -129,6 +130,7 @@ private struct AlpacaStreamSubscriptionKey: Hashable {
     let channel: AlpacaRealtimeChannel
 }
 
+// @unchecked Sendable: all mutable state (observers, task, webSocket) guarded by NSLock
 private final class SharedAlpacaStockStreamSession: @unchecked Sendable {
     private static let logger = Logger(subsystem: "com.starriv.vicu", category: "AlpacaStockStream")
     private static let reconnectPolicy = NetworkRetryPolicy.realtimeStream

@@ -7,6 +7,7 @@ enum RxPollingEvent<Value> {
     case failure(Error)
 }
 
+// @unchecked Sendable: immutable observer; onNext only called on MainActor
 private final class RxPollingObserverBox<Value: Sendable>: @unchecked Sendable {
     private let observer: AnyObserver<RxPollingEvent<Value>>
 

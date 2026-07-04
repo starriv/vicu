@@ -49,9 +49,6 @@ struct AppInfiniteScrollView<LoadMoreTrigger: Equatable, Content: View, LoadingF
                 if canLoadMore {
                     loadingFooter
                         .frame(maxWidth: .infinity)
-                        .onAppear {
-                            Task { await loadMoreIfNeeded() }
-                        }
                         .task(id: loadMoreTrigger) {
                             await loadMoreIfNeeded()
                         }
