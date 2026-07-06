@@ -617,10 +617,10 @@ extension AppModel {
         let startedAt = Date()
         Self.debugMarketSearchLatency("start", query: normalizedQuery, startedAt: startedAt)
         let cacheKey = SearchResultCacheKey(query: normalizedQuery.uppercased(), limit: limit)
-        let cachedEntry = searchResultCache[cacheKey]
+        let cachedEntry = searchCache.resultCache[cacheKey]
         let cachedResults = cachedEntry?.value
-        if let cachedEntry = searchResultCache[cacheKey],
-           Date().timeIntervalSince(cachedEntry.cachedAt) < searchResultCacheTTL {
+        if let cachedEntry = searchCache.resultCache[cacheKey],
+           Date().timeIntervalSince(cachedEntry.cachedAt) < searchCache.resultCacheTTL {
             Self.debugMarketSearchLatency(
                 "cache.fresh",
                 query: normalizedQuery,
@@ -662,7 +662,7 @@ extension AppModel {
         let symbols = matchedAssets.map(\.symbol)
 
         guard !symbols.isEmpty else {
-            searchResultCache[cacheKey] = TimedCacheEntry(value: [], cachedAt: Date())
+            searchCache.resultCache[cacheKey] = TimedCacheEntry(value: [], cachedAt: Date())
             emit(.enriched(normalizedQuery, []))
             return
         }
@@ -698,7 +698,7 @@ extension AppModel {
                 quote: quotesBySymbol[normalizedSymbol] ?? cachedQuotesBySymbol[normalizedSymbol]
             )
         }
-        searchResultCache[cacheKey] = TimedCacheEntry(value: results, cachedAt: Date())
+        searchCache.resultCache[cacheKey] = TimedCacheEntry(value: results, cachedAt: Date())
         Self.debugMarketSearchLatency(
             "enriched.done",
             query: normalizedQuery,
@@ -713,17 +713,17 @@ extension AppModel {
             throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
         }
 
-        if let searchPopularSymbolsCache = searchPopularSymbolsCache[sort],
-           let searchPopularSymbolsCacheDate = searchPopularSymbolsCacheDate[sort],
-           Date().timeIntervalSince(searchPopularSymbolsCacheDate) < searchPopularSymbolsCacheTTL {
+        if let searchPopularSymbolsCache = searchCache.popularSymbolsCache[sort],
+           let searchPopularSymbolsCacheDate = searchCache.popularSymbolsCacheDate[sort],
+           Date().timeIntervalSince(searchPopularSymbolsCacheDate) < searchCache.popularSymbolsCacheTTL {
             return Array(searchPopularSymbolsCache.prefix(limit))
         }
 
         let rankedSymbols = try await services.markets.fetchMostActiveMarketSymbols(top: limit, sort: sort, credentials: credentials)
         let symbols = Self.normalizedMarketSymbols(rankedSymbols.map(\.symbol))
         guard !symbols.isEmpty else {
-            searchPopularSymbolsCache[sort] = []
-            searchPopularSymbolsCacheDate[sort] = Date()
+            searchCache.popularSymbolsCache[sort] = []
+            searchCache.popularSymbolsCacheDate[sort] = Date()
             return []
         }
 
@@ -756,8 +756,8 @@ extension AppModel {
             )
         }
 
-        searchPopularSymbolsCache[sort] = popularSymbols
-        searchPopularSymbolsCacheDate[sort] = Date()
+        searchCache.popularSymbolsCache[sort] = popularSymbols
+        searchCache.popularSymbolsCacheDate[sort] = Date()
         return popularSymbols
     }
 
@@ -905,9 +905,9 @@ extension AppModel {
         marketAssetCacheDate = nil
         watchlistAssetCache = nil
         watchlistAssetCacheDate = nil
-        searchPopularSymbolsCache = [:]
-        searchPopularSymbolsCacheDate = [:]
-        searchResultCache = [:]
+        searchCache.popularSymbolsCache = [:]
+        searchCache.popularSymbolsCacheDate = [:]
+        searchCache.resultCache = [:]
         newsPageCache = [:]
         optionCache.chainPageCache = [:]
         optionCache.expirationCache = [:]

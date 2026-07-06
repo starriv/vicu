@@ -71,11 +71,7 @@ final class AppModel: AssetDetailServicing {
     @ObservationIgnored var favoritesWatchlist: AlpacaWatchlist?
     @ObservationIgnored let marketAssetCacheTTL: TimeInterval = 60 * 60
     @ObservationIgnored let watchlistAssetCacheTTL: TimeInterval = 60 * 60
-    @ObservationIgnored var searchPopularSymbolsCache: [MarketMostActiveSort: [MarketActiveSymbol]] = [:]
-    @ObservationIgnored var searchPopularSymbolsCacheDate: [MarketMostActiveSort: Date] = [:]
-    @ObservationIgnored let searchPopularSymbolsCacheTTL: TimeInterval = 60
-    @ObservationIgnored var searchResultCache: [SearchResultCacheKey: TimedCacheEntry<[MarketSearchResult]>] = [:]
-    @ObservationIgnored let searchResultCacheTTL: TimeInterval = 20
+    @ObservationIgnored let searchCache = SearchDataCache()
     @ObservationIgnored var newsPageCache: [NewsPageCacheKey: TimedCacheEntry<AlpacaNewsPage>] = [:]
     @ObservationIgnored let newsPageCacheTTL: TimeInterval = 45
     @ObservationIgnored let optionCache = OptionDataCache()

@@ -35,6 +35,7 @@
 		0A0000000000000000000120 /* Resources/Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000220 /* Resources/Assets.xcassets */; };
 		0A0000000000000000000121 /* DesignSystem/AppTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000221 /* DesignSystem/AppTypography.swift */; };
 		0A0F70000000000000000101 /* Models/Caching/OptionDataCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F70000000000000000201 /* Models/Caching/OptionDataCache.swift */; };
+		0A0F70000000000000000102 /* Models/Caching/SearchDataCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F70000000000000000202 /* Models/Caching/SearchDataCache.swift */; };
 		0A0000000000000000000122 /* DesignSystem/AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000222 /* DesignSystem/AppTheme.swift */; };
 		0A0000000000000000000123 /* DesignSystem/Components/AppSectionHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000223 /* DesignSystem/Components/AppSectionHeader.swift */; };
 		0A0000000000000000000124 /* DesignSystem/Components/AppMetricRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000224 /* DesignSystem/Components/AppMetricRow.swift */; };
@@ -228,6 +229,7 @@
 		0A0000000000000000000220 /* Resources/Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Resources/Assets.xcassets; sourceTree = "<group>"; };
 		0A0000000000000000000221 /* DesignSystem/AppTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/AppTypography.swift; sourceTree = "<group>"; };
 		0A0F70000000000000000201 /* Models/Caching/OptionDataCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/Caching/OptionDataCache.swift; sourceTree = "<group>"; };
+		0A0F70000000000000000202 /* Models/Caching/SearchDataCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/Caching/SearchDataCache.swift; sourceTree = "<group>"; };
 		0A0000000000000000000222 /* DesignSystem/AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/AppTheme.swift; sourceTree = "<group>"; };
 		0A0000000000000000000223 /* DesignSystem/Components/AppSectionHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppSectionHeader.swift; sourceTree = "<group>"; };
 		0A0000000000000000000224 /* DesignSystem/Components/AppMetricRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppMetricRow.swift; sourceTree = "<group>"; };
@@ -495,6 +497,7 @@
 				0A0000000000000000000246 /* Shared/Layouts/BasicLayout.swift */,
 				0A0000000000000000000221 /* DesignSystem/AppTypography.swift */,
 				0A0F70000000000000000201 /* Models/Caching/OptionDataCache.swift */,
+				0A0F70000000000000000202 /* Models/Caching/SearchDataCache.swift */,
 				0A0000000000000000000222 /* DesignSystem/AppTheme.swift */,
 				0A0000000000000000000250 /* DesignSystem/AppIcon.swift */,
 				0A0F60000000000000000201 /* DesignSystem/AppImagePipeline.swift */,
@@ -843,6 +846,7 @@
 				0A00000000000000000001C1 /* Shared/Utilities/ErrorCancellation.swift in Sources */,
 				0A0000000000000000000121 /* DesignSystem/AppTypography.swift in Sources */,
 				0A0F70000000000000000101 /* Models/Caching/OptionDataCache.swift in Sources */,
+				0A0F70000000000000000102 /* Models/Caching/SearchDataCache.swift in Sources */,
 				0A0000000000000000000122 /* DesignSystem/AppTheme.swift in Sources */,
 				0A0000000000000000000150 /* DesignSystem/AppIcon.swift in Sources */,
 				0A0F60000000000000000101 /* DesignSystem/AppImagePipeline.swift in Sources */,
