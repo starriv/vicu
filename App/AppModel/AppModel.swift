@@ -64,13 +64,8 @@ final class AppModel: AssetDetailServicing {
     @ObservationIgnored let services: AppServices
     @ObservationIgnored var credentials: AlpacaCredentials?
     @ObservationIgnored var verifiedCredentialFingerprint: String?
-    @ObservationIgnored var marketAssetCache: [AlpacaAsset]?
-    @ObservationIgnored var marketAssetCacheDate: Date?
-    @ObservationIgnored var watchlistAssetCache: [AlpacaAsset]?
-    @ObservationIgnored var watchlistAssetCacheDate: Date?
     @ObservationIgnored var favoritesWatchlist: AlpacaWatchlist?
-    @ObservationIgnored let marketAssetCacheTTL: TimeInterval = 60 * 60
-    @ObservationIgnored let watchlistAssetCacheTTL: TimeInterval = 60 * 60
+    @ObservationIgnored let assetCache = MarketAssetCache()
     @ObservationIgnored let searchCache = SearchDataCache()
     @ObservationIgnored var newsPageCache: [NewsPageCacheKey: TimedCacheEntry<AlpacaNewsPage>] = [:]
     @ObservationIgnored let newsPageCacheTTL: TimeInterval = 45

@@ -168,10 +168,10 @@ extension AppModel {
     }
 
     private func watchlistAssets(credentials: AlpacaCredentials) async throws -> [AlpacaAsset] {
-        if let watchlistAssetCache,
-           let watchlistAssetCacheDate,
-           Date().timeIntervalSince(watchlistAssetCacheDate) < watchlistAssetCacheTTL {
-            return watchlistAssetCache
+        if let cached = assetCache.watchlistAssets,
+           let cacheDate = assetCache.watchlistAssetsDate,
+           Date().timeIntervalSince(cacheDate) < assetCache.watchlistAssetsTTL {
+            return cached
         }
 
         let fetchedAssets = try await services.watchlists.fetchAssets(assetClass: nil, credentials: credentials)
@@ -180,8 +180,8 @@ extension AppModel {
                 && asset.status?.lowercased() == "active"
         }
 
-        watchlistAssetCache = assets
-        watchlistAssetCacheDate = Date()
+        assetCache.watchlistAssets = assets
+        assetCache.watchlistAssetsDate = Date()
         return assets
     }
 

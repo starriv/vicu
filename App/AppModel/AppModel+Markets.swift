@@ -776,10 +776,10 @@ extension AppModel {
     }
 
     private func marketAssets(credentials: AlpacaCredentials) async throws -> [AlpacaAsset] {
-        if let marketAssetCache,
-           let marketAssetCacheDate,
-           Date().timeIntervalSince(marketAssetCacheDate) < marketAssetCacheTTL {
-            return marketAssetCache
+        if let cached = assetCache.marketAssets,
+           let cacheDate = assetCache.marketAssetsDate,
+           Date().timeIntervalSince(cacheDate) < assetCache.marketAssetsTTL {
+            return cached
         }
 
         let fetchedAssets = try await services.markets.fetchMarketAssets(credentials: credentials)
@@ -787,8 +787,8 @@ extension AppModel {
             asset.symbol.isEmpty == false && asset.status?.lowercased() == "active"
         }
 
-        marketAssetCache = assets
-        marketAssetCacheDate = Date()
+        assetCache.marketAssets = assets
+        assetCache.marketAssetsDate = Date()
         return assets
     }
 
@@ -901,10 +901,10 @@ extension AppModel {
     }
 
     func resetMarketSearchCaches() {
-        marketAssetCache = nil
-        marketAssetCacheDate = nil
-        watchlistAssetCache = nil
-        watchlistAssetCacheDate = nil
+        assetCache.marketAssets = nil
+        assetCache.marketAssetsDate = nil
+        assetCache.watchlistAssets = nil
+        assetCache.watchlistAssetsDate = nil
         searchCache.popularSymbolsCache = [:]
         searchCache.popularSymbolsCacheDate = [:]
         searchCache.resultCache = [:]
