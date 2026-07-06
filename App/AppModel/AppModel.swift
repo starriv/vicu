@@ -70,16 +70,7 @@ final class AppModel: AssetDetailServicing {
     @ObservationIgnored let newsCache = NewsDataCache()
     @ObservationIgnored let optionCache = OptionDataCache()
     @ObservationIgnored var credentialOperationGeneration = 0
-    @ObservationIgnored var activityStreamDisposable: Disposable?
-    @ObservationIgnored var activityStreamCredentials: AlpacaCredentials?
-    @ObservationIgnored var recentActivityRefIDs = Set<String>()
-    @ObservationIgnored var recentActivityRefIDOrder: [String] = []
-    @ObservationIgnored let recentActivityRefLimit = 50
-    @ObservationIgnored var tradeEventStreamDisposable: Disposable?
-    @ObservationIgnored var tradeEventStreamCredentials: AlpacaCredentials?
-    @ObservationIgnored var recentTradeEventIDs = Set<String>()
-    @ObservationIgnored var recentTradeEventIDOrder: [String] = []
-    @ObservationIgnored let recentTradeEventLimit = 100
+    @ObservationIgnored lazy var realtimeCoordinator: RealtimeEventCoordinator = RealtimeEventCoordinator(app: self)
 
     init(services: AppServices = .live) {
         self.services = services

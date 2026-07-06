@@ -271,10 +271,7 @@ extension AppModel {
     private func setCredentials(_ newCredentials: AlpacaCredentials?) {
         if credentials != newCredentials {
             stopAccountEventListeners()
-            recentActivityRefIDs.removeAll()
-            recentActivityRefIDOrder.removeAll()
-            recentTradeEventIDs.removeAll()
-            recentTradeEventIDOrder.removeAll()
+            realtimeCoordinator.clearDeduplicationState()
             resetMarketSearchCaches()
         }
 
