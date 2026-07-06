@@ -67,8 +67,7 @@ final class AppModel: AssetDetailServicing {
     @ObservationIgnored var favoritesWatchlist: AlpacaWatchlist?
     @ObservationIgnored let assetCache = MarketAssetCache()
     @ObservationIgnored let searchCache = SearchDataCache()
-    @ObservationIgnored var newsPageCache: [NewsPageCacheKey: TimedCacheEntry<AlpacaNewsPage>] = [:]
-    @ObservationIgnored let newsPageCacheTTL: TimeInterval = 45
+    @ObservationIgnored let newsCache = NewsDataCache()
     @ObservationIgnored let optionCache = OptionDataCache()
     @ObservationIgnored var credentialOperationGeneration = 0
     @ObservationIgnored var activityStreamDisposable: Disposable?

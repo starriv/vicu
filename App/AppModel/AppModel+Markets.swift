@@ -491,8 +491,8 @@ extension AppModel {
         )
 
         if !forceReload,
-           let cachedEntry = newsPageCache[cacheKey],
-           Date().timeIntervalSince(cachedEntry.cachedAt) < newsPageCacheTTL {
+           let cachedEntry = newsCache.pageCache[cacheKey],
+           Date().timeIntervalSince(cachedEntry.cachedAt) < newsCache.pageCacheTTL {
             return cachedEntry.value
         }
 
@@ -504,7 +504,7 @@ extension AppModel {
             pageToken: pageToken,
             credentials: credentials
         )
-        newsPageCache[cacheKey] = TimedCacheEntry(value: page, cachedAt: Date())
+        newsCache.pageCache[cacheKey] = TimedCacheEntry(value: page, cachedAt: Date())
         return page
     }
 
@@ -908,7 +908,7 @@ extension AppModel {
         searchCache.popularSymbolsCache = [:]
         searchCache.popularSymbolsCacheDate = [:]
         searchCache.resultCache = [:]
-        newsPageCache = [:]
+        newsCache.pageCache = [:]
         optionCache.chainPageCache = [:]
         optionCache.expirationCache = [:]
         optionCache.snapshotCache = [:]
