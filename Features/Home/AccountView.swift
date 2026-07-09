@@ -20,15 +20,11 @@ struct AccountView: View {
 
     @ViewBuilder
     private var content: some View {
-        if app.environment == .paper {
-            AccountPaperTradingBanner()
-        }
-
         if isLoading && account == nil {
             ProgressView(L10n.AccountDetail.loading)
                 .frame(maxWidth: .infinity, minHeight: 280)
         } else if let account {
-            AccountHeader(account: account)
+            AccountHeader(account: account, isPaperTrading: app.environment == .paper)
             AccountActivityLink()
 
             ForEach(AccountSectionModel.sections(for: account)) { section in
@@ -71,41 +67,11 @@ struct AccountView: View {
     }
 }
 
-private struct AccountPaperTradingBanner: View {
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: AppIcon.Portfolio.warning)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(AppTheme.ColorToken.warning)
-                .frame(width: 28, height: 28)
-                .background(AppTheme.ColorToken.warning.opacity(0.14), in: Circle())
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text(L10n.AccountDetail.paperBannerTitle)
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(.primary)
-
-                Text(L10n.AccountDetail.paperBannerMessage)
-                    .font(AppTypography.detail)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(AppTheme.ColorToken.warning.opacity(0.10), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(AppTheme.ColorToken.warning.opacity(0.24), lineWidth: 1)
-        }
-        .accessibilityElement(children: .combine)
-    }
-}
-
 private struct AccountHeader: View {
     let account: AlpacaAccount
+    let isPaperTrading: Bool
+
+    @State private var isPaperTipPresented = false
 
     var body: some View {
         HStack(spacing: 14) {
@@ -119,6 +85,11 @@ private struct AccountHeader: View {
 
                 HStack(spacing: 8) {
                     AccountStatusPill(text: account.status)
+
+                    if isPaperTrading {
+                        AccountPaperTradingPill(isPresented: $isPaperTipPresented)
+                    }
+
                     Text(AccountDetailFormatter.currency(account.currency))
                         .font(AppTypography.caption.monospacedDigit().weight(.medium))
                         .foregroundStyle(.secondary)
@@ -130,6 +101,54 @@ private struct AccountHeader: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 14)
         .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+}
+
+private struct AccountPaperTradingPill: View {
+    @Binding var isPresented: Bool
+
+    var body: some View {
+        Button {
+            isPresented.toggle()
+        } label: {
+            HStack(spacing: 4) {
+                Text(L10n.AccountDetail.paperBadge)
+
+                Image(systemName: "info.circle.fill")
+                    .font(.system(size: 10, weight: .bold))
+                    .accessibilityHidden(true)
+            }
+            .font(AppTypography.caption.weight(.bold))
+            .foregroundStyle(AppTheme.ColorToken.brandForeground)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(AppTheme.ColorToken.brand.opacity(0.42), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $isPresented, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+            AccountPaperTradingTooltip()
+                .presentationCompactAdaptation(.popover)
+        }
+        .accessibilityLabel(L10n.AccountDetail.paperBadge)
+        .accessibilityHint(L10n.AccountDetail.paperBannerMessage)
+    }
+}
+
+private struct AccountPaperTradingTooltip: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(L10n.AccountDetail.paperBadge)
+                .font(.headline)
+                .foregroundStyle(.primary)
+
+            Text(L10n.AccountDetail.paperBannerMessage)
+                .font(AppTypography.detail)
+                .foregroundStyle(.secondary)
+                .lineSpacing(AppTypography.secondaryLineSpacing)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(14)
+        .frame(width: 260, alignment: .leading)
     }
 }
 

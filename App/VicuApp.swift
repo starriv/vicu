@@ -111,10 +111,9 @@ private struct RootView: View {
                 }
             }
         }
-        .tabBarMinimizeOnScrollIfAvailable()
         .task {
-            await refreshSearchPlaceholderSymbol()
             if app.selectedTab == .search {
+                await refreshSearchPlaceholderSymbol()
                 activateSearchTab()
             }
             openPendingOrderDetail(app.pendingOrderDetailRequest)
@@ -214,17 +213,6 @@ private enum SearchRoute: Hashable {
 
 private enum OrdersRoute: Hashable {
     case orderDetail(OrderDetailNavigationRequest)
-}
-
-private extension View {
-    @ViewBuilder
-    func tabBarMinimizeOnScrollIfAvailable() -> some View {
-        if #available(iOS 26.0, *) {
-            tabBarMinimizeBehavior(.onScrollDown)
-        } else {
-            self
-        }
-    }
 }
 
 private struct CredentialBootstrapView: View {

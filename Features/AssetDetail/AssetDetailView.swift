@@ -677,19 +677,43 @@ private struct AssetAboutPanel: View {
     let store: AssetDetailStore
     let showOptions: () -> Void
 
+    @State private var showsCapabilitiesSheet = false
+    @State private var opensOptionsAfterCapabilitiesSheet = false
+
     var body: some View {
         AssetDetailSection(title: "About") {
-            VStack(alignment: .leading, spacing: 14) {
-                VStack(spacing: 0) {
-                    AssetInfoRow(title: "Name", value: store.displayName)
-                    AssetInfoRow(title: "Exchange", value: store.exchangeText)
-                    AssetInfoRow(title: "Type", value: AssetDetailText.assetClass(store.asset?.assetClass))
-                    AssetInfoRow(title: "Status", value: AssetDetailText.status(store.asset?.status))
+            VStack(spacing: 0) {
+                AssetInfoRow(title: "Name", value: store.displayName)
+                AssetInfoRow(title: "Exchange", value: store.exchangeText)
+                AssetInfoRow(title: "Type", value: AssetDetailText.assetClass(store.asset?.assetClass))
+                AssetInfoRow(title: "Status", value: AssetDetailText.status(store.asset?.status))
+                AssetCapabilitiesEntryRow(asset: store.asset) {
+                    showsCapabilitiesSheet = true
                 }
-
-                AssetCapabilitiesDisclosure(asset: store.asset, showOptions: showOptions)
             }
         }
+        .sheet(isPresented: $showsCapabilitiesSheet, onDismiss: openQueuedOptionsSheet) {
+            AssetCapabilitiesSheet(
+                asset: store.asset,
+                openOptions: queueOptionsSheet
+            )
+            .presentationDetents([.height(520), .large])
+            .presentationDragIndicator(.visible)
+        }
+    }
+
+    private func queueOptionsSheet() {
+        opensOptionsAfterCapabilitiesSheet = true
+        showsCapabilitiesSheet = false
+    }
+
+    private func openQueuedOptionsSheet() {
+        guard opensOptionsAfterCapabilitiesSheet else {
+            return
+        }
+
+        opensOptionsAfterCapabilitiesSheet = false
+        showOptions()
     }
 }
 
@@ -930,204 +954,219 @@ struct AssetMetricTile: View {
     }
 }
 
-private struct AssetCapabilitiesDisclosure: View {
+private struct AssetCapabilitiesEntryRow: View {
     let asset: AlpacaAsset?
-    let showOptions: () -> Void
-    @State private var isExpanded = false
+    let action: () -> Void
 
     private var enabledCount: Int {
-        [
-            asset?.tradable == true,
-            asset?.fractionable == true,
-            asset?.hasAttribute("has_options") == true,
-            asset?.hasAttribute("fractional_eh_enabled") == true,
-            asset?.hasAttribute("overnight_tradable") == true,
-            asset?.marginable == true,
-            asset?.shortable == true,
-            asset?.easyToBorrow == true
-        ].filter { $0 }.count
+        AssetCapabilityItem.items(for: asset).filter(\.isEnabled).count
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Button {
-                withAnimation(.snappy(duration: 0.22)) {
-                    isExpanded.toggle()
-                }
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "checklist")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(AppTheme.ColorToken.brand)
-                        .frame(width: 28, height: 28)
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: "checklist")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(AppTheme.ColorToken.brand)
+                    .frame(width: 24, height: 24)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Trading capabilities")
-                            .font(AppTypography.detail.weight(.semibold))
-                            .foregroundStyle(.primary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Trading capabilities")
+                        .font(AppTypography.detail.weight(.semibold))
+                        .foregroundStyle(.primary)
 
-                        Text("\(enabledCount) available")
-                            .font(AppTypography.caption.weight(.medium))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer(minLength: 12)
-
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 13, weight: .semibold))
+                    Text("\(enabledCount) available")
+                        .font(AppTypography.caption.weight(.medium))
                         .foregroundStyle(.secondary)
-                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
                 }
-                .contentShape(Rectangle())
+
+                Spacer(minLength: 12)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color(.tertiaryLabel))
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Trading capabilities")
-            .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
-
-            if isExpanded {
-                LazyVGrid(columns: AssetDetailGrid.twoColumns, spacing: 10) {
-                    AssetCapabilityChip(
-                        title: "Tradable",
-                        value: AssetDetailText.boolean(asset?.tradable),
-                        systemImage: "arrow.left.arrow.right",
-                        isEnabled: asset?.tradable == true
-                    )
-
-                    AssetCapabilityChip(
-                        title: "Fractional",
-                        value: AssetDetailText.boolean(asset?.fractionable),
-                        systemImage: "chart.pie",
-                        isEnabled: asset?.fractionable == true
-                    )
-
-                    AssetCapabilityChip(
-                        title: "Options",
-                        value: AssetDetailText.boolean(asset?.hasAttribute("has_options")),
-                        systemImage: "square.stack.3d.up",
-                        isEnabled: asset?.hasAttribute("has_options") == true,
-                        action: asset?.hasAttribute("has_options") == true ? showOptions : nil
-                    )
-
-                    AssetCapabilityChip(
-                        title: "Extended hours",
-                        value: AssetDetailText.boolean(asset?.hasAttribute("fractional_eh_enabled")),
-                        systemImage: "clock",
-                        isEnabled: asset?.hasAttribute("fractional_eh_enabled") == true
-                    )
-
-                    AssetCapabilityChip(
-                        title: "Overnight",
-                        value: AssetDetailText.boolean(asset?.hasAttribute("overnight_tradable")),
-                        systemImage: "moon",
-                        isEnabled: asset?.hasAttribute("overnight_tradable") == true
-                    )
-
-                    AssetCapabilityChip(
-                        title: "Margin",
-                        value: AssetDetailText.boolean(asset?.marginable),
-                        systemImage: "creditcard",
-                        isEnabled: asset?.marginable == true
-                    )
-
-                    AssetCapabilityChip(
-                        title: "Shortable",
-                        value: AssetDetailText.boolean(asset?.shortable),
-                        systemImage: "arrow.down.right",
-                        isEnabled: asset?.shortable == true
-                    )
-
-                    AssetCapabilityChip(
-                        title: "Borrow",
-                        value: AssetDetailText.borrowStatus(asset),
-                        systemImage: "arrow.down.circle",
-                        isEnabled: asset?.easyToBorrow == true
-                    )
-                }
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
+            .contentShape(Rectangle())
         }
-        .padding(14)
-        .background(AppTheme.ColorToken.groupedSurface.opacity(0.72), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color(.separator).opacity(0.10))
+        .buttonStyle(.plain)
+        .padding(.vertical, 12)
+        .overlay(alignment: .bottom) {
+            Divider()
+        }
+        .accessibilityLabel("Trading capabilities")
+        .accessibilityValue("\(enabledCount) available")
+    }
+}
+
+private struct AssetCapabilitiesSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let asset: AlpacaAsset?
+    let openOptions: () -> Void
+
+    private var items: [AssetCapabilityItem] {
+        AssetCapabilityItem.items(for: asset)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 0) {
+                    ForEach(items) { item in
+                        AssetCapabilitySheetRow(item: item) {
+                            openOptions()
+                        }
+
+                        if item.id != items.last?.id {
+                            Divider()
+                                .padding(.leading, 46)
+                        }
+                    }
+                }
+                .padding(.horizontal, 14)
+                .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .padding(.horizontal, AppTheme.Spacing.pageHorizontal)
+                .padding(.top, 12)
+                .padding(.bottom, AppTheme.Spacing.pageBottom)
+            }
+            .background(AppTheme.ColorToken.pageBackground.ignoresSafeArea())
+            .navigationTitle("Trading capabilities")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(L10n.Common.close)
+                }
+            }
         }
     }
 }
 
-private struct AssetCapabilityChip: View {
+private struct AssetCapabilityItem: Identifiable {
+    let id: String
     let title: String
     let value: String
     let systemImage: String
     let isEnabled: Bool
-    let action: (() -> Void)?
+    var opensOptions = false
 
-    init(
-        title: String,
-        value: String,
-        systemImage: String,
-        isEnabled: Bool,
-        action: (() -> Void)? = nil
-    ) {
-        self.title = title
-        self.value = value
-        self.systemImage = systemImage
-        self.isEnabled = isEnabled
-        self.action = action
+    static func items(for asset: AlpacaAsset?) -> [AssetCapabilityItem] {
+        [
+            AssetCapabilityItem(
+                id: "tradable",
+                title: "Tradable",
+                value: AssetDetailText.boolean(asset?.tradable),
+                systemImage: "arrow.left.arrow.right",
+                isEnabled: asset?.tradable == true
+            ),
+            AssetCapabilityItem(
+                id: "fractional",
+                title: "Fractional",
+                value: AssetDetailText.boolean(asset?.fractionable),
+                systemImage: "chart.pie",
+                isEnabled: asset?.fractionable == true
+            ),
+            AssetCapabilityItem(
+                id: "options",
+                title: "Options",
+                value: AssetDetailText.boolean(asset?.hasAttribute("has_options")),
+                systemImage: "square.stack.3d.up",
+                isEnabled: asset?.hasAttribute("has_options") == true,
+                opensOptions: asset?.hasAttribute("has_options") == true
+            ),
+            AssetCapabilityItem(
+                id: "extended-hours",
+                title: "Extended hours",
+                value: AssetDetailText.boolean(asset?.hasAttribute("fractional_eh_enabled")),
+                systemImage: "clock",
+                isEnabled: asset?.hasAttribute("fractional_eh_enabled") == true
+            ),
+            AssetCapabilityItem(
+                id: "overnight",
+                title: "Overnight",
+                value: AssetDetailText.boolean(asset?.hasAttribute("overnight_tradable")),
+                systemImage: "moon",
+                isEnabled: asset?.hasAttribute("overnight_tradable") == true
+            ),
+            AssetCapabilityItem(
+                id: "margin",
+                title: "Margin",
+                value: AssetDetailText.boolean(asset?.marginable),
+                systemImage: "creditcard",
+                isEnabled: asset?.marginable == true
+            ),
+            AssetCapabilityItem(
+                id: "shortable",
+                title: "Shortable",
+                value: AssetDetailText.boolean(asset?.shortable),
+                systemImage: "arrow.down.right",
+                isEnabled: asset?.shortable == true
+            ),
+            AssetCapabilityItem(
+                id: "borrow",
+                title: "Borrow",
+                value: AssetDetailText.borrowStatus(asset),
+                systemImage: "arrow.down.circle",
+                isEnabled: asset?.easyToBorrow == true
+            )
+        ]
     }
+}
+
+private struct AssetCapabilitySheetRow: View {
+    let item: AssetCapabilityItem
+    let openOptions: () -> Void
 
     private var tint: Color {
-        isEnabled ? AppTheme.ColorToken.positive : Color(.tertiaryLabel)
+        item.isEnabled ? AppTheme.ColorToken.positive : Color(.tertiaryLabel)
     }
 
     var body: some View {
-        if let action {
-            Button(action: action) {
-                chipContent
+        if item.opensOptions {
+            Button(action: openOptions) {
+                rowContent
             }
             .buttonStyle(.plain)
             .accessibilityHint("Opens options")
         } else {
-            chipContent
+            rowContent
         }
     }
 
-    private var chipContent: some View {
+    private var rowContent: some View {
         HStack(spacing: 10) {
-            Image(systemName: systemImage)
+            Image(systemName: item.systemImage)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(tint)
                 .frame(width: 24, height: 24)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(AppTypography.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
+            Text(item.title)
+                .font(AppTypography.detail)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
 
-                Text(value)
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            Spacer(minLength: 12)
 
-            if action != nil {
+            Text(item.value)
+                .font(AppTypography.caption.weight(.semibold))
+                .foregroundStyle(tint)
+                .padding(.horizontal, 8)
+                .frame(height: 24)
+                .background(tint.opacity(item.isEnabled ? 0.12 : 0.08), in: Capsule())
+
+            if item.opensOptions {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Color(.tertiaryLabel))
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
-        .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color(.separator).opacity(isEnabled ? 0.10 : 0.06))
-        }
+        .padding(.vertical, 13)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
     }
 }
 

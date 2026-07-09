@@ -804,34 +804,34 @@
         }
       }
     },
-    "account_detail.paper_banner.message" : {
+    "account_detail.paper_badge" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Orders, balances, and activity shown here come from Alpaca's paper environment and do not affect live funds."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这里显示的订单、余额和活动来自 Alpaca 模拟环境，不会影响真实资金。"
-          }
-        }
-      }
-    },
-    "account_detail.paper_banner.title" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Paper trading account"
+            "value" : "Paper"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "模拟账户"
+          }
+        }
+      }
+    },
+    "account_detail.paper_banner.message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Using Alpaca's paper environment. Orders, balances, and activity won't affect live funds."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前为 Alpaca 模拟环境，订单、余额和活动不会影响真实资金。"
           }
         }
       }
@@ -3063,9 +3063,6 @@
     "Close" : {
 
     },
-    "Collapsed" : {
-
-    },
     "common.back" : {
       "localizations" : {
         "en" : {
@@ -3552,9 +3549,6 @@
           }
         }
       }
-    },
-    "Expanded" : {
-
     },
     "Floor" : {
 

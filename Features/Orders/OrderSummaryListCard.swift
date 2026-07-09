@@ -97,10 +97,12 @@ struct OrderSummaryRow: View {
                     Text(order.symbol)
                         .font(.headline)
                         .foregroundStyle(.primary)
+                        .lineLimit(1)
 
                     Text(order.side?.uppercased() ?? AppFormatter.placeholder)
                         .font(AppTypography.badge)
                         .foregroundStyle(sideColor)
+                        .lineLimit(1)
                 }
 
                 HStack(spacing: 7) {
@@ -108,24 +110,27 @@ struct OrderSummaryRow: View {
                         .font(AppTypography.rowMeta)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                        .truncationMode(.tail)
 
                     if order.extendedHours == true {
                         OrderExtendedHoursTag(title: L10n.Orders.extendedHoursTag(locale: locale))
                     }
                 }
             }
-
-            Spacer(minLength: 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             VStack(alignment: .trailing, spacing: 7) {
                 Text(order.status?.uppercased() ?? AppFormatter.placeholder)
                     .font(AppTypography.badge)
                     .foregroundStyle(statusColor)
+                    .lineLimit(1)
 
                 Text(submittedTimeText)
                     .font(AppTypography.detail.monospacedDigit())
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
+            .fixedSize(horizontal: true, vertical: false)
 
             if showsDisclosure {
                 Image(systemName: "chevron.right")

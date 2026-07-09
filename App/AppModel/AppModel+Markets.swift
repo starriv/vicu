@@ -728,15 +728,10 @@ extension AppModel {
         }
 
         async let quotesRequest = services.markets.fetchMarketSymbols(symbols: symbols, credentials: credentials)
-        async let assetsRequest = marketAssets(credentials: credentials)
 
         let quotes = (try? await quotesRequest) ?? []
-        let assets = try await assetsRequest
         let quotesBySymbol = quotes.reduce(into: [:]) { result, quote in
             result[normalizedMarketSymbol(quote.symbol)] = quote
-        }
-        let assetsBySymbol = assets.reduce(into: [:]) { result, asset in
-            result[normalizedMarketSymbol(asset.symbol)] = asset
         }
         let rankedBySymbol = rankedSymbols.reduce(into: [:]) { result, symbol in
             result[normalizedMarketSymbol(symbol.symbol)] = symbol
@@ -747,7 +742,7 @@ extension AppModel {
             let quote = quotesBySymbol[symbol]
             return MarketActiveSymbol(
                 symbol: symbol,
-                companyName: assetsBySymbol[symbol]?.name ?? rankedSymbol?.companyName,
+                companyName: rankedSymbol?.companyName,
                 price: quote?.price ?? rankedSymbol?.price,
                 change: quote?.change ?? rankedSymbol?.change,
                 percentChange: quote?.percentChange ?? rankedSymbol?.percentChange,
@@ -762,8 +757,22 @@ extension AppModel {
     }
 
     func fetchSearchPlaceholderSymbol(sort: MarketMostActiveSort = .trades) async -> String {
+        guard let credentials else {
+            return Self.searchPlaceholderFallbackSymbol
+        }
+
+        if let searchPopularSymbolsCache = searchCache.popularSymbolsCache[sort],
+           let searchPopularSymbolsCacheDate = searchCache.popularSymbolsCacheDate[sort],
+           Date().timeIntervalSince(searchPopularSymbolsCacheDate) < searchCache.popularSymbolsCacheTTL {
+            return Self.searchPlaceholderSymbol(from: searchPopularSymbolsCache)
+        }
+
         do {
-            let mostActiveSymbols = try await fetchSearchPopularMarketSymbols(limit: 12, sort: sort)
+            let mostActiveSymbols = try await services.markets.fetchMostActiveMarketSymbols(
+                top: 12,
+                sort: sort,
+                credentials: credentials
+            )
             return Self.searchPlaceholderSymbol(from: mostActiveSymbols)
         } catch {
             return Self.searchPlaceholderFallbackSymbol

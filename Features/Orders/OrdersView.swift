@@ -661,11 +661,13 @@ private struct OrderActionList: View {
                         }
                         .buttonStyle(.plain)
 
-                        OrderRowActionMenu(
-                            order: order,
-                            onCancelRequested: onCancelRequested,
-                            onReplacePrice: onReplacePrice
-                        )
+                        if order.hasRowActions {
+                            OrderRowActionMenu(
+                                order: order,
+                                onCancelRequested: onCancelRequested,
+                                onReplacePrice: onReplacePrice
+                            )
+                        }
                     }
                     .listRowInsets(rowInsets)
                 }
@@ -694,41 +696,31 @@ private struct OrderRowActionMenu: View {
         order.supportsPriceReplacement && order.editablePriceField != nil
     }
 
-    private var hasActions: Bool {
-        order.supportsCancellation || canReplacePrice
-    }
-
     var body: some View {
-        if hasActions {
-            Menu {
-                if order.supportsPriceReplacement, let field = order.editablePriceField {
-                    Button {
-                        onReplacePrice(order, field)
-                    } label: {
-                        Label(L10n.Orders.replacePrice(locale: locale), systemImage: "pencil")
-                    }
+        Menu {
+            if order.supportsPriceReplacement, let field = order.editablePriceField {
+                Button {
+                    onReplacePrice(order, field)
+                } label: {
+                    Label(L10n.Orders.replacePrice(locale: locale), systemImage: "pencil")
                 }
-
-                if order.supportsCancellation {
-                    if canReplacePrice {
-                        Divider()
-                    }
-
-                    Button(role: .destructive) {
-                        onCancelRequested(order)
-                    } label: {
-                        Label(L10n.Orders.cancelOrder(locale: locale), systemImage: "xmark.circle")
-                    }
-                }
-            } label: {
-                OrderRowActionMenuLabel(isEnabled: true)
             }
-            .accessibilityLabel(L10n.Orders.actionMenu(locale: locale))
-        } else {
-            Color.clear
-                .frame(width: 36, height: 36)
-                .accessibilityHidden(true)
+
+            if order.supportsCancellation {
+                if canReplacePrice {
+                    Divider()
+                }
+
+                Button(role: .destructive) {
+                    onCancelRequested(order)
+                } label: {
+                    Label(L10n.Orders.cancelOrder(locale: locale), systemImage: "xmark.circle")
+                }
+            }
+        } label: {
+            OrderRowActionMenuLabel(isEnabled: true)
         }
+        .accessibilityLabel(L10n.Orders.actionMenu(locale: locale))
     }
 }
 
@@ -772,6 +764,12 @@ private struct SelectedActionOrder: Identifiable, Hashable {
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
+    }
+}
+
+private extension AlpacaOrder {
+    var hasRowActions: Bool {
+        supportsCancellation || supportsPriceReplacement
     }
 }
 
