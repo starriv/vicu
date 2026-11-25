@@ -12,7 +12,7 @@ struct OptionDetailSkeleton: View {
             AssetSkeletonCapsule(width: 150, height: 48, fill: Color(.secondarySystemFill), cornerRadius: 16)
 
             OptionChartLoadingBackground(tint: AppTheme.ColorToken.positive)
-                .frame(height: 300)
+                .frame(height: 244)
 
             LazyVGrid(columns: AssetDetailGrid.twoColumns, spacing: 12) {
                 ForEach(0..<8, id: \.self) { index in

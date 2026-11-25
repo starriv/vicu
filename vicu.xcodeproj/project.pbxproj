@@ -165,6 +165,19 @@
 		0A91A91A91A91A91A91A9101 /* DesignSystem/Components/AppMarqueeText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A91A91A91A91A91A91A9102 /* DesignSystem/Components/AppMarqueeText.swift */; };
 		0A92A92A92A92A92A92A9201 /* DesignSystem/Components/AppScreenHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A92A92A92A92A92A92A9202 /* DesignSystem/Components/AppScreenHeader.swift */; };
 		0A93A93A93A93A93A93A9301 /* DesignSystem/Components/AppSettingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A93A93A93A93A93A93A9302 /* DesignSystem/Components/AppSettingsComponents.swift */; };
+		0A0F80000000000000000101 /* DesignSystem/Charts/Models/FinancialChartModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F80000000000000000201 /* DesignSystem/Charts/Models/FinancialChartModels.swift */; };
+		0A0F80000000000000000102 /* DesignSystem/Charts/Engine/FinancialChartYAxisSolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F80000000000000000202 /* DesignSystem/Charts/Engine/FinancialChartYAxisSolver.swift */; };
+		0A0F80000000000000000103 /* DesignSystem/Charts/Engine/FinancialChartCoordinateSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F80000000000000000203 /* DesignSystem/Charts/Engine/FinancialChartCoordinateSystem.swift */; };
+		0A0F80000000000000000104 /* DesignSystem/Charts/Engine/FinancialChartDownsampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F80000000000000000204 /* DesignSystem/Charts/Engine/FinancialChartDownsampler.swift */; };
+		0A0F80000000000000000105 /* DesignSystem/Charts/Engine/FinancialChartViewport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F80000000000000000205 /* DesignSystem/Charts/Engine/FinancialChartViewport.swift */; };
+		0A0F80000000000000000106 /* DesignSystem/Charts/Rendering/FinancialChartPathBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F80000000000000000206 /* DesignSystem/Charts/Rendering/FinancialChartPathBuilder.swift */; };
+		0A0F80000000000000000107 /* DesignSystem/Charts/Rendering/FinancialChartBaseCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F80000000000000000207 /* DesignSystem/Charts/Rendering/FinancialChartBaseCanvas.swift */; };
+		0A0F80000000000000000108 /* DesignSystem/Charts/Rendering/FinancialChartCrosshairOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F80000000000000000208 /* DesignSystem/Charts/Rendering/FinancialChartCrosshairOverlay.swift */; };
+		0A0F8000000000000000010C /* DesignSystem/Charts/Rendering/FinancialChartMorphCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F8000000000000000020C /* DesignSystem/Charts/Rendering/FinancialChartMorphCanvas.swift */; };
+		0A0F80000000000000000109 /* DesignSystem/Charts/Interaction/FinancialChartGestureOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F80000000000000000209 /* DesignSystem/Charts/Interaction/FinancialChartGestureOverlay.swift */; };
+		0A0F8000000000000000010A /* DesignSystem/Charts/Views/FinancialChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F8000000000000000020A /* DesignSystem/Charts/Views/FinancialChartView.swift */; };
+		0A0F8000000000000000010B /* Features/AssetDetail/Chart/AssetIntradaySessionMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F8000000000000000020B /* Features/AssetDetail/Chart/AssetIntradaySessionMapper.swift */; };
+		0C0F80000000000000000101 /* vicuTests/FinancialChartEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0F80000000000000000201 /* FinancialChartEngineTests.swift */; };
 		0AC0000000000000000C0002 /* Resources/AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0AC0000000000000000C0001 /* Resources/AppIcon.icon */; };
 		0AC0000000000000000C0004 /* Resources/PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 0AC0000000000000000C0003 /* Resources/PrivacyInfo.xcprivacy */; };
 		0B0000000000000000000101 /* Services/LiveActivities/OrderActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000000000000000000201 /* Services/LiveActivities/OrderActivityAttributes.swift */; };
@@ -362,6 +375,19 @@
 		0A91A91A91A91A91A91A9102 /* DesignSystem/Components/AppMarqueeText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppMarqueeText.swift; sourceTree = "<group>"; };
 		0A92A92A92A92A92A92A9202 /* DesignSystem/Components/AppScreenHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppScreenHeader.swift; sourceTree = "<group>"; };
 		0A93A93A93A93A93A93A9302 /* DesignSystem/Components/AppSettingsComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppSettingsComponents.swift; sourceTree = "<group>"; };
+		0A0F80000000000000000201 /* DesignSystem/Charts/Models/FinancialChartModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Charts/Models/FinancialChartModels.swift; sourceTree = "<group>"; };
+		0A0F80000000000000000202 /* DesignSystem/Charts/Engine/FinancialChartYAxisSolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Charts/Engine/FinancialChartYAxisSolver.swift; sourceTree = "<group>"; };
+		0A0F80000000000000000203 /* DesignSystem/Charts/Engine/FinancialChartCoordinateSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Charts/Engine/FinancialChartCoordinateSystem.swift; sourceTree = "<group>"; };
+		0A0F80000000000000000204 /* DesignSystem/Charts/Engine/FinancialChartDownsampler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Charts/Engine/FinancialChartDownsampler.swift; sourceTree = "<group>"; };
+		0A0F80000000000000000205 /* DesignSystem/Charts/Engine/FinancialChartViewport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Charts/Engine/FinancialChartViewport.swift; sourceTree = "<group>"; };
+		0A0F80000000000000000206 /* DesignSystem/Charts/Rendering/FinancialChartPathBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Charts/Rendering/FinancialChartPathBuilder.swift; sourceTree = "<group>"; };
+		0A0F80000000000000000207 /* DesignSystem/Charts/Rendering/FinancialChartBaseCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Charts/Rendering/FinancialChartBaseCanvas.swift; sourceTree = "<group>"; };
+		0A0F80000000000000000208 /* DesignSystem/Charts/Rendering/FinancialChartCrosshairOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Charts/Rendering/FinancialChartCrosshairOverlay.swift; sourceTree = "<group>"; };
+		0A0F8000000000000000020C /* DesignSystem/Charts/Rendering/FinancialChartMorphCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Charts/Rendering/FinancialChartMorphCanvas.swift; sourceTree = "<group>"; };
+		0A0F80000000000000000209 /* DesignSystem/Charts/Interaction/FinancialChartGestureOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Charts/Interaction/FinancialChartGestureOverlay.swift; sourceTree = "<group>"; };
+		0A0F8000000000000000020A /* DesignSystem/Charts/Views/FinancialChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Charts/Views/FinancialChartView.swift; sourceTree = "<group>"; };
+		0A0F8000000000000000020B /* Features/AssetDetail/Chart/AssetIntradaySessionMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/Chart/AssetIntradaySessionMapper.swift; sourceTree = "<group>"; };
+		0C0F80000000000000000201 /* FinancialChartEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = vicuTests/FinancialChartEngineTests.swift; sourceTree = "<group>"; };
 		0AC0000000000000000C0001 /* Resources/AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = Resources/AppIcon.icon; sourceTree = "<group>"; };
 		0AC0000000000000000C0003 /* Resources/PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Resources/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		0B0000000000000000000201 /* Services/LiveActivities/OrderActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/LiveActivities/OrderActivityAttributes.swift; sourceTree = "<group>"; };
@@ -531,8 +557,21 @@
 				0C0000000000000000000201 /* PageCacheTests.swift */,
 				0C0000000000000000000202 /* AssetPositionSharePerformanceTests.swift */,
 				0C0F60000000000000000203 /* OrderDraftTests.swift */,
+				0C0F80000000000000000201 /* FinancialChartEngineTests.swift */,
 				0A92A92A92A92A92A92A9202 /* DesignSystem/Components/AppScreenHeader.swift */,
 				0A93A93A93A93A93A93A9302 /* DesignSystem/Components/AppSettingsComponents.swift */,
+				0A0F80000000000000000201 /* DesignSystem/Charts/Models/FinancialChartModels.swift */,
+				0A0F80000000000000000202 /* DesignSystem/Charts/Engine/FinancialChartYAxisSolver.swift */,
+				0A0F80000000000000000203 /* DesignSystem/Charts/Engine/FinancialChartCoordinateSystem.swift */,
+				0A0F80000000000000000204 /* DesignSystem/Charts/Engine/FinancialChartDownsampler.swift */,
+				0A0F80000000000000000205 /* DesignSystem/Charts/Engine/FinancialChartViewport.swift */,
+				0A0F80000000000000000206 /* DesignSystem/Charts/Rendering/FinancialChartPathBuilder.swift */,
+				0A0F80000000000000000207 /* DesignSystem/Charts/Rendering/FinancialChartBaseCanvas.swift */,
+				0A0F80000000000000000208 /* DesignSystem/Charts/Rendering/FinancialChartCrosshairOverlay.swift */,
+				0A0F8000000000000000020C /* DesignSystem/Charts/Rendering/FinancialChartMorphCanvas.swift */,
+				0A0F80000000000000000209 /* DesignSystem/Charts/Interaction/FinancialChartGestureOverlay.swift */,
+				0A0F8000000000000000020A /* DesignSystem/Charts/Views/FinancialChartView.swift */,
+				0A0F8000000000000000020B /* Features/AssetDetail/Chart/AssetIntradaySessionMapper.swift */,
 				0A90A90A90A90A90A90A9002 /* DesignSystem/Components/QuoteSizeRatioBar.swift */,
 				0A91A91A91A91A91A91A9102 /* DesignSystem/Components/AppMarqueeText.swift */,
 				0A0000000000000000000263 /* Shared/Reactive/RxPolling.swift */,
@@ -883,6 +922,18 @@
 				0A0F8000000000000000010F /* DesignSystem/Components/AppConfirmationSheet.swift in Sources */,
 				0A92A92A92A92A92A92A9201 /* DesignSystem/Components/AppScreenHeader.swift in Sources */,
 				0A93A93A93A93A93A93A9301 /* DesignSystem/Components/AppSettingsComponents.swift in Sources */,
+				0A0F80000000000000000101 /* DesignSystem/Charts/Models/FinancialChartModels.swift in Sources */,
+				0A0F80000000000000000102 /* DesignSystem/Charts/Engine/FinancialChartYAxisSolver.swift in Sources */,
+				0A0F80000000000000000103 /* DesignSystem/Charts/Engine/FinancialChartCoordinateSystem.swift in Sources */,
+				0A0F80000000000000000104 /* DesignSystem/Charts/Engine/FinancialChartDownsampler.swift in Sources */,
+				0A0F80000000000000000105 /* DesignSystem/Charts/Engine/FinancialChartViewport.swift in Sources */,
+				0A0F80000000000000000106 /* DesignSystem/Charts/Rendering/FinancialChartPathBuilder.swift in Sources */,
+				0A0F80000000000000000107 /* DesignSystem/Charts/Rendering/FinancialChartBaseCanvas.swift in Sources */,
+				0A0F80000000000000000108 /* DesignSystem/Charts/Rendering/FinancialChartCrosshairOverlay.swift in Sources */,
+				0A0F8000000000000000010C /* DesignSystem/Charts/Rendering/FinancialChartMorphCanvas.swift in Sources */,
+				0A0F80000000000000000109 /* DesignSystem/Charts/Interaction/FinancialChartGestureOverlay.swift in Sources */,
+				0A0F8000000000000000010A /* DesignSystem/Charts/Views/FinancialChartView.swift in Sources */,
+				0A0F8000000000000000010B /* Features/AssetDetail/Chart/AssetIntradaySessionMapper.swift in Sources */,
 				0A90A90A90A90A90A90A9001 /* DesignSystem/Components/QuoteSizeRatioBar.swift in Sources */,
 				0A91A91A91A91A91A91A9101 /* DesignSystem/Components/AppMarqueeText.swift in Sources */,
 				0A0000000000000000000163 /* Shared/Reactive/RxPolling.swift in Sources */,
@@ -934,6 +985,7 @@
 				0C0000000000000000000101 /* vicuTests/PageCacheTests.swift in Sources */,
 				0C0000000000000000000102 /* vicuTests/AssetPositionSharePerformanceTests.swift in Sources */,
 				0C0F60000000000000000103 /* vicuTests/OrderDraftTests.swift in Sources */,
+				0C0F80000000000000000101 /* vicuTests/FinancialChartEngineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

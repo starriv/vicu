@@ -7,6 +7,8 @@ struct AssetDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var store: AssetDetailStore
     @State private var showsHeaderTitle = false
+    @State private var isTradeBarVisible = true
+    @State private var tradeBarScrollTracker = AssetDetailTradeBarScrollTracker()
     @State private var showsQuoteHistory = false
     @State private var showsNews = false
     @State private var showsOptions = false
@@ -57,12 +59,20 @@ struct AssetDetailView: View {
                 .padding(.top, AppTheme.Spacing.pageTop)
                 .padding(.bottom, AppTheme.Spacing.pageBottom + (store.canShowTradeActions ? 88 : 0))
             }
-            .onScrollGeometryChange(for: AssetDetailHeaderRevealRegion.self) { geometry in
-                Self.headerRevealRegion(for: geometry.contentOffset.y)
-            } action: { _, region in
-                updateHeaderTitleVisibility(for: region)
+            .onScrollPhaseChange { _, newPhase in
+                tradeBarScrollTracker.updateScrollPhase(newPhase)
+            }
+            .onScrollGeometryChange(for: AssetDetailScrollMetrics.self) { geometry in
+                AssetDetailScrollMetrics(geometry: geometry)
+            } action: { _, metrics in
+                updateHeaderTitleVisibility(for: Self.headerRevealRegion(for: metrics.rawOffsetY))
+                updateTradeBarVisibility(for: metrics)
             }
             .onAppear {
+                tradeBarScrollTracker.reset()
+                if !isTradeBarVisible {
+                    isTradeBarVisible = true
+                }
                 proxy.scrollTo(Self.topAnchorID, anchor: .top)
             }
         }
@@ -88,24 +98,39 @@ struct AssetDetailView: View {
                 }
             )
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if store.canShowTradeActions && showsHeaderTitle {
-                AssetDetailTradeBar(
-                    symbol: store.symbol,
-                    supportsOptions: store.asset?.attributes?.contains("has_options") == true,
-                    showOrders: {
-                        app.openOrdersList(symbol: store.symbol, reason: .assetDetail)
-                    },
-                    showNews: {
-                        showsNews = true
-                    },
-                    showOptions: {
-                        showsOptions = true
-                    },
-                    openTrade: openTrade(_:)
-                )
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+        .overlay(alignment: .bottom) {
+            ZStack {
+                if store.canShowTradeActions {
+                    AssetDetailTradeBar(
+                        symbol: store.symbol,
+                        supportsOptions: store.asset?.attributes?.contains("has_options") == true,
+                        showOrders: {
+                            app.openOrdersList(symbol: store.symbol, reason: .assetDetail)
+                        },
+                        showNews: {
+                            showsNews = true
+                        },
+                        showOptions: {
+                            showsOptions = true
+                        },
+                        openTrade: openTrade(_:)
+                    )
+                    .offset(y: isTradeBarVisible ? 0 : 104)
+                    .scaleEffect(isTradeBarVisible ? 1 : 0.90, anchor: .bottom)
+                    .opacity(isTradeBarVisible ? 1 : 0)
+                    .allowsHitTesting(isTradeBarVisible)
+                    .accessibilityHidden(!isTradeBarVisible)
+                    .transition(
+                        .asymmetric(
+                            insertion: .move(edge: .bottom)
+                                .combined(with: .opacity)
+                                .combined(with: .scale(scale: 0.92, anchor: .bottom)),
+                            removal: .move(edge: .bottom).combined(with: .opacity)
+                        )
+                    )
+                }
             }
+            .animation(.spring(response: 0.38, dampingFraction: 0.82), value: store.canShowTradeActions)
         }
         .navigationDestination(item: $tradeDestination) { destination in
             TradeView(
@@ -203,6 +228,23 @@ struct AssetDetailView: View {
         }
     }
 
+    private func updateTradeBarVisibility(for metrics: AssetDetailScrollMetrics) {
+        guard let nextVisible = tradeBarScrollTracker.update(
+            offsetY: metrics.normalizedOffsetY,
+            maxOffsetY: metrics.maxOffsetY
+        ), nextVisible != isTradeBarVisible else {
+            return
+        }
+
+        let animation: Animation = nextVisible
+            ? .spring(response: 0.36, dampingFraction: 0.80)
+            : .spring(response: 0.30, dampingFraction: 0.92)
+
+        withAnimation(animation) {
+            isTradeBarVisible = nextVisible
+        }
+    }
+
     private func showSubmittedOrder(_: AlpacaOrder) {
         tradeDestination = nil
     }
@@ -271,6 +313,101 @@ private enum AssetDetailHeaderRevealRegion: Equatable {
     case hidden
     case hold
     case visible
+}
+
+private struct AssetDetailScrollMetrics: Equatable {
+    let rawOffsetY: CGFloat
+    let normalizedOffsetY: CGFloat
+    let maxOffsetY: CGFloat
+
+    init(geometry: ScrollGeometry) {
+        let raw = geometry.contentOffset.y
+        let normalized = raw + geometry.contentInsets.top
+        let maxOffset = max(
+            0,
+            geometry.contentSize.height
+                - geometry.containerSize.height
+                + geometry.contentInsets.top
+                + geometry.contentInsets.bottom
+        )
+
+        rawOffsetY = raw.rounded()
+        normalizedOffsetY = normalized.rounded()
+        maxOffsetY = maxOffset.rounded()
+    }
+}
+
+final class AssetDetailTradeBarScrollTracker {
+    private static let topRevealThreshold: CGFloat = 12
+    private static let minimumScrollableDistance: CGFloat = 24
+    private static let hideStartOffset: CGFloat = 36
+    private static let hideDeltaThreshold: CGFloat = 22
+    private static let showDeltaThreshold: CGFloat = 14
+
+    private var lastClampedOffsetY: CGFloat?
+    private var accumulatedDelta: CGFloat = 0
+    private var scrollPhase: ScrollPhase = .idle
+    private(set) var isVisible = true
+
+    func reset() {
+        lastClampedOffsetY = nil
+        accumulatedDelta = 0
+        scrollPhase = .idle
+        isVisible = true
+    }
+
+    func updateScrollPhase(_ phase: ScrollPhase) {
+        scrollPhase = phase
+        if phase == .idle {
+            accumulatedDelta = 0
+        }
+    }
+
+    func update(offsetY: CGFloat, maxOffsetY: CGFloat, isUserDriven: Bool? = nil) -> Bool? {
+        let userDriven = isUserDriven ?? (scrollPhase == .interacting || scrollPhase == .decelerating)
+        if maxOffsetY <= Self.minimumScrollableDistance || offsetY <= Self.topRevealThreshold {
+            lastClampedOffsetY = max(offsetY, 0)
+            accumulatedDelta = 0
+            guard !isVisible else { return nil }
+            isVisible = true
+            return true
+        }
+
+        let clampedY = min(max(offsetY, 0), maxOffsetY)
+        defer { lastClampedOffsetY = clampedY }
+
+        guard userDriven, let previousY = lastClampedOffsetY else {
+            accumulatedDelta = 0
+            return nil
+        }
+
+        let delta = clampedY - previousY
+        guard delta != 0 else {
+            return nil
+        }
+
+        if (delta > 0 && accumulatedDelta < 0) || (delta < 0 && accumulatedDelta > 0) {
+            accumulatedDelta = delta
+        } else {
+            accumulatedDelta += delta
+        }
+
+        if accumulatedDelta >= Self.hideDeltaThreshold, clampedY >= Self.hideStartOffset {
+            accumulatedDelta = 0
+            guard isVisible else { return nil }
+            isVisible = false
+            return false
+        }
+
+        if accumulatedDelta <= -Self.showDeltaThreshold {
+            accumulatedDelta = 0
+            guard !isVisible else { return nil }
+            isVisible = true
+            return true
+        }
+
+        return nil
+    }
 }
 
 private extension View {
@@ -506,7 +643,8 @@ private struct AssetPriceHeroSection: View {
                 displayedPrice,
                 font: .system(size: 48, weight: .medium, design: .rounded),
                 minimumScaleFactor: 0.72,
-                isAnimated: chartSelection == nil
+                isAnimated: true,
+                animationDuration: chartSelection == nil ? 0.18 : 0.08
             )
 
             VStack(alignment: .leading, spacing: 2) {
@@ -569,12 +707,12 @@ private struct AssetChartSection: View {
     @Binding var chartSelection: AssetChartSelection?
     @Binding var isChartScrubbing: Bool
 
-    private static let chartHeight: CGFloat = 330
+    private static let linePlotHeight: CGFloat = 228
+    private static let candlePlotHeight: CGFloat = 272
     private static let timelineHeight: CGFloat = 24
-    private static let scrubTimelineClearance: CGFloat = 32
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             ZStack(alignment: .bottom) {
                 AssetPriceChart(
                     model: store.chartRenderModels.model(for: store.effectiveChartMode),
@@ -583,19 +721,7 @@ private struct AssetChartSection: View {
                     selection: $chartSelection,
                     isScrubbing: $isChartScrubbing
                 )
-                .padding(.bottom, chartBottomClearance)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .allowsHitTesting(!store.isLoadingChart)
-
-                AssetPeriodChartSkeleton(
-                    mode: store.effectiveChartMode,
-                    tint: AppTheme.ColorToken.positive,
-                    showsMockSeries: false
-                )
-                .padding(.bottom, chartBottomClearance)
-                .opacity(store.isLoadingChart ? 1 : 0)
-                .animation(.snappy(duration: 0.18), value: store.isLoadingChart)
-                .allowsHitTesting(false)
 
                 if store.selectedRange == .oneDay {
                     MarketSessionTimelineView(
@@ -604,36 +730,55 @@ private struct AssetChartSection: View {
                     )
                     .frame(height: Self.timelineHeight)
                     .padding(.horizontal, 4)
+                    .padding(.bottom, 2)
                     .opacity(isChartScrubbing ? 1 : 0)
-                    .animation(.snappy(duration: 0.16), value: isChartScrubbing)
+                    .animation(.easeOut(duration: 0.16), value: isChartScrubbing)
                     .allowsHitTesting(false)
                 }
             }
-            .frame(height: Self.chartHeight)
+            .frame(height: resolvedPlotHeight)
+            .animation(.snappy(duration: 0.22), value: store.effectiveChartMode)
 
-            HStack(spacing: 12) {
-                AssetRangePicker(selection: store.selectedRange) { range in
-                    chartSelection = nil
-                    isChartScrubbing = false
-                    store.selectRange(range)
-                }
+            ZStack {
+                HStack(spacing: 8) {
+                    AssetRangePicker(selection: store.selectedRange) { range in
+                        chartSelection = nil
+                        isChartScrubbing = false
+                        store.selectRange(range)
+                    }
 
-                Spacer(minLength: 8)
-
-                if store.selectedRange != .oneDay {
-                    AssetChartModePicker(
-                        selection: Binding(
-                            get: { store.chartMode },
-                            set: { store.selectChartMode($0) }
+                    if store.selectedRange != .oneDay {
+                        AssetChartModePicker(
+                            selection: Binding(
+                                get: { store.chartMode },
+                                set: { store.selectChartMode($0) }
+                            )
                         )
-                    )
+                    }
+                }
+                .opacity(isChartScrubbing ? 0 : 1)
+                .allowsHitTesting(!isChartScrubbing)
+
+                if isChartScrubbing {
+                    let ticks = scrubAxisTicks
+                    if !ticks.isEmpty {
+                        FinancialChartTimeAxisStrip(labels: ticks)
+                            .transition(.opacity)
+                    }
                 }
             }
+            .animation(.easeOut(duration: 0.16), value: isChartScrubbing)
         }
     }
 
-    private var chartBottomClearance: CGFloat {
-        store.selectedRange == .oneDay ? Self.scrubTimelineClearance : 0
+    private var scrubAxisTicks: [String] {
+        chartSelection?.axisDates.map { date in
+            date.map { AssetChartDateLabelFormatter.axisTick(from: $0, range: store.selectedRange) } ?? ""
+        } ?? []
+    }
+
+    private var resolvedPlotHeight: CGFloat {
+        store.effectiveChartMode == .candles ? Self.candlePlotHeight : Self.linePlotHeight
     }
 }
 
@@ -697,8 +842,6 @@ private struct AssetAboutPanel: View {
                 asset: store.asset,
                 openOptions: queueOptionsSheet
             )
-            .presentationDetents([.height(520), .large])
-            .presentationDragIndicator(.visible)
         }
     }
 
@@ -999,8 +1142,6 @@ private struct AssetCapabilitiesEntryRow: View {
 }
 
 private struct AssetCapabilitiesSheet: View {
-    @Environment(\.dismiss) private var dismiss
-
     let asset: AlpacaAsset?
     let openOptions: () -> Void
 
@@ -1009,39 +1150,27 @@ private struct AssetCapabilitiesSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    ForEach(items) { item in
-                        AssetCapabilitySheetRow(item: item) {
-                            openOptions()
-                        }
+        AppActionSheetContainer(
+            title: "Trading capabilities",
+            minHeight: 420,
+            maxHeight: 640,
+            fallbackHeight: 500,
+            allowsLargeDetent: true
+        ) {
+            VStack(spacing: 0) {
+                ForEach(items) { item in
+                    AssetCapabilitySheetRow(item: item) {
+                        openOptions()
+                    }
 
-                        if item.id != items.last?.id {
-                            Divider()
-                                .padding(.leading, 46)
-                        }
+                    if item.id != items.last?.id {
+                        AppSheetDivider()
                     }
                 }
-                .padding(.horizontal, 14)
-                .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .padding(.horizontal, AppTheme.Spacing.pageHorizontal)
-                .padding(.top, 12)
-                .padding(.bottom, AppTheme.Spacing.pageBottom)
             }
-            .background(AppTheme.ColorToken.pageBackground.ignoresSafeArea())
-            .navigationTitle("Trading capabilities")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(L10n.Common.close)
-                }
-            }
+            .appSheetCard(horizontalPadding: 16, verticalPadding: 4)
+            .padding(.top, 8)
+            .padding(.bottom, 16)
         }
     }
 }

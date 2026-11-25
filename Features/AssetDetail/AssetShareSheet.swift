@@ -75,53 +75,24 @@ struct AssetSharePayload: Identifiable {
 struct AssetShareChartModel {
     private static let maximumPointCount = 180
 
-    let points: [AssetShareChartPoint]
-    let xDomain: ClosedRange<Double>
-    let yDomain: ClosedRange<Double>
+    let series: FinancialChartSeries
     let priceChangeBaseline: Double?
 
     init(renderModel: AssetChartRenderModel) {
-        points = Self.sampledPoints(from: renderModel.points)
-        xDomain = renderModel.xDomain
-        yDomain = renderModel.yDomain
+        let financialPoints = renderModel.points.map(\.financialPoint)
+        let sampled = FinancialChartDownsampler.lttb(
+            financialPoints[...],
+            targetCount: Self.maximumPointCount
+        )
+        series = FinancialChartSeries(
+            kind: .area,
+            points: sampled,
+            xDomain: renderModel.xDomain,
+            baselinePolicy: .none,
+            yScaleConfig: .sparkline,
+            allowsZoomAndPan: false
+        )
         priceChangeBaseline = renderModel.priceChangeBaseline
-    }
-
-    private static func sampledPoints(from points: [AssetChartPoint]) -> [AssetShareChartPoint] {
-        guard points.count > maximumPointCount, maximumPointCount > 1 else {
-            return points.map(AssetShareChartPoint.init(point:))
-        }
-
-        let step = Double(points.count - 1) / Double(maximumPointCount - 1)
-        var sampled: [AssetShareChartPoint] = []
-        sampled.reserveCapacity(maximumPointCount)
-
-        var lastIndex = -1
-        for outputIndex in 0..<maximumPointCount {
-            let sourceIndex = min(points.count - 1, Int((Double(outputIndex) * step).rounded()))
-            guard sourceIndex != lastIndex else {
-                continue
-            }
-
-            sampled.append(AssetShareChartPoint(point: points[sourceIndex]))
-            lastIndex = sourceIndex
-        }
-
-        if let last = points.last, sampled.last?.xPosition != last.xPosition {
-            sampled.append(AssetShareChartPoint(point: last))
-        }
-
-        return sampled
-    }
-}
-
-struct AssetShareChartPoint {
-    let xPosition: Double
-    let close: Double
-
-    init(point: AssetChartPoint) {
-        xPosition = point.xPosition
-        close = point.close
     }
 }
 
@@ -138,15 +109,16 @@ struct AssetShareSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
+            ScrollView(showsIndicators: false) {
                 VStack(spacing: 22) {
                     preview
                     shareActions
                 }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, AppTheme.Spacing.pageHorizontal)
                 .padding(.top, 12)
                 .padding(.bottom, 26)
             }
+            .scrollBounceBehavior(.basedOnSize)
             .background(Color.clear)
             .scrollContentBackground(.hidden)
             .task(id: "\(payload.id)-\(locale.identifier)-\(colorScheme)") {
@@ -179,11 +151,7 @@ struct AssetShareSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Text(L10n.AssetPositionShare.done)
-                    }
+                    AppSheetCloseButton()
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
@@ -529,102 +497,27 @@ private struct AssetShareSparklineChart: View {
     let style: AssetShareCardStyle
 
     var body: some View {
-        Canvas { context, size in
-            drawGrid(context: &context, size: size)
-
-            guard model.points.count > 1 else {
-                drawEmptyLine(context: &context, size: size)
-                return
-            }
-
-            let points = model.points.map { point(for: $0, in: size) }
-            guard let first = points.first, let last = points.last else {
-                return
-            }
-
-            var linePath = Path()
-            linePath.move(to: first)
-            points.dropFirst().forEach { linePath.addLine(to: $0) }
-
-            var areaPath = linePath
-            areaPath.addLine(to: CGPoint(x: last.x, y: size.height - 8))
-            areaPath.addLine(to: CGPoint(x: first.x, y: size.height - 8))
-            areaPath.closeSubpath()
-
-            context.fill(
-                areaPath,
-                with: .linearGradient(
-                    Gradient(colors: [tint.opacity(style.chartFillOpacity), tint.opacity(0.02)]),
-                    startPoint: CGPoint(x: size.width / 2, y: 0),
-                    endPoint: CGPoint(x: size.width / 2, y: size.height)
-                )
-            )
-
-            context.stroke(
-                linePath,
-                with: .color(tint.opacity(0.92)),
-                style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round)
-            )
-            context.stroke(
-                linePath,
-                with: .color(style.chartHighlight),
-                style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round)
-            )
-
-            context.fill(
-                Path(ellipseIn: CGRect(x: last.x - 6, y: last.y - 6, width: 12, height: 12)),
-                with: .color(tint)
-            )
-            context.stroke(
-                Path(ellipseIn: CGRect(x: last.x - 9, y: last.y - 9, width: 18, height: 18)),
-                with: .color(tint.opacity(0.30)),
-                lineWidth: 3
-            )
-        }
-    }
-
-    private func drawGrid(context: inout GraphicsContext, size: CGSize) {
-        for index in 1..<4 {
-            let y = size.height * CGFloat(index) / 4
-            var path = Path()
-            path.move(to: CGPoint(x: 0, y: y))
-            path.addLine(to: CGPoint(x: size.width, y: y))
-            context.stroke(path, with: .color(style.chartGrid), lineWidth: 1)
-        }
-
-        for index in 1..<5 {
-            let x = size.width * CGFloat(index) / 5
-            var path = Path()
-            path.move(to: CGPoint(x: x, y: 0))
-            path.addLine(to: CGPoint(x: x, y: size.height))
-            context.stroke(path, with: .color(style.chartGrid), lineWidth: 1)
-        }
-    }
-
-    private func drawEmptyLine(context: inout GraphicsContext, size: CGSize) {
-        var path = Path()
-        path.move(to: CGPoint(x: 0, y: size.height * 0.58))
-        path.addLine(to: CGPoint(x: size.width, y: size.height * 0.42))
-        context.stroke(
-            path,
-            with: .color(tint.opacity(0.35)),
-            style: StrokeStyle(lineWidth: 5, lineCap: .round)
+        StaticSparklineChartView(
+            series: model.series,
+            style: FinancialChartStyle(
+                lineColor: tint.opacity(0.92),
+                positiveColor: AppTheme.ColorToken.positive,
+                negativeColor: AppTheme.ColorToken.negative,
+                areaTopOpacity: style.chartFillOpacity,
+                areaBottomOpacity: 0.02,
+                lineWidth: 5,
+                lineHighlightColor: style.chartHighlight,
+                lineHighlightWidth: 1.6,
+                gridColor: style.chartGrid,
+                showsGrid: true,
+                showsVolume: false,
+                showsEndpointPulse: false,
+                interpolation: .monotone
+            ),
+            insets: .sparkline,
+            showsEndpointDot: true
         )
     }
-
-    private func point(for point: AssetShareChartPoint, in size: CGSize) -> CGPoint {
-        let xSpan = max(model.xDomain.upperBound - model.xDomain.lowerBound, 0.0001)
-        let ySpan = max(model.yDomain.upperBound - model.yDomain.lowerBound, 0.0001)
-        let xProgress = (point.xPosition - model.xDomain.lowerBound) / xSpan
-        let yProgress = (point.close - model.yDomain.lowerBound) / ySpan
-        let inset: CGFloat = 8
-
-        return CGPoint(
-            x: inset + (size.width - inset * 2) * CGFloat(xProgress),
-            y: inset + (size.height - inset * 2) * (1 - CGFloat(yProgress))
-        )
-    }
-
 }
 
 private struct AssetShareMetric: View {

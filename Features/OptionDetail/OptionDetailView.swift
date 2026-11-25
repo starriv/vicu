@@ -157,7 +157,8 @@ private struct OptionPriceHeroSection: View {
                 fractionLength: OptionValueText.moneyFractionLength(for: displayPrice),
                 font: .system(size: 44, weight: .medium, design: .rounded),
                 minimumScaleFactor: 0.72,
-                isAnimated: chartSelection == nil
+                isAnimated: true,
+                animationDuration: chartSelection == nil ? 0.18 : 0.08
             )
 
             VStack(alignment: .leading, spacing: 2) {
@@ -194,51 +195,59 @@ private struct OptionChartSection: View {
     @Binding var chartSelection: AssetChartSelection?
     @Binding var isChartScrubbing: Bool
 
-    private static let chartHeight: CGFloat = 300
+    private static let linePlotHeight: CGFloat = 224
+    private static let candlePlotHeight: CGFloat = 268
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            AssetPriceChart(
+                model: store.chartRenderModels.model(for: store.effectiveChartMode),
+                isLoading: store.isLoadingChart,
+                range: store.selectedRange,
+                selection: $chartSelection,
+                isScrubbing: $isChartScrubbing
+            )
+            .frame(maxWidth: .infinity)
+            .frame(height: store.effectiveChartMode == .candles ? Self.candlePlotHeight : Self.linePlotHeight)
+            .animation(.snappy(duration: 0.22), value: store.effectiveChartMode)
+
             ZStack {
-                AssetPriceChart(
-                    model: store.chartRenderModels.model(for: store.effectiveChartMode),
-                    isLoading: store.isLoadingChart,
-                    range: store.selectedRange,
-                    selection: $chartSelection,
-                    isScrubbing: $isChartScrubbing
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .allowsHitTesting(!store.isLoadingChart)
+                HStack(spacing: 8) {
+                    AssetRangePicker(selection: store.selectedRange) { range in
+                        chartSelection = nil
+                        isChartScrubbing = false
+                        store.selectRange(range)
+                    }
 
-                if store.isLoadingChart {
-                    OptionChartLoadingBackground(
-                        tint: store.chartRenderModels.model(for: store.effectiveChartMode).periodTint
-                    )
-                    .transition(.opacity)
-                }
-            }
-            .frame(height: Self.chartHeight)
-            .animation(.snappy(duration: 0.18), value: store.isLoadingChart)
-
-            HStack(spacing: 12) {
-                AssetRangePicker(selection: store.selectedRange) { range in
-                    chartSelection = nil
-                    isChartScrubbing = false
-                    store.selectRange(range)
-                }
-
-                Spacer(minLength: 8)
-
-                if store.selectedRange != .oneDay {
-                    AssetChartModePicker(
-                        selection: Binding(
-                            get: { store.chartMode },
-                            set: { store.selectChartMode($0) }
+                    if store.selectedRange != .oneDay {
+                        AssetChartModePicker(
+                            selection: Binding(
+                                get: { store.chartMode },
+                                set: { store.selectChartMode($0) }
+                            )
                         )
-                    )
+                    }
+                }
+                .opacity(isChartScrubbing ? 0 : 1)
+                .allowsHitTesting(!isChartScrubbing)
+
+                if isChartScrubbing {
+                    let ticks = scrubAxisTicks
+                    if !ticks.isEmpty {
+                        FinancialChartTimeAxisStrip(labels: ticks)
+                            .transition(.opacity)
+                    }
                 }
             }
+            .animation(.easeOut(duration: 0.16), value: isChartScrubbing)
 
         }
+    }
+
+    private var scrubAxisTicks: [String] {
+        chartSelection?.axisDates.map { date in
+            date.map { AssetChartDateLabelFormatter.axisTick(from: $0, range: store.selectedRange) } ?? ""
+        } ?? []
     }
 }
 

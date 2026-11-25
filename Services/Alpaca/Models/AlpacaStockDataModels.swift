@@ -253,11 +253,21 @@ enum AssetChartRange: String, Codable, CaseIterable, Identifiable, Hashable, Sen
 
     func startDate(now: Date = Date()) -> Date {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+        calendar.timeZone = TimeZone(identifier: "America/New_York") ?? TimeZone(secondsFromGMT: 0) ?? .current
 
         if self == .yearToDate {
             let year = calendar.component(.year, from: now)
-            return calendar.date(from: DateComponents(year: year, month: 1, day: 1)) ?? now
+            return calendar.date(
+                from: DateComponents(
+                    timeZone: calendar.timeZone,
+                    year: year,
+                    month: 1,
+                    day: 1,
+                    hour: 0,
+                    minute: 0,
+                    second: 0
+                )
+            ) ?? now
         }
 
         return calendar.date(byAdding: calendarComponent, value: calendarValue, to: now) ?? now

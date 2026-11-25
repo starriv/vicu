@@ -1064,362 +1064,28 @@ final class AssetDetailStore {
     }
 
     private func chartRenderInput(from sourceBars: [AlpacaMarketBar], for range: AssetChartRange) -> AssetChartRenderInput {
-        let priceChangeBaseline = chartBaselines[range]
-        let indexedSourceBars = Self.indexedChartInputBars(from: sourceBars)
-        guard range == .oneDay else {
-            return AssetChartRenderInput(
-                bars: indexedSourceBars,
-                xDomain: nil,
-                priceChangeBaseline: priceChangeBaseline
-            )
-        }
-
-        guard feed == .overnight else {
-            if let extendedSessionFallbackInput = extendedSessionFallbackChartRenderInput(
-                from: sourceBars,
-                priceChangeBaseline: priceChangeBaseline
-            ) {
-                return extendedSessionFallbackInput
-            }
-
-            return activeSessionChartRenderInput(
-                from: sourceBars,
-                priceChangeBaseline: priceChangeBaseline
-            ) ?? AssetChartRenderInput(
-                bars: indexedSourceBars,
-                xDomain: nil,
-                priceChangeBaseline: priceChangeBaseline
-            )
-        }
-
-        let overnightBars = overnightChartBars(referenceBar: sourceBars.last)
-        guard !overnightBars.isEmpty,
-              let latestOvernightDate = AlpacaDateParser.date(overnightBars.last?.timestamp) else {
-            return overnightFallbackChartRenderInput(
-                from: indexedSourceBars,
-                priceChangeBaseline: priceChangeBaseline
-            ) ?? AssetChartRenderInput(
-                bars: indexedSourceBars,
-                xDomain: nil,
-                priceChangeBaseline: priceChangeBaseline
-            )
-        }
-
-        let overnightKeys = Set(overnightBars.compactMap(Self.chartBarKey))
-        let dedupedSourceBars = sourceBars.filter { bar in
-            guard let barKey = Self.chartBarKey(for: bar) else {
-                return true
-            }
-
-            return !overnightKeys.contains(barKey)
-        }
-
-        let sourceInputBars = Self.indexedChartInputBars(from: dedupedSourceBars)
-        let sourceCount = sourceInputBars.count
-        let overnightInputBars = overnightBars.compactMap { bar -> AssetChartInputBar? in
-            guard let barDate = AlpacaDateParser.date(bar.timestamp) else {
-                return nil
-            }
-
-            return AssetChartInputBar(
-                bar: bar,
-                xPosition: overnightLatestXPosition(for: barDate, sourceCount: sourceCount)
-            )
-        }
-        guard let latestXPosition = overnightInputBars.last?.xPosition else {
-            return AssetChartRenderInput(
-                bars: indexedSourceBars,
-                xDomain: nil,
-                priceChangeBaseline: priceChangeBaseline
-            )
-        }
-
-        let xDomain = overnightXDomain(
-            for: latestOvernightDate,
-            sourceCount: sourceCount,
-            latestXPosition: latestXPosition
-        )
-
-        return AssetChartRenderInput(
-            bars: sourceInputBars + overnightInputBars,
-            xDomain: xDomain,
-            priceChangeBaseline: priceChangeBaseline
-        )
-    }
-
-    private func overnightFallbackChartRenderInput(
-        from sourceInputBars: [AssetChartInputBar],
-        priceChangeBaseline: Double?
-    ) -> AssetChartRenderInput? {
-        guard !sourceInputBars.isEmpty,
-              let interval = activeOvernightInterval(for: sessionProgress?.referenceDate ?? Date()) else {
-            return nil
-        }
-
-        let sourceCount = sourceInputBars.count
-        let totalUnits = oneDaySlotMetrics(for: interval.end, in: interval).totalUnits
-        return AssetChartRenderInput(
-            bars: sourceInputBars,
-            xDomain: 0...max(Double(sourceCount) + totalUnits, Double(sourceCount), 1),
-            priceChangeBaseline: priceChangeBaseline
-        )
-    }
-
-    private func extendedSessionFallbackChartRenderInput(
-        from sourceBars: [AlpacaMarketBar],
-        priceChangeBaseline: Double?
-    ) -> AssetChartRenderInput? {
-        guard let interval = activeReferenceInterval(),
-              interval.session.usesLatestRegularBarsFallback else {
-            return nil
-        }
-
-        let baseBars = sourceBars.filter { bar in
-            guard let barDate = AlpacaDateParser.date(bar.timestamp) else {
-                return false
-            }
-
-            return barDate < interval.start
-        }
-        guard baseBars.count >= 2 else {
-            return nil
-        }
-
-        let baseInputBars = Self.indexedChartInputBars(from: baseBars)
-        let baseCount = baseInputBars.count
-        var overlayInputBars = sourceBars.compactMap { bar -> AssetChartInputBar? in
-            guard let barDate = AlpacaDateParser.date(bar.timestamp),
-                  barDate >= interval.start,
-                  barDate <= interval.end else {
-                return nil
-            }
-
-            return AssetChartInputBar(
-                bar: bar,
-                xPosition: Double(baseCount) + oneDayXPosition(for: barDate, in: interval)
-            )
-        }
-
-        if let realtimeInputBar = realtimeActiveSessionInputBar(in: interval) {
-            upsertNewerChartInputBar(
-                AssetChartInputBar(
-                    bar: realtimeInputBar.bar,
-                    xPosition: Double(baseCount) + realtimeInputBar.xPosition
-                ),
-                in: &overlayInputBars
-            )
-        }
-
-        overlayInputBars.sort { lhs, rhs in
-            if lhs.xPosition == rhs.xPosition {
-                let lhsDate = AlpacaDateParser.date(lhs.bar.timestamp) ?? .distantPast
-                let rhsDate = AlpacaDateParser.date(rhs.bar.timestamp) ?? .distantPast
-                return lhsDate < rhsDate
-            }
-
-            return lhs.xPosition < rhs.xPosition
-        }
-
-        return AssetChartRenderInput(
-            bars: baseInputBars + overlayInputBars,
-            xDomain: extendedSessionFallbackXDomain(
-                baseCount: baseCount,
-                latestXPosition: overlayInputBars.last?.xPosition,
-                interval: interval
-            ),
-            priceChangeBaseline: priceChangeBaseline
-        )
-    }
-
-    private func extendedSessionFallbackXDomain(
-        baseCount: Int,
-        latestXPosition: Double?,
-        interval: MarketSessionInterval
-    ) -> ClosedRange<Double> {
-        let totalUnits = oneDaySlotMetrics(for: interval.end, in: interval).totalUnits
-        let upperBound = max(
-            Double(baseCount) + totalUnits,
-            (latestXPosition ?? 0) + 1,
-            Double(baseCount),
-            1
-        )
-        return 0...upperBound
-    }
-
-    private func activeSessionChartRenderInput(
-        from sourceBars: [AlpacaMarketBar],
-        priceChangeBaseline: Double?
-    ) -> AssetChartRenderInput? {
-        let latestBarDate = sourceBars
-            .compactMap { AlpacaDateParser.date($0.timestamp) }
-            .last
-        guard let interval = activeNonOvernightInterval(for: latestBarDate) else {
-            return nil
-        }
-
-        return oneDaySessionChartRenderInput(
+        AssetIntradaySessionMapper.makeRenderInput(
             from: sourceBars,
-            in: interval,
-            priceChangeBaseline: priceChangeBaseline
+            range: range,
+            priceChangeBaseline: chartBaselines[range],
+            context: intradaySessionContext
         )
     }
 
-    private func oneDaySessionChartRenderInput(
-        from sourceBars: [AlpacaMarketBar],
-        in interval: MarketSessionInterval,
-        priceChangeBaseline: Double?
-    ) -> AssetChartRenderInput? {
-        let sessionInputBars = sourceBars.compactMap { bar -> AssetChartInputBar? in
-            guard let barDate = AlpacaDateParser.date(bar.timestamp),
-                  barDate >= interval.start,
-                  barDate <= interval.end else {
-                return nil
-            }
-
-            return AssetChartInputBar(
-                bar: bar,
-                xPosition: oneDayXPosition(for: barDate, in: interval)
-            )
-        }
-        let inputBars = activeSessionInputBars(
-            from: sessionInputBars,
-            in: interval,
-            priceChangeBaseline: priceChangeBaseline
+    private var intradaySessionContext: AssetIntradaySessionContext {
+        AssetIntradaySessionContext(
+            symbol: symbol,
+            feed: feed,
+            sessionProgress: sessionProgress,
+            latestTrade: latestTrade,
+            quote: quote,
+            latestOvernightBar: latestOvernightBar,
+            overnightSupplementBars: overnightSupplementBars,
+            previousClose: previousClose,
+            dayOpen: dayOpen,
+            latestCoreSessionClose: latestCoreSessionClose,
+            currentPrice: currentPrice
         )
-
-        guard inputBars.count >= 2 else {
-            return nil
-        }
-
-        return AssetChartRenderInput(
-            bars: inputBars,
-            xDomain: oneDayXDomain(for: interval, latestXPosition: inputBars.last?.xPosition),
-            priceChangeBaseline: priceChangeBaseline
-        )
-    }
-
-    private func activeSessionInputBars(
-        from inputBars: [AssetChartInputBar],
-        in interval: MarketSessionInterval,
-        priceChangeBaseline: Double?
-    ) -> [AssetChartInputBar] {
-        var resolvedInputBars = inputBars
-        if let realtimeInputBar = realtimeActiveSessionInputBar(in: interval) {
-            upsertNewerChartInputBar(realtimeInputBar, in: &resolvedInputBars)
-        }
-
-        if resolvedInputBars.count < 2,
-           let openingInputBar = openingActiveSessionInputBar(
-            in: interval,
-            inputBars: resolvedInputBars,
-            priceChangeBaseline: priceChangeBaseline
-           ) {
-            appendUniqueChartInputBar(openingInputBar, to: &resolvedInputBars)
-        }
-
-        return resolvedInputBars.sorted { lhs, rhs in
-            if lhs.xPosition == rhs.xPosition {
-                let lhsDate = AlpacaDateParser.date(lhs.bar.timestamp) ?? .distantPast
-                let rhsDate = AlpacaDateParser.date(rhs.bar.timestamp) ?? .distantPast
-                return lhsDate < rhsDate
-            }
-
-            return lhs.xPosition < rhs.xPosition
-        }
-    }
-
-    private func realtimeActiveSessionInputBar(in interval: MarketSessionInterval) -> AssetChartInputBar? {
-        guard let realtimePrice = latestRealtimeChartPrice(),
-              let realtimeDate = AlpacaDateParser.date(realtimePrice.timestamp),
-              realtimeDate >= interval.start,
-              realtimeDate <= interval.end else {
-            return nil
-        }
-
-        let chartDate = Self.minuteTimestamp(for: realtimeDate)
-        return AssetChartInputBar(
-            bar: AlpacaMarketBar(
-                symbol: symbol,
-                open: realtimePrice.price,
-                high: realtimePrice.price,
-                low: realtimePrice.price,
-                close: realtimePrice.price,
-                volume: 0,
-                vwap: nil,
-                tradeCount: nil,
-                timestamp: Self.chartTimestampFormatter.string(from: chartDate)
-            ),
-            xPosition: oneDayXPosition(for: chartDate, in: interval)
-        )
-    }
-
-    private func openingActiveSessionInputBar(
-        in interval: MarketSessionInterval,
-        inputBars: [AssetChartInputBar],
-        priceChangeBaseline: Double?
-    ) -> AssetChartInputBar? {
-        let price = priceChangeBaseline
-            ?? previousClose
-            ?? inputBars.first?.bar.open
-            ?? inputBars.first?.bar.close
-            ?? dayOpen
-            ?? latestCoreSessionClose
-            ?? currentPrice
-        guard Self.hasValidMarketPrice(price) else {
-            return nil
-        }
-
-        return AssetChartInputBar(
-            bar: AlpacaMarketBar(
-                symbol: symbol,
-                open: price,
-                high: price,
-                low: price,
-                close: price,
-                volume: 0,
-                vwap: nil,
-                tradeCount: nil,
-                timestamp: Self.chartTimestampFormatter.string(from: interval.start)
-            ),
-            xPosition: oneDayXPosition(for: interval.start, in: interval)
-        )
-    }
-
-    private func upsertNewerChartInputBar(
-        _ inputBar: AssetChartInputBar,
-        in inputBars: inout [AssetChartInputBar]
-    ) {
-        guard let inputKey = Self.chartBarKey(for: inputBar.bar) else {
-            inputBars.append(inputBar)
-            return
-        }
-
-        guard let index = inputBars.firstIndex(where: { Self.chartBarKey(for: $0.bar) == inputKey }) else {
-            inputBars.append(inputBar)
-            return
-        }
-
-        let existingDate = AlpacaDateParser.date(inputBars[index].bar.timestamp) ?? .distantPast
-        let inputDate = AlpacaDateParser.date(inputBar.bar.timestamp) ?? .distantPast
-        if inputDate >= existingDate {
-            inputBars[index] = inputBar
-        }
-    }
-
-    private func appendUniqueChartInputBar(
-        _ inputBar: AssetChartInputBar,
-        to inputBars: inout [AssetChartInputBar]
-    ) {
-        guard let inputKey = Self.chartBarKey(for: inputBar.bar) else {
-            inputBars.append(inputBar)
-            return
-        }
-
-        guard !inputBars.contains(where: { Self.chartBarKey(for: $0.bar) == inputKey }) else {
-            return
-        }
-
-        inputBars.append(inputBar)
     }
 
     private func setChartBaseline(_ baseline: Double?, for range: AssetChartRange) {
@@ -1440,164 +1106,15 @@ final class AssetDetailStore {
         }
     }
 
-    private func overnightLatestXPosition(for date: Date, sourceCount: Int) -> Double {
-        guard let slotMetrics = overnightSlotMetrics(for: date) else {
-            return Double(sourceCount)
-        }
-
-        return Double(sourceCount) + slotMetrics.elapsedUnits
-    }
-
-    private func overnightXDomain(
-        for date: Date,
-        sourceCount: Int,
-        latestXPosition: Double
-    ) -> ClosedRange<Double> {
-        let upperBound: Double
-        if let slotMetrics = overnightSlotMetrics(for: date) {
-            upperBound = Double(sourceCount) + slotMetrics.totalUnits
-        } else {
-            upperBound = latestXPosition + 1
-        }
-
-        return 0...max(upperBound, latestXPosition + 1, 1)
-    }
-
-    private func overnightSlotMetrics(for date: Date) -> (elapsedUnits: Double, totalUnits: Double)? {
-        guard let interval = activeOvernightInterval(for: date) else {
-            return nil
-        }
-
-        return oneDaySlotMetrics(for: date, in: interval)
-    }
-
-    private func oneDayXPosition(for date: Date, in interval: MarketSessionInterval) -> Double {
-        oneDaySlotMetrics(for: date, in: interval).elapsedUnits
-    }
-
-    private func oneDayXDomain(
-        for interval: MarketSessionInterval,
-        latestXPosition: Double?
-    ) -> ClosedRange<Double> {
-        let totalUnits = oneDaySlotMetrics(for: interval.end, in: interval).totalUnits
-        return 0...max(totalUnits, (latestXPosition ?? 0) + 1, 1)
-    }
-
-    private func oneDaySlotMetrics(
-        for date: Date,
-        in interval: MarketSessionInterval
-    ) -> (elapsedUnits: Double, totalUnits: Double) {
-        let totalSlots = max(
-            1.0,
-            interval.end.timeIntervalSince(interval.start) / Self.oneDayChartSlotDuration
-        )
-        let elapsedSlots = date.timeIntervalSince(interval.start) / Self.oneDayChartSlotDuration
-        return (min(max(elapsedSlots, 0), totalSlots), totalSlots)
-    }
-
-    private func activeOvernightInterval(for date: Date) -> MarketSessionInterval? {
-        if let containingDate = sessionProgress?.intervals.first(where: { interval in
-            interval.session == .overnight && interval.contains(date)
-        }) {
-            return containingDate
-        }
-
-        if let referenceDate = sessionProgress?.referenceDate,
-           let containingReference = sessionProgress?.intervals.first(where: { interval in
-               interval.session == .overnight && interval.contains(referenceDate)
-           }) {
-            return containingReference
-        }
-
-        return sessionProgress?.intervals.first { interval in
-            interval.session == .overnight
-        }
-    }
-
     private func activeReferenceInterval() -> MarketSessionInterval? {
-        guard let sessionProgress else {
-            return nil
-        }
-
-        return sessionProgress.intervals
-            .filter { $0.contains(sessionProgress.referenceDate) }
-            .min { lhs, rhs in
-                if lhs.session.activePriority == rhs.session.activePriority {
-                    return lhs.start < rhs.start
-                }
-
-                return lhs.session.activePriority < rhs.session.activePriority
-            }
-    }
-
-    private func activeNonOvernightInterval(for date: Date?) -> MarketSessionInterval? {
-        let intervals = sessionProgress?.intervals.filter { $0.session != .overnight } ?? []
-        if let date,
-           let containingDate = intervals.filter({ interval in
-               interval.start <= date && date <= interval.end
-           }).min(by: sessionIntervalPrioritySort) {
-            return containingDate
-        }
-
-        if let referenceDate = sessionProgress?.referenceDate,
-           let containingReference = intervals.first(where: { $0.contains(referenceDate) }) {
-            return containingReference
-        }
-
-        return nil
+        AssetIntradaySessionMapper.activeReferenceInterval(in: sessionProgress)
     }
 
     private func completedExtendedInterval(
         containing date: Date,
         in progress: MarketSessionProgress
     ) -> MarketSessionInterval? {
-        progress.intervals
-            .filter { interval in
-                interval.session.extendedTradingSession != nil
-                    && interval.start <= date
-                    && date <= interval.end
-                    && interval.end <= progress.referenceDate
-            }
-            .min(by: sessionIntervalPrioritySort)
-    }
-
-    private func sessionIntervalPrioritySort(_ lhs: MarketSessionInterval, _ rhs: MarketSessionInterval) -> Bool {
-        if lhs.session.activePriority == rhs.session.activePriority {
-            return lhs.start < rhs.start
-        }
-
-        return lhs.session.activePriority < rhs.session.activePriority
-    }
-
-    private func overnightChartBars(referenceBar: AlpacaMarketBar?) -> [AlpacaMarketBar] {
-        var barsByKey: [Int: AlpacaMarketBar] = [:]
-
-        for bar in overnightSupplementBars {
-            storeOvernightChartBar(bar, in: &barsByKey)
-        }
-
-        if let latestBar = latestOvernightChartBar(referenceBar: referenceBar) {
-            storeOvernightChartBar(latestBar, in: &barsByKey)
-        }
-
-        let referenceDate = AlpacaDateParser.date(referenceBar?.timestamp)
-        return barsByKey.values
-            .filter { bar in
-                guard let barDate = AlpacaDateParser.date(bar.timestamp) else {
-                    return false
-                }
-
-                if let referenceDate {
-                    return barDate > referenceDate
-                }
-
-                return true
-            }
-            .sorted { lhs, rhs in
-                let lhsDate = AlpacaDateParser.date(lhs.timestamp) ?? .distantPast
-                let rhsDate = AlpacaDateParser.date(rhs.timestamp) ?? .distantPast
-                return lhsDate < rhsDate
-            }
+        AssetIntradaySessionMapper.completedExtendedInterval(containing: date, in: progress)
     }
 
     private func resetOvernightSupplementBars(feed: AlpacaMarketDataFeed, latestBar: AlpacaMarketBar?) {
@@ -1614,189 +1131,35 @@ final class AssetDetailStore {
             return
         }
 
-        mergeOvernightSupplementBar(latestOvernightChartBar(referenceBar: bars.last))
+        mergeOvernightSupplementBar(
+            AssetIntradaySessionMapper.latestOvernightChartBar(
+                referenceBar: bars.last,
+                context: intradaySessionContext
+            )
+        )
     }
 
     private func mergeOvernightSupplementBar(_ bar: AlpacaMarketBar?) {
         guard let bar,
               feed == .overnight,
               selectedRange == .oneDay,
-              let barKey = Self.chartBarKey(for: bar) else {
+              let barKey = AssetIntradaySessionMapper.minuteKey(for: bar) else {
             return
         }
 
-        if let index = overnightSupplementBars.firstIndex(where: { Self.chartBarKey(for: $0) == barKey }) {
-            overnightSupplementBars[index] = newerOvernightBar(
-                current: overnightSupplementBars[index],
-                candidate: bar
-            )
+        if let index = overnightSupplementBars.firstIndex(where: { AssetIntradaySessionMapper.minuteKey(for: $0) == barKey }) {
+            let currentDate = AlpacaDateParser.date(overnightSupplementBars[index].timestamp)
+            let candidateDate = AlpacaDateParser.date(bar.timestamp)
+            if currentDate == nil || candidateDate == nil || candidateDate! >= currentDate! {
+                overnightSupplementBars[index] = bar
+            }
         } else {
             overnightSupplementBars.append(bar)
         }
 
-        overnightSupplementBars = Self.normalizedBars(overnightSupplementBars)
-        if overnightSupplementBars.count > 300 {
-            overnightSupplementBars.removeFirst(overnightSupplementBars.count - 300)
-        }
-    }
-
-    private func storeOvernightChartBar(_ bar: AlpacaMarketBar, in barsByKey: inout [Int: AlpacaMarketBar]) {
-        guard let barKey = Self.chartBarKey(for: bar) else {
-            return
-        }
-
-        barsByKey[barKey] = newerOvernightBar(current: barsByKey[barKey], candidate: bar)
-    }
-
-    private func newerOvernightBar(current: AlpacaMarketBar?, candidate: AlpacaMarketBar) -> AlpacaMarketBar {
-        guard let current,
-              let currentDate = AlpacaDateParser.date(current.timestamp),
-              let candidateDate = AlpacaDateParser.date(candidate.timestamp) else {
-            return candidate
-        }
-
-        return candidateDate >= currentDate ? candidate : current
-    }
-
-    private func latestOvernightChartBar(referenceBar: AlpacaMarketBar?) -> AlpacaMarketBar? {
-        let baseBar = latestOvernightBar ?? makeSyntheticChartBar(
-            price: referenceBar?.close ?? latestCoreSessionClose ?? 0,
-            timestamp: nil,
-            referenceBar: referenceBar
-        )
-
-        guard let baseBar else {
-            return nil
-        }
-
-        return applyingLatestRealtimePrice(to: baseBar)
-    }
-
-    private func applyingLatestRealtimePrice(to baseBar: AlpacaMarketBar) -> AlpacaMarketBar {
-        guard let realtimePrice = latestRealtimeChartPrice(),
-              let realtimeDate = AlpacaDateParser.date(realtimePrice.timestamp),
-              let baseDate = AlpacaDateParser.date(baseBar.timestamp),
-              realtimeDate >= baseDate else {
-            return baseBar
-        }
-
-        let realtimeMinute = Self.minuteTimestamp(for: realtimeDate)
-        if realtimeMinute == baseDate {
-            return AlpacaMarketBar(
-                symbol: symbol,
-                open: baseBar.open,
-                high: max(baseBar.high ?? realtimePrice.price, realtimePrice.price),
-                low: min(baseBar.low ?? realtimePrice.price, realtimePrice.price),
-                close: realtimePrice.price,
-                volume: baseBar.volume,
-                vwap: baseBar.vwap,
-                tradeCount: baseBar.tradeCount,
-                timestamp: baseBar.timestamp
-            )
-        }
-
-        let open = baseBar.close ?? realtimePrice.price
-        return AlpacaMarketBar(
-            symbol: symbol,
-            open: open,
-            high: max(open, realtimePrice.price),
-            low: min(open, realtimePrice.price),
-            close: realtimePrice.price,
-            volume: 0,
-            vwap: nil,
-            tradeCount: nil,
-            timestamp: Self.chartTimestampFormatter.string(from: realtimeMinute)
-        )
-    }
-
-    private func latestRealtimeChartPrice() -> (price: Double, timestamp: String)? {
-        let tradePrice: (price: Double, timestamp: String)?
-        if let price = latestTrade?.price,
-           Self.hasValidMarketPrice(price),
-           let timestamp = latestTrade?.timestamp {
-            tradePrice = (price, timestamp)
-        } else {
-            tradePrice = nil
-        }
-
-        let quotePrice: (price: Double, timestamp: String)?
-        if let price = Self.chartQuotePrice(quote),
-           let timestamp = quote?.timestamp {
-            quotePrice = (price, timestamp)
-        } else {
-            quotePrice = nil
-        }
-
-        return Self.newerChartPrice(preferred: tradePrice, fallback: quotePrice)
-    }
-
-    private static func newerChartPrice(
-        preferred: (price: Double, timestamp: String)?,
-        fallback: (price: Double, timestamp: String)?
-    ) -> (price: Double, timestamp: String)? {
-        guard let preferred else {
-            return fallback
-        }
-
-        guard let fallback else {
-            return preferred
-        }
-
-        guard let preferredDate = AlpacaDateParser.date(preferred.timestamp) else {
-            return AlpacaDateParser.date(fallback.timestamp) == nil ? preferred : fallback
-        }
-
-        guard let fallbackDate = AlpacaDateParser.date(fallback.timestamp) else {
-            return preferred
-        }
-
-        return preferredDate >= fallbackDate ? preferred : fallback
-    }
-
-    private static func chartQuotePrice(_ quote: AlpacaRealtimeQuote?) -> Double? {
-        guard let quote else {
-            return nil
-        }
-
-        switch (hasValidMarketPrice(quote.bidPrice), hasValidMarketPrice(quote.askPrice)) {
-        case (true, true):
-            return ((quote.bidPrice ?? 0) + (quote.askPrice ?? 0)) / 2
-        case (true, false):
-            return quote.bidPrice
-        case (false, true):
-            return quote.askPrice
-        case (false, false):
-            return nil
-        }
-    }
-
-    private func makeSyntheticChartBar(
-        price: Double,
-        timestamp: String?,
-        referenceBar: AlpacaMarketBar?
-    ) -> AlpacaMarketBar? {
-        guard price > 0 else {
-            return nil
-        }
-
-        let referenceClose = referenceBar?.close ?? latestCoreSessionClose ?? price
-        let timestamp = timestamp ?? Self.chartTimestampFormatter.string(from: Date())
-        let eventDate = AlpacaDateParser.date(timestamp)
-        let referenceDate = AlpacaDateParser.date(referenceBar?.timestamp)
-        if let eventDate, let referenceDate, eventDate <= referenceDate {
-            return nil
-        }
-
-        return AlpacaMarketBar(
-            symbol: symbol,
-            open: referenceClose,
-            high: max(referenceClose, price),
-            low: min(referenceClose, price),
-            close: price,
-            volume: 0,
-            vwap: nil,
-            tradeCount: nil,
-            timestamp: timestamp
+        overnightSupplementBars = AssetIntradaySessionMapper.normalizedBars(
+            overnightSupplementBars,
+            maxCount: AssetIntradaySessionMapper.maxOvernightSupplementBars
         )
     }
 
@@ -1818,25 +1181,11 @@ final class AssetDetailStore {
     }
 
     private static func normalizedBars(_ bars: [AlpacaMarketBar]) -> [AlpacaMarketBar] {
-        let sortedBars = bars.sorted { lhs, rhs in
-            let lhsDate = AlpacaDateParser.date(lhs.timestamp) ?? .distantPast
-            let rhsDate = AlpacaDateParser.date(rhs.timestamp) ?? .distantPast
-            return lhsDate < rhsDate
-        }
-
-        guard sortedBars.count > 900 else {
-            return sortedBars
-        }
-
-        return Array(sortedBars.suffix(900))
+        AssetIntradaySessionMapper.normalizedBars(bars)
     }
 
     private static func hasValidMarketPrice(_ price: Double?) -> Bool {
-        guard let price else {
-            return false
-        }
-
-        return price.isFinite && price > 0
+        AssetIntradaySessionMapper.hasValidMarketPrice(price)
     }
 
     private static func hasValidQuotePrice(_ quote: AlpacaStockQuote) -> Bool {
@@ -1846,35 +1195,6 @@ final class AssetDetailStore {
     private static func hasValidQuotePrice(_ quote: AlpacaRealtimeQuote) -> Bool {
         hasValidMarketPrice(quote.bidPrice) || hasValidMarketPrice(quote.askPrice)
     }
-
-    private static func indexedChartInputBars(from bars: [AlpacaMarketBar]) -> [AssetChartInputBar] {
-        bars.enumerated().map { offset, bar in
-            AssetChartInputBar(bar: bar, xPosition: Double(offset))
-        }
-    }
-
-    private static func chartBarKey(for bar: AlpacaMarketBar) -> Int? {
-        guard let date = AlpacaDateParser.date(bar.timestamp) else {
-            return nil
-        }
-
-        return Int(floor(date.timeIntervalSince1970 / 60))
-    }
-
-    private static func minuteTimestamp(for date: Date) -> Date {
-        let interval = floor(date.timeIntervalSince1970 / 60) * 60
-        return Date(timeIntervalSince1970: interval)
-    }
-
-    private static let chartTimestampFormatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [
-            .withInternetDateTime,
-            .withColonSeparatorInTimeZone
-        ]
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        return formatter
-    }()
 
     private static func extendedTradingSession(for date: Date) -> AssetExtendedTradingSession? {
         var calendar = Calendar(identifier: .gregorian)
@@ -1931,12 +1251,6 @@ private enum AssetDetailSupplementalSnapshotResult {
     case success(AlpacaResolvedStockSnapshot, requestedFeed: AlpacaMarketDataFeed)
     case failure(Error, requestedFeed: AlpacaMarketDataFeed)
     case skipped
-}
-
-private struct AssetChartRenderInput: Sendable {
-    let bars: [AssetChartInputBar]
-    let xDomain: ClosedRange<Double>?
-    let priceChangeBaseline: Double?
 }
 
 // @unchecked Sendable: immutable observer; onNext only called on MainActor
@@ -2146,21 +1460,6 @@ enum AssetExtendedTradingSession: Equatable, Sendable {
             "Last after-hours"
         case .overnight:
             "Last overnight"
-        }
-    }
-}
-
-private extension MarketSessionKind {
-    var extendedTradingSession: AssetExtendedTradingSession? {
-        switch self {
-        case .overnight:
-            .overnight
-        case .preMarket:
-            .preMarket
-        case .afterHours:
-            .afterHours
-        case .regular:
-            nil
         }
     }
 }
