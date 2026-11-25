@@ -17,54 +17,55 @@ English | [简体中文](#简体中文)
 
 ## Screenshots / 截图
 
-Light and dark, side by side. / 浅色与深色对照。
+Current UI, captured on iPhone 17 Pro (iOS 26.5) with a Paper Trading account. Light and dark appearances are shown side by side.
+
+使用 Paper Trading 账户在 iPhone 17 Pro（iOS 26.5）上截取的新版界面，浅色与深色对照展示。
 
 ### Home / 首页
 
 | Light | Dark |
 |:---:|:---:|
-| <img src="docs/screenshots/light/home-1.png" width="250" alt="Home — Light"> | <img src="docs/screenshots/dark/home-1.png" width="250" alt="Home — Dark"> |
-| <img src="docs/screenshots/light/home-2.png" width="250" alt="Home detail — Light"> | <img src="docs/screenshots/dark/home-2.png" width="250" alt="Home detail — Dark"> |
+| <img src="docs/screenshots/light/home-1.png" width="250" alt="Portfolio overview — Light"> | <img src="docs/screenshots/dark/home-1.png" width="250" alt="Portfolio overview — Dark"> |
+| <img src="docs/screenshots/light/home-2.png" width="250" alt="Allocation, positions and recent orders — Light"> | <img src="docs/screenshots/dark/home-2.png" width="250" alt="Allocation, positions and recent orders — Dark"> |
+| <img src="docs/screenshots/light/copilot.png" width="250" alt="Portfolio Copilot — Light"> | <img src="docs/screenshots/dark/copilot.png" width="250" alt="Portfolio Copilot — Dark"> |
 
 ### Markets / 行情
 
 | Light | Dark |
 |:---:|:---:|
 | <img src="docs/screenshots/light/markets.png" width="250" alt="Markets — Light"> | <img src="docs/screenshots/dark/markets.png" width="250" alt="Markets — Dark"> |
-| <img src="docs/screenshots/light/search.png" width="250" alt="Search — Light"> | <img src="docs/screenshots/dark/search.png" width="250" alt="Search — Dark"> |
+| <img src="docs/screenshots/light/search.png" width="250" alt="Symbol search and most active stocks — Light"> | <img src="docs/screenshots/dark/search.png" width="250" alt="Symbol search and most active stocks — Dark"> |
+
+### Assets & Positions / 资产与持仓
+
+| Light | Dark |
+|:---:|:---:|
+| <img src="docs/screenshots/light/asset-detail.png" width="250" alt="Asset charts and quotes — Light"> | <img src="docs/screenshots/dark/asset-detail.png" width="250" alt="Asset charts and quotes — Dark"> |
+| <img src="docs/screenshots/light/position.png" width="250" alt="Position details — Light"> | <img src="docs/screenshots/dark/position.png" width="250" alt="Position details — Dark"> |
+| <img src="docs/screenshots/light/news.png" width="250" alt="Asset news — Light"> | <img src="docs/screenshots/dark/news.png" width="250" alt="Asset news — Dark"> |
+
+### Trade & Options / 交易与期权
+
+| Light | Dark |
+|:---:|:---:|
+| <img src="docs/screenshots/light/trade-market-order.png" width="250" alt="Stock market order — Light"> | <img src="docs/screenshots/dark/trade-market-order.png" width="250" alt="Stock market order — Dark"> |
+| <img src="docs/screenshots/light/trade-limit-order.png" width="250" alt="Stock limit order — Light"> | <img src="docs/screenshots/dark/trade-limit-order.png" width="250" alt="Stock limit order — Dark"> |
+| <img src="docs/screenshots/light/options.png" width="250" alt="Options chain — Light"> | <img src="docs/screenshots/dark/options.png" width="250" alt="Options chain — Dark"> |
+| <img src="docs/screenshots/light/option-trade.png" width="250" alt="Option order and expiration payoff — Light"> | <img src="docs/screenshots/dark/option-trade.png" width="250" alt="Option order and expiration payoff — Dark"> |
 
 ### Orders / 订单
 
 | Light | Dark |
 |:---:|:---:|
 | <img src="docs/screenshots/light/order-list.png" width="250" alt="Orders — Light"> | <img src="docs/screenshots/dark/order-list.png" width="250" alt="Orders — Dark"> |
-| <img src="docs/screenshots/light/cancel-order.png" width="250" alt="Cancel order — Light"> | <img src="docs/screenshots/dark/cancel-order.png" width="250" alt="Cancel order — Dark"> |
+| <img src="docs/screenshots/light/order-detail.png" width="250" alt="Order details — Light"> | <img src="docs/screenshots/dark/order-detail.png" width="250" alt="Order details — Dark"> |
 
-### Position / 持仓
-
-| Light | Dark |
-|:---:|:---:|
-| <img src="docs/screenshots/light/position.png" width="250" alt="Position — Light"> | <img src="docs/screenshots/dark/position.png" width="250" alt="Position — Dark"> |
-| <img src="docs/screenshots/light/share.png" width="250" alt="Share position — Light"> | <img src="docs/screenshots/dark/share.png" width="250" alt="Share position — Dark"> |
-
-### Trade / 交易
+### More & Settings / 更多与设置
 
 | Light | Dark |
 |:---:|:---:|
-| <img src="docs/screenshots/light/trad-1.png" width="250" alt="Trade — Light"> | <img src="docs/screenshots/dark/trad-1.png" width="250" alt="Trade — Dark"> |
-| <img src="docs/screenshots/light/trade-2.png" width="250" alt="Trade detail — Light"> | <img src="docs/screenshots/dark/trade-2.png" width="250" alt="Trade detail — Dark"> |
-| <img src="docs/screenshots/light/trade-market-order.png" width="250" alt="Market order — Light"> | <img src="docs/screenshots/dark/trade-market-order.png" width="250" alt="Market order — Dark"> |
-| <img src="docs/screenshots/light/trade-limit-order.png" width="250" alt="Limit order — Light"> | <img src="docs/screenshots/dark/trade-limit-order.png" width="250" alt="Limit order — Dark"> |
-
-### More / 更多
-
-Asset detail, options & account setup. / 资产详情、期权与账户配置。
-
-| Light | Dark |
-|:---:|:---:|
-| <img src="docs/screenshots/light/news.png" width="250" alt="News — Light"> | <img src="docs/screenshots/dark/news.png" width="250" alt="News — Dark"> |
-| <img src="docs/screenshots/light/options.png" width="250" alt="Options — Light"> | <img src="docs/screenshots/dark/options.png" width="250" alt="Options — Dark"> |
-| <img src="docs/screenshots/light/alpaca-acct-config.png" width="250" alt="Account setup — Light"> | <img src="docs/screenshots/dark/alpaca-acct-config.png" width="250" alt="Account setup — Dark"> |
+| <img src="docs/screenshots/light/more.png" width="250" alt="More — Light"> | <img src="docs/screenshots/dark/more.png" width="250" alt="More — Dark"> |
+| <img src="docs/screenshots/light/settings.png" width="250" alt="Appearance and settings — Light"> | <img src="docs/screenshots/dark/settings.png" width="250" alt="Appearance and settings — Dark"> |
 
 ---
 
