@@ -27,7 +27,25 @@ enum PortfolioHistoryRange: String, Codable, CaseIterable, Identifiable, Sendabl
         }
     }
 
-    func queryItems(accountCreatedAt: String?) -> [URLQueryItem] {
+    var cacheFreshTTL: TimeInterval {
+        switch self {
+        case .oneDay:
+            30
+        case .oneWeek, .oneMonth, .threeMonths, .oneYear, .yearToDate:
+            60
+        }
+    }
+
+    var usesCalendarWindowDomain: Bool {
+        switch self {
+        case .oneDay:
+            false
+        case .oneWeek, .oneMonth, .threeMonths, .oneYear, .yearToDate:
+            true
+        }
+    }
+
+    func queryItems(accountCreatedAt: String?, now: Date = Date()) -> [URLQueryItem] {
         switch self {
         case .oneDay:
             return [
@@ -42,50 +60,71 @@ enum PortfolioHistoryRange: String, Codable, CaseIterable, Identifiable, Sendabl
                 URLQueryItem(name: "intraday_reporting", value: "continuous"),
                 URLQueryItem(name: "pnl_reset", value: "no_reset")
             ]
-        case .oneMonth:
+        case .oneMonth, .threeMonths, .oneYear, .yearToDate:
+            let window = calendarWindow(now: now)
             return [
-                URLQueryItem(name: "period", value: "1M"),
-                URLQueryItem(name: "timeframe", value: "1D")
-            ]
-        case .threeMonths:
-            return [
-                URLQueryItem(name: "period", value: "3M"),
-                URLQueryItem(name: "timeframe", value: "1D")
-            ]
-        case .oneYear:
-            return [
-                URLQueryItem(name: "period", value: "1A"),
-                URLQueryItem(name: "timeframe", value: "1D")
-            ]
-        case .yearToDate:
-            return [
-                URLQueryItem(name: "start", value: Self.yearToDateStart()),
-                URLQueryItem(name: "timeframe", value: "1D")
+                URLQueryItem(name: "start", value: Self.isoDateTimeString(from: window.lowerBound)),
+                URLQueryItem(name: "end", value: Self.isoDateTimeString(from: window.upperBound)),
+                URLQueryItem(name: "timeframe", value: "1D"),
+                URLQueryItem(name: "pnl_reset", value: "no_reset")
             ]
         }
     }
 
-    private static func yearToDateStart(now: Date = Date()) -> String {
+    /// Returns the authoritative calendar window `[start ... end]` in `America/New_York` time.
+    func calendarWindow(now: Date = Date()) -> ClosedRange<Date> {
+        let calendar = Self.newYorkCalendar
+        let safeEnd = now
+
+        let start: Date
+        switch self {
+        case .oneDay:
+            start = calendar.date(byAdding: .day, value: -1, to: safeEnd) ?? safeEnd.addingTimeInterval(-86_400)
+        case .oneWeek:
+            start = calendar.date(byAdding: .day, value: -7, to: safeEnd) ?? safeEnd.addingTimeInterval(-7 * 86_400)
+        case .oneMonth:
+            start = calendar.date(byAdding: .month, value: -1, to: safeEnd) ?? safeEnd.addingTimeInterval(-30 * 86_400)
+        case .threeMonths:
+            start = calendar.date(byAdding: .month, value: -3, to: safeEnd) ?? safeEnd.addingTimeInterval(-90 * 86_400)
+        case .oneYear:
+            start = calendar.date(byAdding: .year, value: -1, to: safeEnd) ?? safeEnd.addingTimeInterval(-365 * 86_400)
+        case .yearToDate:
+            let year = calendar.component(.year, from: safeEnd)
+            let jan1 = calendar.date(
+                from: DateComponents(
+                    timeZone: calendar.timeZone,
+                    year: year,
+                    month: 1,
+                    day: 1,
+                    hour: 0,
+                    minute: 0,
+                    second: 0
+                )
+            ) ?? safeEnd
+            start = jan1
+        }
+
+        if safeEnd <= start {
+            return start...(start.addingTimeInterval(86_400))
+        }
+        return start...safeEnd
+    }
+
+    static var newYorkTimeZone: TimeZone {
+        TimeZone(identifier: "America/New_York") ?? .current
+    }
+
+    static var newYorkCalendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "America/New_York") ?? .current
+        calendar.timeZone = newYorkTimeZone
+        return calendar
+    }
 
-        let year = calendar.component(.year, from: now)
-        let start = calendar.date(
-            from: DateComponents(
-                timeZone: calendar.timeZone,
-                year: year,
-                month: 1,
-                day: 1,
-                hour: 0,
-                minute: 0,
-                second: 0
-            )
-        ) ?? now
-
+    private static func isoDateTimeString(from date: Date) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
-        formatter.timeZone = calendar.timeZone
-        return formatter.string(from: start)
+        formatter.timeZone = newYorkTimeZone
+        return formatter.string(from: date)
     }
 }
 
@@ -107,25 +146,33 @@ struct AlpacaPortfolioHistory: Decodable, Sendable {
     func points() -> [PortfolioHistoryPoint] {
         guard let timestamp, let equity else { return [] }
 
-        return timestamp.indices.compactMap { index -> PortfolioHistoryPoint? in
-            guard index < equity.count, let value = equity[index] else {
-                return nil
+        var byTimestamp: [Int: PortfolioHistoryPoint] = [:]
+        byTimestamp.reserveCapacity(min(timestamp.count, equity.count))
+
+        for index in timestamp.indices {
+            guard index < equity.count,
+                  let value = equity[index],
+                  value.isFinite else {
+                continue
             }
 
-            return PortfolioHistoryPoint(
-                date: Date(timeIntervalSince1970: TimeInterval(timestamp[index])),
+            let rawTimestamp = timestamp[index]
+            byTimestamp[rawTimestamp] = PortfolioHistoryPoint(
+                date: Date(timeIntervalSince1970: TimeInterval(rawTimestamp)),
                 equity: value,
-                profitLoss: optionalValue(at: index, in: profitLoss),
-                profitLossPercent: optionalValue(at: index, in: profitLossPct)
+                profitLoss: optionalFiniteValue(at: index, in: profitLoss),
+                profitLossPercent: optionalFiniteValue(at: index, in: profitLossPct)
             )
         }
+
+        return byTimestamp.values.sorted { $0.date < $1.date }
     }
 
-    private func optionalValue(at index: Int, in values: [Double?]?) -> Double? {
-        guard let values, index < values.count else {
+    private func optionalFiniteValue(at index: Int, in values: [Double?]?) -> Double? {
+        guard let values, index < values.count, let value = values[index], value.isFinite else {
             return nil
         }
-        return values[index]
+        return value
     }
 }
 

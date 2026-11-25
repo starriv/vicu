@@ -21,7 +21,9 @@ extension AppModel {
         portfolio.prepareForRefresh()
         defer {
             portfolio.isRefreshing = false
-            portfolio.isLoadingHistory = false
+            if portfolioHistoryTask == nil {
+                portfolio.isLoadingHistory = false
+            }
         }
 
         await withTaskGroup(of: PortfolioRefreshResult.self) { group in
@@ -84,11 +86,7 @@ extension AppModel {
                     portfolio.applyOrders(orders)
                     didReceiveValue = true
                 case .history(let range, let history):
-                    guard portfolio.historyRange == range else {
-                        continue
-                    }
-
-                    portfolio.applyHistory(history)
+                    portfolio.applyHistory(history, for: range)
                     didReceiveValue = true
                 case .failure(let failure):
                     guard !failure.isCancellation else {
@@ -163,32 +161,91 @@ extension AppModel {
             return
         }
 
-        portfolio.historyRange = range
-        await refreshPortfolioHistory()
-    }
+        portfolioHistoryTask?.cancel()
+        portfolioHistoryTask = nil
+        portfolio.selectHistoryRange(range)
 
-    func refreshPortfolioHistory() async {
-        guard let credentials else {
-            portfolio.history = []
-            portfolio.hasLoadedHistory = false
+        if portfolio.isHistoryFresh(for: range) {
+            portfolio.isLoadingHistory = false
             return
         }
 
-        portfolio.isLoadingHistory = true
-        defer { portfolio.isLoadingHistory = false }
+        await refreshPortfolioHistory(for: range, forceRefresh: false)
+    }
 
-        do {
-            let history = try await services.portfolio.fetchPortfolioHistory(
-                range: portfolio.historyRange,
-                accountCreatedAt: portfolio.account?.createdAt,
-                credentials: credentials
-            )
-            portfolio.applyHistory(history)
-            lastError = nil
-        } catch where error.isRequestCancellation {
+    func refreshPortfolioHistory(
+        for targetRange: PortfolioHistoryRange? = nil,
+        forceRefresh: Bool = true
+    ) async {
+        let requestedRange = targetRange ?? portfolio.historyRange
+        guard let activeCredentials = credentials else {
+            portfolio.history = []
+            portfolio.historyLoadedRange = nil
+            portfolio.hasLoadedHistory = false
+            portfolio.isLoadingHistory = false
             return
-        } catch {
-            lastError = error.localizedDescription
+        }
+
+        if !forceRefresh, portfolio.isHistoryFresh(for: requestedRange) {
+            if portfolio.historyRange == requestedRange {
+                portfolio.selectHistoryRange(requestedRange)
+                portfolio.isLoadingHistory = false
+            }
+            return
+        }
+
+        portfolioHistoryTask?.cancel()
+
+        let hasCachedSeriesForRange = portfolio.historyByRange[requestedRange] != nil
+        if portfolio.historyRange == requestedRange {
+            portfolio.isLoadingHistory = !hasCachedSeriesForRange
+        }
+
+        let accountCreatedAt = portfolio.account?.createdAt
+        let portfolioService = services.portfolio
+
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            do {
+                let history = try await portfolioService.fetchPortfolioHistory(
+                    range: requestedRange,
+                    accountCreatedAt: accountCreatedAt,
+                    credentials: activeCredentials
+                )
+                guard !Task.isCancelled,
+                      self.isCurrentCredentialContext(activeCredentials) else {
+                    return
+                }
+
+                self.portfolio.applyHistory(history, for: requestedRange)
+                if self.portfolio.historyRange == requestedRange {
+                    self.portfolio.isLoadingHistory = false
+                }
+                self.lastError = nil
+            } catch where error.isRequestCancellation {
+                return
+            } catch {
+                guard !Task.isCancelled,
+                      self.isCurrentCredentialContext(activeCredentials) else {
+                    return
+                }
+
+                if self.portfolio.historyRange == requestedRange {
+                    if !hasCachedSeriesForRange {
+                        self.portfolio.history = []
+                        self.portfolio.historyLoadedRange = requestedRange
+                    }
+                    self.portfolio.isLoadingHistory = false
+                }
+                self.lastError = error.localizedDescription
+            }
+        }
+
+        portfolioHistoryTask = task
+        await task.value
+        if portfolioHistoryTask == task {
+            portfolioHistoryTask = nil
         }
     }
 
@@ -367,6 +424,8 @@ extension AppModel {
     }
 
     func clearPortfolioSnapshot() {
+        portfolioHistoryTask?.cancel()
+        portfolioHistoryTask = nil
         portfolio.clear()
     }
 

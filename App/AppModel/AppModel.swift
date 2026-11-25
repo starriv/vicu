@@ -76,6 +76,7 @@ final class AppModel: AssetDetailServicing {
     /// Bumped whenever the user mutates favorites so an overlapping refresh
     /// does not overwrite the newer optimistic or server-confirmed state.
     @ObservationIgnored var favoriteMutationGeneration = 0
+    @ObservationIgnored var portfolioHistoryTask: Task<Void, Never>?
     @ObservationIgnored let assetCache = MarketAssetCache()
     @ObservationIgnored let searchCache = SearchDataCache()
     @ObservationIgnored let newsCache = NewsDataCache()

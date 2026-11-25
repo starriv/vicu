@@ -1,88 +1,80 @@
-import Charts
 import SwiftUI
 
 struct HomeHeroView: View {
     @Environment(AppModel.self) private var app
     var showsInitialSkeleton = false
+
     @State private var chartMode: PortfolioChartMode = .equity
     @State private var chartSelection: PortfolioChartSelection?
     @State private var isChartScrubbing = false
 
-    private var portfolioValue: Double? {
-        app.portfolio.history.last?.equity ??
-        NumberParser.double(from: app.portfolio.account?.portfolioValue) ??
-        NumberParser.double(from: app.portfolio.account?.equity)
+    private var isLoadingPortfolioChart: Bool {
+        app.portfolio.isLoadingHistory || (!app.portfolio.hasLoadedHistory && app.portfolio.isRefreshing)
     }
 
-    private var rangeChange: (amount: Double?, percent: Double?) {
-        guard let latest = app.portfolio.history.last else {
-            return (nil, nil)
+    /// Stable timestamp anchor per range fetch so 120Hz scrubbing never invalidates
+    /// `FinancialChartView`'s O(1) render cache or triggers spurious right-edge haptics.
+    private var chartReferenceNow: Date {
+        if let updatedAt = app.portfolio.historyUpdatedAtByRange[app.portfolio.historyRange] {
+            return updatedAt
+        }
+        let minuteBucket = floor(Date().timeIntervalSince1970 / 60.0) * 60.0
+        return Date(timeIntervalSince1970: minuteBucket)
+    }
+
+    private func computeNormalizedHistory(now: Date) -> [NormalizedPortfolioHistoryPoint] {
+        PortfolioEquitySeriesNormalizer.normalize(
+            history: app.portfolio.displayedHistory(for: app.portfolio.historyRange),
+            account: app.portfolio.account,
+            range: app.portfolio.historyRange,
+            now: now
+        )
+    }
+
+    private func portfolioValue(from history: [NormalizedPortfolioHistoryPoint]) -> Double? {
+        PortfolioEquitySeriesNormalizer.liveAccountEquity(from: app.portfolio.account) ??
+        history.last?.equity
+    }
+
+    private func rangeChange(from history: [NormalizedPortfolioHistoryPoint]) -> PortfolioRangeChange {
+        PortfolioRangeChange(amount: history.last?.profitLoss, percent: history.last?.profitLossPercent)
+    }
+
+    private func displayedHeroAmount(
+        from history: [NormalizedPortfolioHistoryPoint],
+        resolvedChange: PortfolioRangeChange
+    ) -> Double? {
+        if let selectedValue = chartSelection?.point.value {
+            return selectedValue
         }
 
-        let amount = latest.profitLoss ?? computedRangeChangeAmount
-        let percent = latest.profitLossPercent ?? computedRangeChangePercent
-        return (amount, percent)
-    }
-
-    private var computedRangeChangeAmount: Double? {
-        guard let first = app.portfolio.history.first?.equity,
-              let last = app.portfolio.history.last?.equity else {
-            return nil
-        }
-
-        return last - first
-    }
-
-    private var computedRangeChangePercent: Double? {
-        guard let first = app.portfolio.history.first?.equity,
-              first != 0,
-              let amount = computedRangeChangeAmount else {
-            return nil
-        }
-
-        return amount / first
-    }
-
-    private var displayedHeroAmount: Double? {
-        chartSelection?.point.value ?? currentChartAmount
-    }
-
-    private var currentChartAmount: Double? {
         switch chartMode {
         case .equity:
-            portfolioValue
+            return portfolioValue(from: history)
         case .profitLoss:
-            rangeChange.amount
+            return resolvedChange.amount
         }
     }
 
-    private var displayedRangeChange: (amount: Double?, percent: Double?) {
+    private func displayedRangeChange(resolvedChange: PortfolioRangeChange) -> PortfolioRangeChange {
         guard let chartSelection else {
-            return rangeChange
+            return resolvedChange
         }
 
-        switch chartMode {
-        case .equity:
-            return (chartSelection.change, chartSelection.percentChange)
-        case .profitLoss:
-            return (
-                chartSelection.point.value,
-                chartSelection.point.profitLossPercent ?? chartSelection.percentFromBaseline
-            )
-        }
+        return PortfolioRangeChange(amount: chartSelection.point.profitLoss, percent: chartSelection.point.profitLossPercent)
     }
 
-    private var changeColor: Color {
-        guard let amount = displayedRangeChange.amount else {
+    private func changeColor(for change: PortfolioRangeChange) -> Color {
+        guard let amount = change.amount else {
             return .secondary
         }
 
         return amount >= 0 ? AppTheme.ColorToken.positive : AppTheme.ColorToken.negative
     }
 
-    private var heroAmountColor: Color {
+    private func heroAmountColor(for heroAmount: Double?) -> Color {
         guard chartMode == .profitLoss,
-              let amount = displayedHeroAmount else {
+              let amount = heroAmount else {
             return .primary
         }
 
@@ -106,42 +98,81 @@ struct HomeHeroView: View {
     }
 
     private var content: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            AppPriceText(
-                displayedHeroAmount,
-                font: AppTypography.heroValue,
-                minimumScaleFactor: 0.82,
-                isAnimated: chartSelection == nil,
-                isSigned: chartMode == .profitLoss,
-                notation: .compact,
-                usesCompactFormatting: chartMode == .profitLoss
-            )
-            .foregroundStyle(heroAmountColor)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        let referenceNow = chartReferenceNow
+        let normalized = computeNormalizedHistory(now: referenceNow)
+        let resolvedChange = rangeChange(from: normalized)
+        let displayedChange = displayedRangeChange(resolvedChange: resolvedChange)
+        let heroAmount = displayedHeroAmount(from: normalized, resolvedChange: displayedChange)
 
-            HStack(spacing: 8) {
-                Text(AppFormatter.signedCompactMoney(displayedRangeChange.amount))
-                Text("(\(AppFormatter.signedPercent(displayedRangeChange.percent)))")
-                Text(app.portfolio.historyRange.title)
-                    .foregroundStyle(.secondary)
+        return VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                AppPriceText(
+                    heroAmount,
+                    font: AppTypography.heroValue,
+                    minimumScaleFactor: 0.82,
+                    isAnimated: true,
+                    animationDuration: chartSelection == nil ? 0.18 : 0.08,
+                    isSigned: chartMode == .profitLoss,
+                    notation: .compact,
+                    usesCompactFormatting: chartMode == .profitLoss
+                )
+                .foregroundStyle(heroAmountColor(for: heroAmount))
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                HStack(spacing: 8) {
+                    Text(AppFormatter.signedCompactMoney(displayedChange.amount))
+                    Text("(\(AppFormatter.signedPercent(displayedChange.percent)))")
+                    Text(app.portfolio.historyRange.title)
+                        .foregroundStyle(.secondary)
+
+                    Spacer(minLength: 8)
+
+                    if app.environment == .paper {
+                        Text(L10n.AccountDetail.paperBadge)
+                            .font(AppTypography.caption.weight(.medium))
+                            .foregroundStyle(Color(.secondaryLabel))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color(.tertiarySystemFill), in: Capsule())
+                    }
+                }
+                .font(AppTypography.heroDelta)
+                .foregroundStyle(changeColor(for: displayedChange))
             }
-            .font(AppTypography.heroDelta)
-            .foregroundStyle(changeColor)
 
             PortfolioChartView(
                 mode: chartMode,
+                history: normalized,
+                referenceNow: referenceNow,
                 selection: $chartSelection,
                 isScrubbing: $isChartScrubbing
             )
-                .frame(height: 230)
+            .frame(height: 216)
 
-            HStack(spacing: 12) {
-                PortfolioRangePicker()
+            ZStack {
+                HStack(spacing: 8) {
+                    PortfolioRangePicker()
+                        .frame(maxWidth: .infinity)
 
-                Spacer(minLength: 8)
+                    PortfolioChartModePicker(selection: $chartMode)
+                }
+                .opacity(isChartScrubbing ? 0 : 1)
+                .allowsHitTesting(!isChartScrubbing)
 
-                PortfolioChartModePicker(selection: $chartMode)
+                if isChartScrubbing {
+                    let ticks = PortfolioChartTimeline.axisLabels(
+                        for: app.portfolio.historyRange,
+                        dates: normalized.map(\.date),
+                        now: referenceNow,
+                        locale: app.appLanguage.locale
+                    )
+                    if !ticks.isEmpty {
+                        FinancialChartTimeAxisStrip(labels: ticks)
+                            .transition(.opacity)
+                    }
+                }
             }
+            .animation(.easeOut(duration: 0.16), value: isChartScrubbing)
         }
         .padding(.top, 4)
     }
@@ -150,6 +181,11 @@ struct HomeHeroView: View {
         chartSelection = nil
         isChartScrubbing = false
     }
+}
+
+private struct PortfolioRangeChange: Equatable {
+    let amount: Double?
+    let percent: Double?
 }
 
 private enum PortfolioChartMode: String, CaseIterable, Identifiable {
@@ -180,31 +216,55 @@ private enum PortfolioChartMode: String, CaseIterable, Identifiable {
 private struct PortfolioChartView: View {
     @Environment(AppModel.self) private var app
     let mode: PortfolioChartMode
+    let history: [NormalizedPortfolioHistoryPoint]
+    let referenceNow: Date
     @Binding var selection: PortfolioChartSelection?
     @Binding var isScrubbing: Bool
-    @State private var overlayLabel: PortfolioChartOverlayLabel?
+    @State private var chartSelection: FinancialChartSelection?
+    @State private var seriesCache = PortfolioChartSeriesCache()
 
     var body: some View {
-        let points = chartPoints
+        let range = app.portfolio.historyRange
+        let prepared = seriesCache.resolve(
+            history: history,
+            mode: mode,
+            range: range,
+            referenceNow: referenceNow
+        )
+        let points = prepared.points
+        let isLoadingPortfolioChart = app.portfolio.isLoadingHistory || (!app.portfolio.hasLoadedHistory && app.portfolio.isRefreshing)
 
-        ZStack {
-            if points.isEmpty {
-                PortfolioChartEmptyState(
-                    isLoading: !app.portfolio.hasLoadedHistory && (app.portfolio.isRefreshing || app.portfolio.isLoadingHistory)
+        Group {
+            if points.count < 2 && !isLoadingPortfolioChart {
+                AppEmptyStateView(
+                    title: L10n.Common.noData,
+                    systemImage: AppIcon.Portfolio.history,
+                    minHeight: 216
                 )
             } else {
-                chart(points: points)
-            }
-
-            if app.portfolio.isLoadingHistory && !points.isEmpty {
-                ProgressView()
-                    .padding(14)
-                    .background(.regularMaterial, in: Circle())
+                chart(prepared: prepared, range: range, isLoading: isLoadingPortfolioChart)
             }
         }
-        .animation(.snappy, value: chartRevision(for: points))
-        .animation(.snappy, value: app.portfolio.isLoadingHistory)
-        .animation(.snappy, value: mode)
+        .onChange(of: chartSelection) { _, next in
+            guard let next else {
+                if selection != nil {
+                    selection = nil
+                }
+                return
+            }
+
+            let matchingPoint: PortfolioChartPoint? = {
+                if points.indices.contains(next.index), points[next.index].date == next.point.date {
+                    return points[next.index]
+                }
+                return points.first(where: { $0.date == next.point.date })
+            }()
+            guard let matchingPoint else {
+                return
+            }
+
+            selection = PortfolioChartSelection(point: matchingPoint)
+        }
         .onChange(of: mode) { _, _ in
             clearSelection()
         }
@@ -213,215 +273,169 @@ private struct PortfolioChartView: View {
         }
     }
 
-    private func chart(points: [PortfolioChartPoint]) -> some View {
-        let domain = yDomain(for: points)
-        let areaBaseline = areaBaseline(for: domain)
-        let chartTint = chartTint(for: points)
+    private func chart(
+        prepared: PortfolioChartPreparedData,
+        range: PortfolioHistoryRange,
+        isLoading: Bool
+    ) -> some View {
+        let style = FinancialChartStyle(
+            lineColor: prepared.tint,
+            positiveColor: AppTheme.ColorToken.positive,
+            negativeColor: AppTheme.ColorToken.negative,
+            areaFillStyle: .dotMatrix(spacing: 4.5, dotDiameter: 1.5),
+            areaTopOpacity: 0.18,
+            areaBottomOpacity: 0.0,
+            lineWidth: 2.0,
+            glowRadius: 5.0,
+            glowOpacity: 0.42,
+            referenceLineColor: Color(.tertiaryLabel).opacity(0.42),
+            crosshairColor: Color(.tertiaryLabel).opacity(0.85),
+            showsGrid: false,
+            showsVolume: false,
+            showsEndpointPulse: false,
+            interpolation: .monotone
+        )
+        let locale = app.appLanguage.locale
 
-        return Chart {
-            ForEach(points) { point in
-                AreaMark(
-                    x: .value("Point", point.xPosition),
-                    yStart: .value("Floor", areaBaseline),
-                    yEnd: .value("Value", point.value)
-                )
-                .interpolationMethod(.catmullRom)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [
-                            chartTint.opacity(0.24),
-                            chartTint.opacity(0.02)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-
-                LineMark(
-                    x: .value("Point", point.xPosition),
-                    y: .value("Value", point.value)
-                )
-                .interpolationMethod(.catmullRom)
-                .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-                .foregroundStyle(chartTint)
-            }
-
-            if let selectedPoint = selection?.point {
-                RuleMark(x: .value("Selected", selectedPoint.xPosition))
-                    .foregroundStyle(Color(.tertiaryLabel).opacity(0.85))
-                    .lineStyle(StrokeStyle(lineWidth: 1, lineCap: .round))
-                    .zIndex(-1)
-
-                PointMark(
-                    x: .value("Selected Point", selectedPoint.xPosition),
-                    y: .value("Selected Value", selectedPoint.value)
-                )
-                .foregroundStyle(chartTint)
-                .symbolSize(58)
-                .zIndex(2)
-            }
-        }
-        .chartXAxis(.hidden)
-        .chartYAxis(.hidden)
-        .chartLegend(.hidden)
-        .chartXScale(domain: xDomain(for: points))
-        .chartYScale(domain: domain)
-        .chartPlotStyle { plotArea in
-            plotArea
-                .background(Color.clear)
-                .contentShape(Rectangle())
-        }
-        .chartOverlay { proxy in
-            GeometryReader { geometry in
-                ZStack(alignment: .topLeading) {
-                    if let overlayLabel {
-                        Text(overlayLabel.text)
-                            .font(.footnote.monospacedDigit().weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .textCase(.uppercase)
-                            .fixedSize()
-                            .position(x: overlayLabel.x, y: 12)
-                            .allowsHitTesting(false)
-                    }
-
-                    Rectangle()
-                        .fill(.clear)
-                        .contentShape(Rectangle())
-                        .simultaneousGesture(
-                            DragGesture(minimumDistance: 0)
-                                .onChanged { value in
-                                    isScrubbing = true
-                                    updateSelectedPoint(
-                                        at: value.location,
-                                        proxy: proxy,
-                                        geometry: geometry,
-                                        points: points
-                                    )
-                                }
-                                .onEnded { _ in
-                                    clearSelection()
-                                }
-                        )
-                }
-            }
+        return FinancialChartView(
+            series: prepared.series,
+            style: style,
+            insets: .compact,
+            isLoading: isLoading,
+            transitionKey: "\(range.rawValue)-\(mode.rawValue)",
+            selection: $chartSelection,
+            isScrubbing: $isScrubbing
+        ) { point in
+            PortfolioChartDateLabelFormatter.string(from: point.date, range: range, locale: locale)
         }
         .accessibilityLabel(L10n.Portfolio.chartAccessibility)
     }
 
-    private func chartRevision(for points: [PortfolioChartPoint]) -> PortfolioChartRevision {
-        PortfolioChartRevision(
-            count: points.count,
-            firstDate: points.first?.date,
-            lastDate: points.last?.date,
-            lastValue: points.last?.value
-        )
+    private func clearSelection() {
+        chartSelection = nil
+        selection = nil
+        isScrubbing = false
+    }
+}
+
+private struct PortfolioChartPreparedData {
+    let points: [PortfolioChartPoint]
+    let series: FinancialChartSeries
+    let tint: Color
+}
+
+/// Caches the prepared `FinancialChartSeries` and point array across 120Hz scrub updates
+/// so scrubbing never re-maps or re-hashes the portfolio series.
+@MainActor
+private final class PortfolioChartSeriesCache {
+    private struct CacheKey: Equatable {
+        let mode: PortfolioChartMode
+        let range: PortfolioHistoryRange
+        let referenceTimestamp: TimeInterval
+        let count: Int
+        let firstTimestamp: TimeInterval?
+        let lastTimestamp: TimeInterval?
+        let lastEquity: Double?
+        let lastProfitLoss: Double?
+        let checksum: Int
     }
 
-    private var chartPoints: [PortfolioChartPoint] {
-        let history = app.portfolio.history
-        let firstEquity = history.first?.equity
+    private var lastKey: CacheKey?
+    private var lastValue: PortfolioChartPreparedData?
 
-        return history.enumerated().compactMap { offset, point in
+    func resolve(
+        history: [NormalizedPortfolioHistoryPoint],
+        mode: PortfolioChartMode,
+        range: PortfolioHistoryRange,
+        referenceNow: Date
+    ) -> PortfolioChartPreparedData {
+        var hasher = Hasher()
+        hasher.combine(history.count)
+        for point in history {
+            hasher.combine(point.date.timeIntervalSince1970)
+            switch mode {
+            case .equity:
+                hasher.combine(point.equity)
+            case .profitLoss:
+                hasher.combine(point.profitLoss)
+            }
+        }
+        let key = CacheKey(
+            mode: mode,
+            range: range,
+            referenceTimestamp: referenceNow.timeIntervalSince1970,
+            count: history.count,
+            firstTimestamp: history.first?.date.timeIntervalSince1970,
+            lastTimestamp: history.last?.date.timeIntervalSince1970,
+            lastEquity: history.last?.equity,
+            lastProfitLoss: history.last?.profitLoss,
+            checksum: hasher.finalize()
+        )
+        if let lastKey, lastKey == key, let lastValue {
+            return lastValue
+        }
+
+        var points: [PortfolioChartPoint] = []
+        var financialPoints: [FinancialChartPoint] = []
+        var dates: [Date] = []
+        points.reserveCapacity(history.count)
+        financialPoints.reserveCapacity(history.count)
+        dates.reserveCapacity(history.count)
+
+        for point in history {
             let value: Double?
             switch mode {
             case .equity:
                 value = point.equity
             case .profitLoss:
-                value = point.profitLoss ?? firstEquity.map { point.equity - $0 }
+                value = point.profitLoss
             }
 
             guard let value, value.isFinite else {
-                return nil
+                continue
             }
 
-            return PortfolioChartPoint(
-                date: point.date,
-                xPosition: Double(offset),
-                value: value,
-                profitLossPercent: point.profitLossPercent
+            let xPosition = point.date.timeIntervalSince1970
+            points.append(
+                PortfolioChartPoint(
+                    date: point.date,
+                    xPosition: xPosition,
+                    value: value,
+                    profitLoss: point.profitLoss,
+                    profitLossPercent: point.profitLossPercent
+                )
             )
-        }
-    }
-
-    private func xDomain(for points: [PortfolioChartPoint]) -> ClosedRange<Double> {
-        guard let first = points.first, let last = points.last, last.xPosition > first.xPosition else {
-            return 0...1
+            financialPoints.append(
+                FinancialChartPoint(date: point.date, x: xPosition, value: value)
+            )
+            dates.append(point.date)
         }
 
-        return first.xPosition...last.xPosition
-    }
-
-    private func yDomain(for points: [PortfolioChartPoint]) -> ClosedRange<Double> {
-        var values = points.map(\.value)
-        if mode == .profitLoss {
-            values.append(0)
-        }
-
-        guard let minValue = values.min(), let maxValue = values.max() else {
-            return 0...1
-        }
-
-        if minValue == maxValue {
-            let padding = max(abs(minValue) * 0.12, 1)
-            return (minValue - padding)...(maxValue + padding)
-        }
-
-        let padding = (maxValue - minValue) * 0.12
-        return (minValue - padding)...(maxValue + padding)
-    }
-
-    private func areaBaseline(for domain: ClosedRange<Double>) -> Double {
-        switch mode {
-        case .equity:
-            domain.lowerBound
-        case .profitLoss:
-            min(max(0, domain.lowerBound), domain.upperBound)
-        }
-    }
-
-    private func chartTint(for points: [PortfolioChartPoint]) -> Color {
-        guard mode == .profitLoss else {
-            return AppTheme.ColorToken.brand
-        }
-
-        return (points.last?.value ?? 0) >= 0 ? AppTheme.ColorToken.positive : AppTheme.ColorToken.negative
-    }
-
-    private func clearSelection() {
-        selection = nil
-        overlayLabel = nil
-        isScrubbing = false
-    }
-
-    private func updateSelectedPoint(
-        at location: CGPoint,
-        proxy: ChartProxy,
-        geometry: GeometryProxy,
-        points: [PortfolioChartPoint]
-    ) {
-        guard let plotFrameAnchor = proxy.plotFrame else {
-            return
-        }
-
-        let plotFrame = geometry[plotFrameAnchor]
-        guard plotFrame.width > 0 else {
-            return
-        }
-
-        let xPosition = min(max(location.x - plotFrame.origin.x, 0), plotFrame.width)
-        guard let chartPosition = proxy.value(atX: xPosition, as: Double.self),
-              let nearestPoint = PortfolioChartPoint.nearest(in: points, to: chartPosition) else {
-            return
-        }
-
-        selection = PortfolioChartSelection(
-            point: nearestPoint,
-            baseline: app.portfolio.history.first?.equity
+        let baselinePolicy: FinancialChartBaselinePolicy = mode == .profitLoss
+            ? .softInclude(value: 0, maxExpansionRatio: 0.60, showsReferenceLine: true)
+            : .none
+        let scaleConfig: FinancialChartYScaleConfig = mode == .profitLoss
+            ? .portfolioProfitLoss
+            : .portfolioEquity
+        let xDomain = PortfolioChartTimeline.xDomain(for: range, dates: dates, now: referenceNow)
+        let series = FinancialChartSeries(
+            kind: .area,
+            points: financialPoints,
+            xDomain: xDomain,
+            baselinePolicy: baselinePolicy,
+            yScaleConfig: scaleConfig,
+            allowsZoomAndPan: false
         )
-        overlayLabel = PortfolioChartOverlayLabel(
-            text: nearestPoint.dateLabel(for: app.portfolio.historyRange),
-            x: min(max(location.x, 64), geometry.size.width - 64)
-        )
+        let tint: Color = if mode == .profitLoss {
+            (points.last?.value ?? 0) >= 0 ? AppTheme.ColorToken.positive : AppTheme.ColorToken.negative
+        } else {
+            AppTheme.ColorToken.brand
+        }
+
+        let prepared = PortfolioChartPreparedData(points: points, series: series, tint: tint)
+        lastKey = key
+        lastValue = prepared
+        return prepared
     }
 }
 
@@ -429,131 +443,73 @@ private struct PortfolioChartPoint: Identifiable, Equatable {
     let date: Date
     let xPosition: Double
     let value: Double
+    let profitLoss: Double?
     let profitLossPercent: Double?
 
     var id: Date { date }
-
-    func dateLabel(for range: PortfolioHistoryRange) -> String {
-        PortfolioChartDateLabelFormatter.string(from: date, range: range)
-    }
-
-    static func nearest(in points: [PortfolioChartPoint], to xPosition: Double) -> PortfolioChartPoint? {
-        guard !points.isEmpty else {
-            return nil
-        }
-
-        var lowerBound = 0
-        var upperBound = points.count - 1
-
-        while lowerBound < upperBound {
-            let midpoint = (lowerBound + upperBound) / 2
-            if points[midpoint].xPosition < xPosition {
-                lowerBound = midpoint + 1
-            } else {
-                upperBound = midpoint
-            }
-        }
-
-        let next = points[lowerBound]
-        guard lowerBound > 0 else {
-            return next
-        }
-
-        let previous = points[lowerBound - 1]
-        return abs(previous.xPosition - xPosition) <= abs(next.xPosition - xPosition) ? previous : next
-    }
-}
-
-private struct PortfolioChartRevision: Equatable {
-    let count: Int
-    let firstDate: Date?
-    let lastDate: Date?
-    let lastValue: Double?
 }
 
 private struct PortfolioChartSelection: Equatable {
     let point: PortfolioChartPoint
-    let baseline: Double?
-
-    var change: Double? {
-        guard let baseline else {
-            return nil
-        }
-
-        return point.value - baseline
-    }
-
-    var percentChange: Double? {
-        guard let baseline, baseline != 0, let change else {
-            return nil
-        }
-
-        return change / baseline
-    }
-
-    var percentFromBaseline: Double? {
-        guard let baseline, baseline != 0 else {
-            return nil
-        }
-
-        return point.value / baseline
-    }
-}
-
-private struct PortfolioChartOverlayLabel: Sendable {
-    let text: String
-    let x: CGFloat
 }
 
 private enum PortfolioChartDateLabelFormatter {
-    private static let intradayFormatter = makeFormatter("h:mm a")
-    private static let shortRangeFormatter = makeFormatter("MMM d, h:mm a")
-    private static let longRangeFormatter = makeFormatter(
-        "MMM d, yyyy",
-        timeZone: TimeZone(identifier: "America/New_York")
-    )
+    private static let cache = LockedPortfolioChartDateFormatterCache()
 
-    static func string(from date: Date, range: PortfolioHistoryRange) -> String {
-        let formatter = switch range {
-        case .oneDay:
-            intradayFormatter
-        case .oneWeek:
-            shortRangeFormatter
-        case .oneMonth, .threeMonths, .oneYear, .yearToDate:
-            longRangeFormatter
-        }
-
-        return formatter.string(from: date).uppercased()
-    }
-
-    private static func makeFormatter(_ dateFormat: String, timeZone: TimeZone? = nil) -> DateFormatter {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = dateFormat
-        if let timeZone {
-            formatter.timeZone = timeZone
-        }
-        return formatter
+    static func string(from date: Date, range: PortfolioHistoryRange, locale: Locale) -> String {
+        cache.string(from: date, range: range, locale: locale)
     }
 }
 
-private struct PortfolioChartEmptyState: View {
-    let isLoading: Bool
+// @unchecked Sendable: DateFormatter dictionary guarded by NSLock
+private final class LockedPortfolioChartDateFormatterCache: @unchecked Sendable {
+    private struct Key: Hashable {
+        let range: PortfolioHistoryRange
+        let localeIdentifier: String
+        let timeZoneIdentifier: String
+    }
 
-    var body: some View {
-        if isLoading {
-            HomeChartSkeleton()
-                .frame(maxWidth: .infinity, minHeight: 230)
-                .redacted(reason: .placeholder)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-        } else {
-            AppEmptyStateView(
-                title: L10n.Common.noData,
-                systemImage: AppIcon.Portfolio.history,
-                minHeight: 230
-            )
+    private let lock = NSLock()
+    private var formatters: [Key: DateFormatter] = [:]
+
+    func string(from date: Date, range: PortfolioHistoryRange, locale: Locale) -> String {
+        let resolvedLocale = AppLocale.resolvedLocale(for: locale)
+        let timeZone: TimeZone = switch range {
+        case .oneDay, .oneWeek:
+            // Matches 1D/1W axis ticks in device local timezone so crosshair and axis dates never drift by 1 day.
+            .current
+        case .oneMonth, .threeMonths, .oneYear, .yearToDate:
+            PortfolioHistoryRange.newYorkTimeZone
         }
+        let key = Key(
+            range: range,
+            localeIdentifier: resolvedLocale.identifier,
+            timeZoneIdentifier: timeZone.identifier
+        )
+
+        lock.lock()
+        defer { lock.unlock() }
+
+        let formatter: DateFormatter
+        if let cached = formatters[key] {
+            formatter = cached
+        } else {
+            let created = DateFormatter()
+            created.locale = resolvedLocale
+            created.timeZone = timeZone
+            switch range {
+            case .oneDay:
+                created.setLocalizedDateFormatFromTemplate("yMdHm")
+            case .oneWeek:
+                created.setLocalizedDateFormatFromTemplate("MMMdHm")
+            case .oneMonth, .threeMonths, .oneYear, .yearToDate:
+                created.setLocalizedDateFormatFromTemplate("yMMMd")
+            }
+            formatters[key] = created
+            formatter = created
+        }
+
+        return formatter.string(from: date)
     }
 }
 
@@ -566,7 +522,7 @@ private struct PortfolioRangePicker: View {
             options: PortfolioHistoryRange.allCases,
             selection: app.portfolio.historyRange,
             layout: .compact,
-            isDisabled: app.portfolio.isLoadingHistory,
+            isDisabled: false,
             title: \.title,
             accessibilityLabel: { range in
                 L10n.PortfolioRange.accessibility(title: range.title, locale: locale)

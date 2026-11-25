@@ -24,12 +24,10 @@ final class HomeAccountPolling {
         .subscribe(onNext: { event in
             switch event {
             case .loading:
-                app.portfolio.isRefreshing = true
+                break
             case .value:
-                app.portfolio.isRefreshing = false
                 app.lastError = nil
             case .failure(let error):
-                app.portfolio.isRefreshing = false
                 app.lastError = error.localizedDescription
             }
         })
