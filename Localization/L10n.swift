@@ -1596,6 +1596,36 @@ enum L10n {
         static func simpleDelete(locale: Locale) -> String {
             L10n.string("trade.simple.delete", locale: locale)
         }
+        static func simpleBuyingPower(locale: Locale) -> String {
+            L10n.string("trade.simple.buying_power", locale: locale)
+        }
+        static func simpleAvailablePosition(locale: Locale) -> String {
+            L10n.string("trade.simple.available_position", locale: locale)
+        }
+        static func simpleAvailable(locale: Locale) -> String {
+            L10n.string("trade.simple.available", locale: locale)
+        }
+        static func simpleEstimatedPrice(locale: Locale) -> String {
+            L10n.string("trade.simple.estimated_price", locale: locale)
+        }
+        static func simpleEstimatedShares(locale: Locale) -> String {
+            L10n.string("trade.simple.estimated_shares", locale: locale)
+        }
+        static func simpleWholeSharesOnly(locale: Locale) -> String {
+            L10n.string("trade.simple.whole_shares_only", locale: locale)
+        }
+        static func simplePriceSourceAsk(locale: Locale) -> String {
+            L10n.string("trade.simple.price_source_ask", locale: locale)
+        }
+        static func simplePriceSourceBid(locale: Locale) -> String {
+            L10n.string("trade.simple.price_source_bid", locale: locale)
+        }
+        static func simplePriceSourceLast(locale: Locale) -> String {
+            L10n.string("trade.simple.price_source_last", locale: locale)
+        }
+        static func simpleSwitchUnit(locale: Locale) -> String {
+            L10n.string("trade.simple.switch_unit", locale: locale)
+        }
         static func limitTitle(side: String, symbol: String, locale: Locale) -> String {
             L10n.format("trade.limit.title_format", locale: locale, side, symbol)
         }
@@ -1619,6 +1649,120 @@ enum L10n {
         }
         static func limitAsk(locale: Locale) -> String {
             L10n.string("trade.limit.ask", locale: locale)
+        }
+        static func limitMarketPrice(_ value: String, locale: Locale) -> String {
+            L10n.format("trade.limit.market_price_format", locale: locale, value)
+        }
+        static func limitAtMarket(locale: Locale) -> String {
+            L10n.string("trade.limit.at_market", locale: locale)
+        }
+        static func limitVsMarket(_ delta: String, locale: Locale) -> String {
+            L10n.format("trade.limit.vs_market_format", locale: locale, delta)
+        }
+        static func limitExtendedHours(locale: Locale) -> String {
+            L10n.string("trade.limit.extended_hours", locale: locale)
+        }
+        static func limitDecreasePrice(locale: Locale) -> String {
+            L10n.string("trade.limit.decrease_price", locale: locale)
+        }
+        static func limitIncreasePrice(locale: Locale) -> String {
+            L10n.string("trade.limit.increase_price", locale: locale)
+        }
+        static func optionContracts(locale: Locale) -> String {
+            L10n.string("trade.option.contracts", locale: locale)
+        }
+        static func optionContractUnit(locale: Locale) -> String {
+            L10n.string("trade.option.contract_unit", locale: locale)
+        }
+        static func optionBuyingPower(locale: Locale) -> String {
+            L10n.string("trade.option.buying_power", locale: locale)
+        }
+        static func optionLongAvailable(locale: Locale) -> String {
+            L10n.string("trade.option.long_available", locale: locale)
+        }
+        static func optionShortAvailable(locale: Locale) -> String {
+            L10n.string("trade.option.short_available", locale: locale)
+        }
+        static func optionSharesAvailable(locale: Locale) -> String {
+            L10n.string("trade.option.shares_available", locale: locale)
+        }
+        static func optionMultiplier(locale: Locale) -> String {
+            L10n.string("trade.option.multiplier", locale: locale)
+        }
+        static func optionMultiplierValue(locale: Locale) -> String {
+            L10n.string("trade.option.multiplier_value", locale: locale)
+        }
+        static func optionContractSymbol(locale: Locale) -> String {
+            L10n.string("trade.option.contract_symbol", locale: locale)
+        }
+        static func optionExpiration(_ date: String, locale: Locale) -> String {
+            L10n.format("trade.option.expiration_format", locale: locale, date)
+        }
+        static func optionIntentTitle(_ intent: OrderPositionIntent, locale: Locale) -> String {
+            switch intent {
+            case .buyToOpen:
+                L10n.string("trade.option.intent.buy_to_open", locale: locale)
+            case .buyToClose:
+                L10n.string("trade.option.intent.buy_to_close", locale: locale)
+            case .sellToOpen:
+                L10n.string("trade.option.intent.sell_to_open", locale: locale)
+            case .sellToClose:
+                L10n.string("trade.option.intent.sell_to_close", locale: locale)
+            }
+        }
+        static func optionPayoffTitle(locale: Locale) -> String {
+            L10n.string("trade.option.payoff.title", locale: locale)
+        }
+        static func optionPayoffPreviewBadge(locale: Locale) -> String {
+            L10n.string("trade.option.payoff.preview_badge", locale: locale)
+        }
+        static func optionPayoffScrubHint(locale: Locale) -> String {
+            L10n.string("trade.option.payoff.scrub_hint", locale: locale)
+        }
+        static func optionPayoffAtExpiryPrice(symbol: String, price: String, locale: Locale) -> String {
+            L10n.format("trade.option.payoff.at_expiry_price_format", locale: locale, symbol, price)
+        }
+        static func optionPayoffAtCurrentSpot(locale: Locale) -> String {
+            L10n.string("trade.option.payoff.at_current_spot", locale: locale)
+        }
+        static func optionPayoffMaxProfit(locale: Locale) -> String {
+            L10n.string("trade.option.payoff.max_profit", locale: locale)
+        }
+        static func optionPayoffBreakeven(locale: Locale) -> String {
+            L10n.string("trade.option.payoff.breakeven", locale: locale)
+        }
+        static func optionPayoffMaxLoss(locale: Locale) -> String {
+            L10n.string("trade.option.payoff.max_loss", locale: locale)
+        }
+        static func optionPayoffUnlimited(locale: Locale) -> String {
+            L10n.string("trade.option.payoff.unlimited", locale: locale)
+        }
+        static func optionDone(locale: Locale) -> String {
+            L10n.string("trade.option.done", locale: locale)
+        }
+        static func optionErrorDisabled(locale: Locale) -> String {
+            L10n.string("trade.option.error.disabled", locale: locale)
+        }
+        static func optionErrorLevel2Required(locale: Locale) -> String {
+            L10n.string("trade.option.error.level2_required", locale: locale)
+        }
+        static func optionErrorLevel1Required(locale: Locale) -> String {
+            L10n.string("trade.option.error.level1_required", locale: locale)
+        }
+        static func optionErrorCloseRequiresAccess(locale: Locale) -> String {
+            L10n.string("trade.option.error.close_requires_access", locale: locale)
+        }
+        static func optionErrorBuyToCloseExceedsShort(locale: Locale) -> String {
+            L10n.string("trade.option.error.buy_to_close_exceeds_short", locale: locale)
+        }
+        static func optionErrorSellToCloseExceedsLong(locale: Locale) -> String {
+            L10n.string("trade.option.error.sell_to_close_exceeds_long", locale: locale)
+        }
+        static func optionErrorCspExceedsBuyingPower(locale: Locale) -> String {
+            L10n.string("trade.option.error.csp_exceeds_buying_power", locale: locale)
+        }
+        static func optionErrorCoveredCallShares(shares: String, symbol: String, locale: Locale) -> String {
+            L10n.format("trade.option.error.covered_call_shares_format", locale: locale, shares, symbol)
         }
     }
 

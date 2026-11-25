@@ -1,4 +1,6 @@
+import Observation
 import SwiftUI
+import UIKit
 
 struct TradeView: View {
     @Environment(AppModel.self) private var app
@@ -7,7 +9,6 @@ struct TradeView: View {
 
     @State private var store: TradeStore
     @State private var confirmation: TradeOrderConfirmationSnapshot?
-    @State private var isShowingLimitOrder = false
 
     private let submittedOrderHandler: ((AlpacaOrder) -> Void)?
 
@@ -17,7 +18,23 @@ struct TradeView: View {
         seed: TradeSeedContext? = nil,
         onSubmittedOrder: ((AlpacaOrder) -> Void)? = nil
     ) {
-        _store = State(initialValue: TradeStore(symbol: symbol, side: side, orderType: .market, sizingMode: .shares, seed: seed))
+        let defaultSizingMode: TradeSizingMode = {
+            if seed?.asset?.fractionable == false {
+                return .shares
+            }
+            if side == .sell, (NumberParser.decimal(from: seed?.position?.quantity) ?? 0) <= 0 {
+                return .shares
+            }
+            return .notional
+        }()
+
+        _store = State(initialValue: TradeStore(
+            symbol: symbol,
+            side: side,
+            orderType: .market,
+            sizingMode: defaultSizingMode,
+            seed: seed
+        ))
         submittedOrderHandler = onSubmittedOrder
     }
 
@@ -25,9 +42,9 @@ struct TradeView: View {
         TradeSimpleView(
             store: store,
             canUseAPI: app.canUseAlpacaAPI,
+            environment: app.environment,
             close: { dismiss() },
-            review: reviewOrder,
-            showLimitOrder: showLimitOrder
+            review: reviewOrder
         )
         .task(id: store.normalizedSymbol) {
             guard !store.normalizedSymbol.isEmpty else { return }
@@ -55,16 +72,9 @@ struct TradeView: View {
 
             store.stopPolling()
         }
-        .navigationDestination(isPresented: $isShowingLimitOrder) {
-            TradeLimitOrderView(
-                store: store,
-                canUseAPI: app.canUseAlpacaAPI,
-                onSubmittedOrder: { showSubmittedOrder($0) }
-            )
-        }
         .sheet(item: $confirmation) { snapshot in
             TradeOrderConfirmationSheet(snapshot: snapshot) {
-                await store.submit(snapshot.order, clientOrderID: snapshot.clientOrderID, app: app)
+                await store.submit(snapshot.order, clientOrderID: snapshot.clientOrderID, confirmedEnvironment: snapshot.environment, app: app)
             } onSubmitted: { order in
                 showSubmittedOrder(order)
             }
@@ -80,15 +90,9 @@ struct TradeView: View {
         }
     }
 
-    private func showLimitOrder() {
-        store.prepareLimitOrder()
-        isShowingLimitOrder = true
-    }
-
     private func showSubmittedOrder(_ order: AlpacaOrder) {
         if let submittedOrderHandler {
             store.stopPolling()
-            isShowingLimitOrder = false
             submittedOrderHandler(order)
             return
         }
@@ -106,604 +110,415 @@ struct TradeView: View {
     }
 }
 
-private enum TradeLimitFocusedField {
-    case quantity
-    case limitPrice
-}
-
-private struct TradeLimitOrderView: View {
-    @Environment(AppModel.self) private var app
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.locale) private var locale
-
-    let store: TradeStore
-    let canUseAPI: Bool
-    let onSubmittedOrder: (AlpacaOrder) -> Void
-
-    @State private var focusedField: TradeLimitFocusedField = .quantity
-    @State private var confirmation: TradeOrderConfirmationSnapshot?
-
-    var body: some View {
-        VStack(spacing: 0) {
-            TradeLimitTopBar(title: orderTypeTitle) {
-                dismiss()
-            }
-            .padding(.top, 8)
-
-            VStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(titleText)
-                        .font(.largeTitle.weight(.bold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
-
-                    Text(L10n.Trade.limitSharesAvailable(TradeFormat.quantity(store.positionQuantity), locale: locale))
-                        .font(AppTypography.description)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, AppTheme.Spacing.pageTop)
-
-                VStack(spacing: 0) {
-                    TradeLimitInputRow(
-                        title: L10n.Trade.limitNumberOfShares(locale: locale),
-                        value: quantityDisplayValue,
-                        isFocused: focusedField == .quantity
-                    ) {
-                        focusedField = .quantity
-                    }
-
-                    if !limitQuickFillItems.isEmpty {
-                        TradeSimpleQuickFillRow(items: limitQuickFillItems, style: .compact) { percent in
-                            applyLimitQuickFill(percent)
-                        }
-                        .padding(.top, 2)
-                        .padding(.bottom, 8)
-                    }
-
-                    TradeLimitDivider()
-
-                    TradeLimitInputRow(
-                        title: L10n.Trade.limitPrice(locale: locale),
-                        subtitle: L10n.Trade.limitBidAsk(
-                            bid: TradeFormat.price(store.bidPrice, currency: store.currencyCode),
-                            ask: TradeFormat.price(store.askPrice, currency: store.currencyCode),
-                            locale: locale
-                        ),
-                        value: priceDisplayValue,
-                        isFocused: focusedField == .limitPrice,
-                        trailingHelp: true
-                    ) {
-                        focusedField = .limitPrice
-                    }
-
-                    priceFillActions
-                        .padding(.top, 10)
-
-                    TradeLimitDivider()
-                        .padding(.top, 14)
-
-                    TradeLimitSummaryRow(
-                        title: store.draft.side == .buy
-                            ? L10n.Trade.simpleEstimatedDebit(locale: locale)
-                            : L10n.Trade.simpleEstimatedCredit(locale: locale),
-                        value: AppFormatter.money(store.estimatedNotional, currencyCode: store.currencyCode)
-                    )
-                }
-                .padding(.top, 18)
-
-                TradeSimpleStatusLine(status: status)
-                    .padding(.top, 16)
-
-                Spacer(minLength: 16)
-
-                TradeSimpleInputActionButton(state: limitActionButtonState) {
-                    reviewOrder()
-                }
-                .padding(.bottom, 6)
-
-                TradeNumberPad(action: applyKey(_:))
-                    .padding(.bottom, 8)
-            }
-            .padding(.horizontal, 22)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(AppTheme.ColorToken.pageBackground.ignoresSafeArea())
-        .navigationBarBackButtonHidden()
-        .toolbar(.hidden, for: .navigationBar)
-        .onAppear {
-            store.message = nil
-        }
-        .sheet(item: $confirmation) { snapshot in
-            TradeOrderConfirmationSheet(snapshot: snapshot) {
-                await store.submit(snapshot.order, clientOrderID: snapshot.clientOrderID, app: app)
-            } onSubmitted: { order in
-                onSubmittedOrder(order)
-            }
-        }
-    }
-
-    private var titleText: String {
-        L10n.Trade.limitTitle(
-            side: store.draft.side.titleText(locale: locale),
-            symbol: store.draft.normalizedSymbol,
-            locale: locale
-        )
-    }
-
-    private var orderTypeTitle: String {
-        L10n.Trade.simpleOrderTypeTitle(
-            orderType: store.draft.orderType.titleText(locale: locale),
-            locale: locale
-        )
-    }
-
-    private var priceDisplayValue: String {
-        let text = displayValue(store.draft.limitPriceText)
-        return text == AppFormatter.placeholder ? text : "$\(text)"
-    }
-
-    private var canContinue: Bool {
-        canUseAPI && store.validation.canSubmit && !store.isLoadingContext && !store.isSubmitting
-    }
-
-    private var limitActionButtonState: TradeSimpleInputActionButtonState {
-        let tint = store.draft.side.tradeActionTint
-
-        if store.isSubmitting {
-            return TradeSimpleInputActionButtonState(
-                title: L10n.Trade.simpleSubmitting(locale: locale),
-                tint: tint,
-                isEnabled: false,
-                showsProgress: true
-            )
-        }
-
-        if !canUseAPI {
-            return TradeSimpleInputActionButtonState(
-                title: L10n.Trade.addCredentialsBeforeOrder(locale: locale),
-                tint: AppTheme.ColorToken.warning,
-                isEnabled: false
-            )
-        }
-
-        if hasRequiredLimitInputs, let issue = store.validation.firstIssue {
-            return TradeSimpleInputActionButtonState(
-                title: limitActionTitle(for: issue),
-                tint: AppTheme.ColorToken.negative,
-                isEnabled: false
-            )
-        }
-
-        return TradeSimpleInputActionButtonState(
-            title: L10n.Trade.simpleContinue(locale: locale),
-            tint: canContinue ? tint : Color(.secondaryLabel),
-            isEnabled: canContinue
-        )
-    }
-
-    private var status: TradeSimpleStatus? {
-        if !canUseAPI {
-            return TradeSimpleStatus(
-                systemImage: "key",
-                text: L10n.Trade.addCredentialsBeforeOrder(locale: locale),
-                tint: AppTheme.ColorToken.warning
-            )
-        }
-
-        if let error = store.validation.errors.first, hasRequiredLimitInputs {
-            return TradeSimpleStatus(systemImage: "exclamationmark.triangle.fill", text: error, tint: AppTheme.ColorToken.negative)
-        }
-
-        if let warning = store.validation.warnings.first, hasRequiredLimitInputs {
-            return TradeSimpleStatus(systemImage: "exclamationmark.circle", text: warning, tint: AppTheme.ColorToken.warning)
-        }
-
-        if let message = store.message, hasRequiredLimitInputs {
-            return TradeSimpleStatus(systemImage: "info.circle", text: message, tint: AppTheme.ColorToken.icon)
-        }
-
-        return nil
-    }
-
-    private var hasRequiredLimitInputs: Bool {
-        TradeInputFormat.hasPositiveValue(store.draft.quantityText)
-            && TradeInputFormat.hasPositiveValue(store.draft.limitPriceText)
-    }
-
-    private var quantityDisplayValue: String {
-        let normalized = NumberText.trimTrailingZeros(store.draft.quantityText)
-        return normalized.isEmpty ? "0" : normalized
-    }
-
-    private func displayValue(_ text: String) -> String {
-        let normalized = NumberText.trimTrailingZeros(text)
-        return normalized.isEmpty ? AppFormatter.placeholder : normalized
-    }
-
-    private func reviewOrder() {
-        let validation = store.validation
-        if validation.canSubmit {
-            confirmation = TradeOrderConfirmationSnapshot(store: store, environment: app.environment)
-        } else if hasRequiredLimitInputs {
-            store.message = validation.errors.first
-        } else {
-            store.message = nil
-        }
-    }
-
-    private func limitActionTitle(for issue: TradeValidationIssue) -> String {
-        switch issue.kind {
-        case .missingInput:
-            return L10n.Trade.simpleEnterAmount(locale: locale)
-        case .buyExceedsBuyingPower, .shortExceedsBuyingPower:
-            return L10n.Trade.simpleInsufficientBuyingPower(locale: locale)
-        case .sellExceedsPosition:
-            return L10n.Trade.simpleExceedsPosition(locale: locale)
-        case .fractionalShortSaleUnsupported:
-            return L10n.Trade.simpleShortUnavailable(locale: locale)
-        case .generic:
-            return L10n.Trade.simpleOrderUnavailable(locale: locale)
-        }
-    }
-
-    private func applyKey(_ key: TradeNumberPadKey) {
-        store.message = nil
-        switch focusedField {
-        case .quantity:
-            store.draft.quantityText = TradeInputFormat.text(
-                updatedText(store.draft.quantityText, key: key),
-                kind: .quantity
-            )
-        case .limitPrice:
-            store.draft.limitPriceText = TradeInputFormat.text(
-                updatedText(store.draft.limitPriceText, key: key),
-                kind: .decimal(maxFractionDigits: priceFractionDigits)
-            )
-        }
-    }
-
-    private var priceFractionDigits: Int {
-        guard let value = NumberParser.decimal(from: store.draft.limitPriceText) else {
-            return 4
-        }
-
-        return value >= 1 ? 2 : 4
-    }
-
-    private func updatedText(_ text: String, key: TradeNumberPadKey) -> String {
-        var value = text
-        switch key {
-        case .digit(let digit):
-            value.append(digit)
-        case .decimal:
-            guard !value.contains(".") else { return value }
-            value.append(".")
-        case .backspace:
-            guard !value.isEmpty else { return value }
-            value.removeLast()
-        case .clear:
-            value = ""
-        }
-        return value
-    }
-
-    @ViewBuilder
-    private var priceFillActions: some View {
-        if #available(iOS 26.0, *) {
-            GlassEffectContainer(spacing: 10) {
-                priceFillButtons
-            }
-        } else {
-            priceFillButtons
-        }
-    }
-
-    private var priceFillButtons: some View {
-        HStack(spacing: 10) {
-            TradeSmallAction(
-                title: L10n.Trade.limitBid(locale: locale),
-                tint: Color(.secondaryLabel)
-            ) {
-                store.fillLimitFromBid()
-                focusedField = .limitPrice
-            }
-            .disabled(store.bidPrice == nil)
-
-            TradeSmallAction(
-                title: L10n.Trade.limitMid(locale: locale),
-                tint: Color(.secondaryLabel)
-            ) {
-                store.fillLimitFromMid()
-                focusedField = .limitPrice
-            }
-            .disabled(store.lastPrice == nil)
-
-            TradeSmallAction(
-                title: L10n.Trade.limitAsk(locale: locale),
-                tint: Color(.secondaryLabel)
-            ) {
-                store.fillLimitFromAsk()
-                focusedField = .limitPrice
-            }
-            .disabled(store.askPrice == nil)
-
-            Spacer(minLength: 0)
-        }
-    }
-
-    private var limitQuickFillItems: [TradeSimpleQuickFillItem] {
-        guard let base = limitQuickFillBase, base > 0 else {
-            return []
-        }
-
-        return [
-            TradeSimpleQuickFillItem(title: "25%", percent: Decimal(string: "0.25")!),
-            TradeSimpleQuickFillItem(title: "50%", percent: Decimal(string: "0.50")!),
-            TradeSimpleQuickFillItem(title: L10n.Trade.simpleMax(locale: locale), percent: Decimal(string: "1.0")!)
-        ]
-    }
-
-    private var limitQuickFillBase: Decimal? {
-        switch store.draft.side {
-        case .buy:
-            guard let buyingPower = store.buyingPower,
-                  let price = store.estimatedExecutionPrice,
-                  price > 0 else {
-                return nil
-            }
-            return buyingPower / price
-        case .sell:
-            return store.sellQuickFillQuantityBase
-        }
-    }
-
-    private func applyLimitQuickFill(_ percent: Decimal) {
-        store.message = nil
-        store.fillQuantity(percent: percent)
-        focusedField = .quantity
-    }
-}
-
-private struct TradeLimitTopBar: View {
-    let title: String
-    let back: () -> Void
-
-    var body: some View {
-        AppScreenHeader(background: AppTheme.ColorToken.pageBackground) {
-            AppGlassIconButton(
-                systemImage: "chevron.left",
-                accessibilityLabel: L10n.Common.back,
-                action: back
-            )
-        } center: {
-            Text(title)
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
-        }
-    }
-}
-
-private struct TradeLimitInputRow: View {
-    let title: String
-    var subtitle: String?
-    let value: String
-    let isFocused: Bool
-    var trailingHelp = false
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text(title)
-                            .font(AppTypography.description)
-                            .foregroundStyle(.primary)
-
-                        if trailingHelp {
-                            Image(systemName: "questionmark.circle")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(AppTheme.ColorToken.brandDark)
-                        }
-                    }
-
-                    if let subtitle {
-                        Text(subtitle)
-                            .font(AppTypography.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
-                    }
-                }
-
-                Spacer(minLength: 10)
-
-                Text(value)
-                    .font(.title3.weight(.bold).monospacedDigit())
-                    .foregroundStyle(value == AppFormatter.placeholder ? .secondary : .primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-
-                if isFocused {
-                    TradeLimitBlinkingCursor()
-                }
-            }
-            .frame(minHeight: 70)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-private struct TradeLimitBlinkingCursor: View {
-    @State private var isVisible = true
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: 1)
-            .fill(AppTheme.ColorToken.brandDark)
-            .frame(width: 2, height: 28)
-            .opacity(isVisible ? 1 : 0)
-            .onAppear {
-                isVisible = true
-                withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) {
-                    isVisible = false
-                }
-            }
-            .onDisappear {
-                isVisible = true
-            }
-    }
-}
-
-private struct TradeLimitSummaryRow: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Text(title)
-                .font(AppTypography.description)
-                .foregroundStyle(.primary)
-
-            Spacer(minLength: 10)
-
-            Text(value)
-                .font(.title3.weight(.bold).monospacedDigit())
-                .foregroundStyle(value == AppFormatter.placeholder ? .secondary : .primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-        }
-        .frame(minHeight: 64)
-    }
-}
-
-private struct TradeLimitDivider: View {
-    var body: some View {
-        Rectangle()
-            .fill(Color(.separator).opacity(0.22))
-            .frame(height: 0.5)
-    }
-}
+// MARK: - Unified Trade Simple & Limit Container
 
 private struct TradeSimpleView: View {
     let store: TradeStore
     let canUseAPI: Bool
+    let environment: TradeEnvironment
     let close: () -> Void
     let review: () -> Void
-    let showLimitOrder: () -> Void
-
-    @Environment(\.locale) private var locale
-    @State private var notionalInputText = ""
 
     var body: some View {
         VStack(spacing: 0) {
             TradeSimpleTopBar(
                 store: store,
-                close: close,
-                setSizingMode: setSizingMode(_:),
-                showLimitOrder: showLimitOrder
+                close: close
             )
-            .padding(.top, 8)
+            .padding(.top, 4)
 
             Group {
                 if showsSkeleton {
                     TradeSimpleContentSkeleton()
                         .transition(.opacity)
                 } else {
-                    tradeContent
-                        .transition(.opacity)
+                    TradeOrderModeHost(
+                        store: store,
+                        canUseAPI: canUseAPI,
+                        environment: environment,
+                        review: review
+                    )
+                    .transition(.opacity)
                 }
             }
-            .padding(.horizontal, 22)
+            .padding(.horizontal, 20)
         }
-        .animation(.snappy(duration: 0.18), value: showsSkeleton)
+        .animation(.snappy(duration: 0.16), value: showsSkeleton)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AppTheme.ColorToken.pageBackground.ignoresSafeArea())
         .navigationBarBackButtonHidden()
         .toolbar(.hidden, for: .navigationBar)
-        .onChange(of: store.estimatedExecutionPrice) { _, _ in
-            syncNotionalInputForCurrentOrder()
-        }
-        .onChange(of: store.draft.orderType) { _, _ in
-            syncNotionalInputForCurrentOrder()
-        }
-        .onChange(of: store.draft.timeInForce) { _, _ in
-            syncNotionalInputForCurrentOrder()
-        }
     }
 
     private var showsSkeleton: Bool {
         canUseAPI && store.normalizedSymbol.isEmpty && store.context == nil && store.isLoadingContext
     }
+}
 
-    private var tradeContent: some View {
-        VStack(spacing: 0) {
-            TradeSimpleDisplayRegion(
-                amountText: primaryAmountText,
-                showsCurrencyMark: store.sizingMode == .notional,
-                unit: store.sizingMode == .shares ? L10n.Trade.simpleShares(locale: locale) : nil
+private struct TradeOrderModeHost: View {
+    let store: TradeStore
+    let canUseAPI: Bool
+    let environment: TradeEnvironment
+    let review: () -> Void
+
+    var body: some View {
+        Group {
+            switch store.draft.orderType {
+            case .market:
+                TradeMarketContentLayout(
+                    store: store,
+                    canUseAPI: canUseAPI,
+                    environment: environment,
+                    review: review
+                )
+                .transition(.opacity)
+            case .limit:
+                TradeLimitContentLayout(
+                    store: store,
+                    canUseAPI: canUseAPI,
+                    review: review
+                )
+                .transition(.opacity)
+            }
+        }
+        .animation(.snappy(duration: 0.18), value: store.draft.orderType)
+    }
+}
+
+private struct TradeSimpleTopBar: View {
+    let store: TradeStore
+    let close: () -> Void
+
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        AppScreenHeader(background: AppTheme.ColorToken.pageBackground) {
+            AppGlassIconButton(
+                systemImage: "chevron.left",
+                accessibilityLabel: L10n.Common.back,
+                action: close
             )
-            .padding(.top, 46)
-
-            Spacer(minLength: 0)
-
-            TradeSimpleStatusLine(status: status, layout: .centered)
-                .padding(.bottom, 10)
-
-            Text(availabilityText)
-                .font(AppTypography.description)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .padding(.bottom, 14)
-
-            Group {
-                if hasAnyInput {
-                    TradeSimpleInputActionButton(state: inputActionButtonState) {
-                        review()
-                    }
-                } else {
-                    TradeSimpleQuickFillRow(items: quickFillItems) { percent in
-                        applyQuickFill(percent)
+        } center: {
+            EmptyView()
+        } trailing: {
+            Menu {
+                Button {
+                    TradeKeypadHaptics.selection()
+                    store.prepareMarketOrder()
+                } label: {
+                    if store.draft.orderType == .market {
+                        Label(L10n.Trade.simpleMarketOrder(locale: locale), systemImage: "checkmark")
+                    } else {
+                        Text(L10n.Trade.simpleMarketOrder(locale: locale))
                     }
                 }
-            }
-            .animation(.snappy(duration: 0.18), value: hasAnyInput)
-            .frame(height: 44)
-            .padding(.bottom, 6)
 
-            TradeNumberPad(action: applyKey(_:))
-                .padding(.bottom, 8)
+                Button {
+                    TradeKeypadHaptics.selection()
+                    store.prepareLimitOrder()
+                } label: {
+                    let limitTitle = L10n.Trade.simpleOrderTypeTitle(
+                        orderType: OrderType.limit.titleText(locale: locale),
+                        locale: locale
+                    )
+                    if store.draft.orderType == .limit {
+                        Label(limitTitle, systemImage: "checkmark")
+                    } else {
+                        Text(limitTitle)
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(orderTypeTitle)
+                        .font(.subheadline.weight(.semibold))
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.secondary)
+                }
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 14)
+                .frame(height: 36)
+                .background(AppTheme.ColorToken.groupedSurface, in: Capsule())
+                .overlay {
+                    Capsule()
+                        .strokeBorder(Color(.separator).opacity(0.18), lineWidth: 0.75)
+                }
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var orderTypeTitle: String {
+        if store.draft.orderType == .market {
+            return L10n.Trade.simpleMarketOrder(locale: locale)
+        }
+
+        return L10n.Trade.simpleOrderTypeTitle(
+            orderType: store.draft.orderType.titleText(locale: locale),
+            locale: locale
+        )
+    }
+}
+
+// MARK: - OKX Simple Mode Market Order Layout
+
+/// Isolates `@Observable` reads into focused child views so `TradeNumberPad`
+/// and static chrome never re-evaluate on keystrokes or quote ticks.
+private struct TradeMarketContentLayout: View {
+    let store: TradeStore
+    let canUseAPI: Bool
+    let environment: TradeEnvironment
+    let review: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 12)
+
+            TradeSimpleHeroInput(store: store, canUseAPI: canUseAPI)
+
+            Spacer(minLength: 16)
+
+            TradeSimpleOrderCard(store: store)
+                .padding(.bottom, 12)
+
+            TradeSimpleQuickFillSection(store: store)
+                .padding(.bottom, 10)
+
+            TradeSimpleActionSection(
+                store: store,
+                canUseAPI: canUseAPI,
+                review: review
+            )
+            .padding(.bottom, 8)
+
+            TradeNumberPad(action: handleMarketKey(_:))
+                .padding(.bottom, 6)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var activeInputText: String {
+    private func handleMarketKey(_ key: TradeNumberPadKey) {
+        let current = store.activeInputText
+        let updated: String
         switch store.sizingMode {
-        case .shares:
-            store.draft.quantityText
         case .notional:
-            store.supportsNotionalOrder ? store.draft.notionalText : notionalInputText
+            updated = TradeInputFormat.applyKey(
+                key,
+                to: current,
+                maxIntegerDigits: TradeInputLimit.notionalMaxIntegerDigits,
+                maxFractionDigits: 2,
+                maxTotalDigits: TradeInputLimit.notionalMaxTotalDigits
+            )
+        case .shares:
+            updated = TradeInputFormat.applyKey(
+                key,
+                to: current,
+                maxIntegerDigits: TradeInputLimit.sharesMaxIntegerDigits,
+                maxFractionDigits: store.maxShareInputScale,
+                maxTotalDigits: TradeInputLimit.sharesMaxTotalDigits
+            )
+        }
+        guard updated != current else { return }
+        store.setSimpleInputText(updated)
+    }
+}
+
+private struct TradeSimpleHeroInput: View {
+    let store: TradeStore
+    let canUseAPI: Bool
+
+    @Environment(\.locale) private var locale
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        let swapDirection: CGFloat = store.sizingMode == .shares ? 1 : -1
+
+        VStack(alignment: .center, spacing: 14) {
+            ZStack {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(formattedPrimaryText)
+                        .font(.system(size: primaryFontSize, weight: .bold, design: .rounded).monospacedDigit())
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.68)
+                        .overlay(alignment: .trailing) {
+                            TradeBlinkingCursor(
+                                color: store.draft.side.tradeActionTint,
+                                width: 2.5,
+                                height: cursorHeight
+                            )
+                            .offset(x: 5)
+                        }
+                        .padding(.trailing, 6)
+
+                    Text(primaryUnitLabel)
+                        .font(.system(size: unitFontSize, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+                .id(store.sizingMode)
+                .transition(
+                    .asymmetric(
+                        insertion: .opacity.combined(with: .offset(y: 10 * swapDirection)),
+                        removal: .opacity.combined(with: .offset(y: -10 * swapDirection))
+                    )
+                )
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 84, alignment: .center)
+            .clipped()
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(formattedPrimaryText) \(primaryUnitLabel)")
+
+            Button {
+                guard canToggleSizingMode else { return }
+                TradeKeypadHaptics.selection()
+                withAnimation(.spring(response: 0.30, dampingFraction: 0.88)) {
+                    store.toggleSizingMode()
+                }
+            } label: {
+                HStack(spacing: 7) {
+                    if canToggleSizingMode {
+                        Image(systemName: "arrow.up.arrow.down")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(adaptiveAccentColor)
+                            .rotationEffect(.degrees(store.sizingMode == .shares ? 180 : 0))
+                    }
+
+                    ZStack {
+                        Text(secondaryEstimateText)
+                            .font(.subheadline.weight(.semibold).monospacedDigit())
+                            .foregroundStyle(canToggleSizingMode ? .primary : .secondary)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .id(store.sizingMode)
+                            .transition(
+                                .asymmetric(
+                                    insertion: .opacity.combined(with: .offset(y: -7 * swapDirection)),
+                                    removal: .opacity.combined(with: .offset(y: 7 * swapDirection))
+                                )
+                            )
+                    }
+                    .frame(height: 22)
+                    .clipped()
+                }
+                .padding(.horizontal, 16)
+                .frame(minWidth: 168, minHeight: 36, maxHeight: 36)
+                .background(
+                    AppTheme.ColorToken.groupedSurface,
+                    in: Capsule()
+                )
+                .overlay {
+                    Capsule()
+                        .strokeBorder(
+                            Color(.separator).opacity(canToggleSizingMode ? 0.20 : 0.10),
+                            lineWidth: 0.75
+                        )
+                }
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(!canToggleSizingMode)
+            .accessibilityLabel(L10n.Trade.simpleSwitchUnit(locale: locale))
+            .accessibilityValue(secondaryEstimateText)
+
+            TradeInlineStatusStrip(status: status, alignment: .center)
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.horizontal, 4)
+    }
+
+    private var adaptiveAccentColor: Color {
+        colorScheme == .light
+            ? Color(red: 0.70, green: 0.51, blue: 0.0)
+            : AppTheme.ColorToken.brandDark
+    }
+
+    private var rawInputText: String {
+        store.activeInputText
+    }
+
+    private var formattedPrimaryText: String {
+        TradeInputFormat.formattedDisplay(rawInputText)
+    }
+
+    private var primaryFontSize: CGFloat {
+        switch formattedPrimaryText.count {
+        case 0...5:
+            return 68
+        case 6...7:
+            return 56
+        case 8...10:
+            return 44
+        default:
+            return 34
         }
     }
 
-    private var primaryAmountText: String {
-        activeInputText.isEmpty ? "0" : activeInputText
+    private var unitFontSize: CGFloat {
+        switch formattedPrimaryText.count {
+        case 0...5:
+            return 32
+        case 6...7:
+            return 28
+        case 8...10:
+            return 24
+        default:
+            return 20
+        }
     }
 
-    private var availabilityText: String {
-        switch store.draft.side {
-        case .buy:
-            let value = AppFormatter.money(store.buyingPower, currencyCode: store.currencyCode)
-            return L10n.Trade.simpleBuyingPowerAvailable(value, locale: locale)
-        case .sell:
-            let quantity = TradeFormat.quantity(store.positionQuantity)
-            let value = AppFormatter.money(store.positionMarketValue, currencyCode: store.currencyCode)
-            return L10n.Trade.simplePositionAvailable(quantity: quantity, value: value, locale: locale)
+    private var cursorHeight: CGFloat {
+        round(primaryFontSize * 0.80)
+    }
+
+    private var primaryUnitLabel: String {
+        switch store.sizingMode {
+        case .notional:
+            return store.currencyCode
+        case .shares:
+            let symbol = store.normalizedSymbol
+            return symbol.isEmpty ? L10n.Trade.simpleShares(locale: locale) : symbol
+        }
+    }
+
+    private var canToggleSizingMode: Bool {
+        switch store.sizingMode {
+        case .notional:
+            return true
+        case .shares:
+            guard store.canUseNotionalSizing else { return false }
+            if store.draft.side == .sell, store.availableSellQuantity <= 0 {
+                return false
+            }
+            return true
+        }
+    }
+
+    private var secondaryEstimateText: String {
+        let symbol = store.normalizedSymbol.isEmpty
+            ? L10n.Trade.simpleShares(locale: locale)
+            : store.normalizedSymbol
+
+        switch store.sizingMode {
+        case .notional:
+            guard TradeInputFormat.hasPositiveValue(rawInputText) else {
+                return "≈ 0 \(symbol)"
+            }
+            guard let estimatedQty = store.estimatedQuantity, estimatedQty > 0 else {
+                return "≈ \(AppFormatter.placeholder) \(symbol)"
+            }
+            return "≈ \(TradeFormat.quantity(estimatedQty)) \(symbol)"
+        case .shares:
+            guard TradeInputFormat.hasPositiveValue(rawInputText) else {
+                return "≈ \(AppFormatter.money(Decimal.zero, currencyCode: store.currencyCode))"
+            }
+            guard let estimatedNotional = store.estimatedNotional, estimatedNotional > 0 else {
+                return "≈ \(AppFormatter.placeholder)"
+            }
+            return "≈ \(AppFormatter.money(estimatedNotional, currencyCode: store.currencyCode))"
         }
     }
 
@@ -720,36 +535,234 @@ private struct TradeSimpleView: View {
             )
         }
 
-        if hasPositiveInput {
+        if TradeInputFormat.hasPositiveValue(rawInputText) {
             if let error = store.validation.errors.first {
-                return TradeSimpleStatus(systemImage: "exclamationmark.triangle.fill", text: error, tint: AppTheme.ColorToken.negative)
+                return TradeSimpleStatus(
+                    systemImage: "exclamationmark.triangle.fill",
+                    text: error,
+                    tint: AppTheme.ColorToken.negative
+                )
             }
 
             if let warning = store.validation.warnings.first {
-                return TradeSimpleStatus(systemImage: "exclamationmark.circle", text: warning, tint: AppTheme.ColorToken.warning)
+                return TradeSimpleStatus(
+                    systemImage: "exclamationmark.circle",
+                    text: warning,
+                    tint: AppTheme.ColorToken.warning
+                )
             }
         }
 
         if let message = store.message {
-            return TradeSimpleStatus(systemImage: "info.circle", text: message, tint: AppTheme.ColorToken.icon)
+            return TradeSimpleStatus(
+                systemImage: "info.circle",
+                text: message,
+                tint: AppTheme.ColorToken.icon
+            )
         }
 
         return nil
     }
+}
 
-    private var hasPositiveInput: Bool {
-        TradeInputFormat.hasPositiveValue(activeInputText)
+private struct TradeSimpleOrderCard: View {
+    let store: TradeStore
+
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        VStack(spacing: 0) {
+            assetRow
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+
+            Rectangle()
+                .fill(Color(.separator).opacity(0.18))
+                .frame(height: 0.5)
+                .padding(.horizontal, 16)
+
+            fundingRow
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+        }
+        .background(
+            AppTheme.ColorToken.groupedSurface,
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color(.separator).opacity(0.14), lineWidth: 0.75)
+        }
     }
 
-    private var hasAnyInput: Bool {
-        !activeInputText.isEmpty
+    private var assetRow: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    Text(store.draft.side.titleText(locale: locale))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(store.draft.side.tradeActionTint)
+
+                    Text(store.normalizedSymbol)
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.primary)
+                }
+                .lineLimit(1)
+
+                Text(store.assetDisplayName)
+                    .font(AppTypography.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 3) {
+                Text(TradeFormat.price(store.estimatedExecutionPrice, currency: store.currencyCode))
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Text(priceSourceLabel)
+                    .font(AppTypography.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
     }
 
-    private var inputActionButtonState: TradeSimpleInputActionButtonState {
+    private var fundingRow: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(fundingTitle)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                if let fundingSubtitle {
+                    Text(fundingSubtitle)
+                        .font(AppTypography.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 3) {
+                Text(fundingPrimaryValue)
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+
+                if let fundingSecondaryValue {
+                    Text(fundingSecondaryValue)
+                        .font(AppTypography.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+            }
+        }
+    }
+
+    private var priceSourceLabel: String {
+        switch store.estimatedExecutionPriceSource {
+        case .ask:
+            return L10n.Trade.simplePriceSourceAsk(locale: locale)
+        case .bid:
+            return L10n.Trade.simplePriceSourceBid(locale: locale)
+        case .last:
+            return L10n.Trade.simplePriceSourceLast(locale: locale)
+        case .limit, .none:
+            return L10n.Trade.simpleEstimatedPrice(locale: locale)
+        }
+    }
+
+    private var fundingTitle: String {
+        switch store.draft.side {
+        case .buy:
+            return L10n.Trade.simpleBuyingPower(locale: locale)
+        case .sell:
+            if store.availableSellQuantity > 0 {
+                return L10n.Trade.simpleAvailablePosition(locale: locale)
+            }
+            return L10n.Trade.simpleBuyingPower(locale: locale)
+        }
+    }
+
+    private var fundingSubtitle: String? {
+        if !store.supportsFractionalShares {
+            return L10n.Trade.simpleWholeSharesOnly(locale: locale)
+        }
+        return nil
+    }
+
+    private var fundingPrimaryValue: String {
+        switch store.draft.side {
+        case .buy:
+            return AppFormatter.money(store.buyingPower, currencyCode: store.currencyCode)
+        case .sell:
+            if store.availableSellQuantity > 0 {
+                let qty = TradeFormat.quantity(store.availableSellQuantity)
+                let symbol = store.normalizedSymbol
+                return symbol.isEmpty ? qty : "\(qty) \(symbol)"
+            }
+            return AppFormatter.money(store.buyingPower, currencyCode: store.currencyCode)
+        }
+    }
+
+    private var fundingSecondaryValue: String? {
+        if store.draft.side == .sell, store.availableSellQuantity > 0 {
+            return "≈ \(AppFormatter.money(store.availableSellMarketValue, currencyCode: store.currencyCode))"
+        }
+        return nil
+    }
+}
+
+private struct TradeSimpleQuickFillSection: View {
+    let store: TradeStore
+
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        TradeSimpleQuickFillRow(
+            items: quickFillItems,
+            selectedPercent: store.activeQuickFillPercent,
+            isDisabled: !store.quickFillAvailable
+        ) { percent in
+            TradeKeypadHaptics.selection()
+            store.fillQuickAmount(percent: percent)
+        }
+    }
+
+    private var quickFillItems: [TradeSimpleQuickFillItem] {
+        [
+            TradeSimpleQuickFillItem(title: "25%", percent: Decimal(string: "0.25")!),
+            TradeSimpleQuickFillItem(title: "50%", percent: Decimal(string: "0.50")!),
+            TradeSimpleQuickFillItem(title: "75%", percent: Decimal(string: "0.75")!),
+            TradeSimpleQuickFillItem(title: L10n.Trade.simpleMax(locale: locale), percent: Decimal(string: "1.0")!)
+        ]
+    }
+}
+
+private struct TradeSimpleActionSection: View {
+    let store: TradeStore
+    let canUseAPI: Bool
+    let review: () -> Void
+
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        TradeSimpleActionButton(state: buttonState, action: review)
+    }
+
+    private var buttonState: TradeSimpleActionButtonState {
         let actionTint = store.draft.side.tradeActionTint
 
         if store.isLoadingContext {
-            return TradeSimpleInputActionButtonState(
+            return TradeSimpleActionButtonState(
                 title: L10n.Trade.simpleReviewOrder(locale: locale),
                 tint: actionTint,
                 isEnabled: false
@@ -757,7 +770,7 @@ private struct TradeSimpleView: View {
         }
 
         if store.isSubmitting {
-            return TradeSimpleInputActionButtonState(
+            return TradeSimpleActionButtonState(
                 title: L10n.Trade.simpleSubmitting(locale: locale),
                 tint: actionTint,
                 isEnabled: false,
@@ -766,29 +779,832 @@ private struct TradeSimpleView: View {
         }
 
         if !canUseAPI {
-            return TradeSimpleInputActionButtonState(
+            return TradeSimpleActionButtonState(
                 title: L10n.Trade.addCredentialsBeforeOrder(locale: locale),
                 tint: AppTheme.ColorToken.warning,
-                isEnabled: false
+                isEnabled: false,
+                isError: true
             )
         }
 
-        if let issue = store.validation.firstIssue {
-            return TradeSimpleInputActionButtonState(
-                title: actionTitle(for: issue),
+        let hasInput = !store.activeInputText.isEmpty
+        if hasInput, let issue = store.validation.firstIssue {
+            return TradeSimpleActionButtonState(
+                title: TradeValidationActionTitle.title(for: issue, locale: locale),
                 tint: AppTheme.ColorToken.negative,
-                isEnabled: false
+                isEnabled: false,
+                isError: issue.kind != .missingInput
             )
         }
 
-        return TradeSimpleInputActionButtonState(
+        return TradeSimpleActionButtonState(
             title: L10n.Trade.simpleReviewOrder(locale: locale),
             tint: actionTint,
-            isEnabled: true
+            isEnabled: store.validation.canSubmit
         )
     }
+}
 
-    private func actionTitle(for issue: TradeValidationIssue) -> String {
+// MARK: - Refactored OKX-Style Limit Order Layout
+
+private enum TradeLimitFocusedField: Equatable {
+    case quantity
+    case limitPrice
+}
+
+@MainActor
+@Observable
+private final class TradeLimitFocusController {
+    var focusedField: TradeLimitFocusedField = .quantity
+    var replaceLimitPriceOnNextDigit = false
+
+    func focusLimitPrice(selectForReplacement: Bool = true) {
+        let wasAlreadyFocused = focusedField == .limitPrice
+        focusedField = .limitPrice
+        if selectForReplacement, !wasAlreadyFocused {
+            replaceLimitPriceOnNextDigit = true
+        }
+    }
+
+    func focusQuantity() {
+        focusedField = .quantity
+        replaceLimitPriceOnNextDigit = false
+    }
+
+    func commitLimitPriceEdit() {
+        focusedField = .limitPrice
+        replaceLimitPriceOnNextDigit = false
+    }
+}
+
+/// Fine-grained limit order layout: none of the volatile `@Observable` fields
+/// are read directly in this `body`, keeping `TradeNumberPad` completely immune
+/// to keystroke and 120ms quote-tick invalidations.
+private struct TradeLimitContentLayout: View {
+    let store: TradeStore
+    let canUseAPI: Bool
+    let review: () -> Void
+
+    @State private var focusState = TradeLimitFocusController()
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 14) {
+                    TradeLimitAssetHeader(store: store)
+                        .padding(.top, 10)
+                        .padding(.bottom, 2)
+
+                    TradeLimitPriceCard(store: store, focusState: focusState)
+
+                    TradeLimitQuantityCard(store: store, focusState: focusState)
+
+                    TradeLimitOptionsBar(store: store)
+
+                    TradeLimitStatusSection(store: store, canUseAPI: canUseAPI)
+                }
+                .padding(.bottom, 12)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+
+            TradeLimitActionSection(
+                store: store,
+                canUseAPI: canUseAPI,
+                review: review
+            )
+            .padding(.top, 4)
+            .padding(.bottom, 10)
+
+            TradeNumberPad(action: handleLimitKey(_:))
+                .padding(.bottom, 6)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func handleLimitKey(_ key: TradeNumberPadKey) {
+        switch focusState.focusedField {
+        case .quantity:
+            let current = store.draft.quantityText
+            let updated = TradeInputFormat.applyKey(
+                key,
+                to: current,
+                maxIntegerDigits: TradeInputLimit.sharesMaxIntegerDigits,
+                maxFractionDigits: store.maxShareInputScale,
+                maxTotalDigits: TradeInputLimit.sharesMaxTotalDigits
+            )
+            guard updated != current else { return }
+            store.setLimitQuantityText(updated)
+
+        case .limitPrice:
+            let current = store.draft.limitPriceText
+            let shouldReplace = focusState.replaceLimitPriceOnNextDigit
+            let baseText: String
+            switch key {
+            case .digit, .decimal:
+                baseText = shouldReplace ? "" : current
+            case .backspace, .clear:
+                baseText = current
+            }
+            focusState.replaceLimitPriceOnNextDigit = false
+
+            let maxDecimals = priceFractionDigits(for: baseText)
+            let updated = TradeInputFormat.applyKey(
+                key,
+                to: baseText,
+                maxIntegerDigits: TradeInputLimit.priceMaxIntegerDigits,
+                maxFractionDigits: maxDecimals,
+                maxTotalDigits: TradeInputLimit.priceMaxTotalDigits
+            )
+            guard updated != current else { return }
+            store.setLimitPriceText(updated)
+        }
+    }
+
+    private func priceFractionDigits(for text: String) -> Int {
+        guard let value = NumberParser.decimal(from: text) else {
+            return 4
+        }
+        return value >= 1 ? 2 : 4
+    }
+}
+
+private struct TradeLimitAssetHeader: View {
+    let store: TradeStore
+
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        HStack(spacing: 12) {
+            SymbolLogoView(symbol: store.normalizedSymbol, size: 40)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(store.draft.side.titleText(locale: locale))
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(store.draft.side.tradeActionTint)
+
+                    Text(store.normalizedSymbol)
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(.primary)
+                }
+                .lineLimit(1)
+
+                Text(
+                    L10n.Trade.limitMarketPrice(
+                        TradeFormat.price(store.marketReferencePrice, currency: store.currencyCode),
+                        locale: locale
+                    )
+                )
+                .font(.subheadline.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 3) {
+                Text(availablePrimaryValue)
+                    .font(.headline.weight(.bold).monospacedDigit())
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+
+                Text(availableLabel)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 4)
+    }
+
+    private var availableLabel: String {
+        switch store.draft.side {
+        case .buy:
+            return L10n.Trade.simpleBuyingPower(locale: locale)
+        case .sell:
+            return store.availableSellQuantity > 0
+                ? L10n.Trade.simpleAvailablePosition(locale: locale)
+                : L10n.Trade.simpleBuyingPower(locale: locale)
+        }
+    }
+
+    private var availablePrimaryValue: String {
+        switch store.draft.side {
+        case .buy:
+            return AppFormatter.money(store.buyingPower, currencyCode: store.currencyCode)
+        case .sell:
+            if store.availableSellQuantity > 0 {
+                let qty = TradeFormat.quantity(store.availableSellQuantity)
+                let symbol = store.normalizedSymbol
+                return symbol.isEmpty ? qty : "\(qty) \(symbol)"
+            }
+            return AppFormatter.money(store.buyingPower, currencyCode: store.currencyCode)
+        }
+    }
+}
+
+private struct TradeLimitPriceCard: View {
+    let store: TradeStore
+    let focusState: TradeLimitFocusController
+
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        VStack(spacing: 14) {
+            HStack(spacing: 8) {
+                Text(L10n.Trade.limitPrice(locale: locale))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(isFocused ? .primary : .secondary)
+
+                Spacer(minLength: 8)
+
+                if let deltaInfo = priceDeltaDisplay {
+                    Text(deltaInfo.text)
+                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(deltaInfo.tint)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(deltaInfo.tint.opacity(0.12), in: Capsule())
+                        .lineLimit(1)
+                }
+            }
+            .frame(minHeight: 22)
+
+            HStack(spacing: 12) {
+                TradeLimitStepperButton(
+                    systemImage: "minus",
+                    accessibilityLabel: L10n.Trade.limitDecreasePrice(locale: locale)
+                ) {
+                    TradeKeypadHaptics.keyTap()
+                    focusState.commitLimitPriceEdit()
+                    store.stepLimitPrice(steps: -1)
+                }
+                .disabled(!canStepPrice)
+
+                Button {
+                    TradeKeypadHaptics.selection()
+                    focusState.focusLimitPrice(selectForReplacement: !store.draft.limitPriceText.isEmpty)
+                } label: {
+                    HStack(alignment: .center, spacing: 3) {
+                        Text("$")
+                            .font(.system(size: priceCurrencyFontSize, weight: .semibold, design: .rounded))
+                            .foregroundStyle(hasPrice ? .secondary : Color(.tertiaryLabel))
+                            .fixedSize(horizontal: true, vertical: false)
+
+                        Text(priceDisplayText)
+                            .font(.system(size: priceFontSize, weight: .bold, design: .rounded).monospacedDigit())
+                            .foregroundStyle(hasPrice ? .primary : .secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.68)
+                            .padding(.horizontal, isSelectedForReplace ? 8 : 0)
+                            .padding(.vertical, 2)
+                            .background(
+                                isSelectedForReplace ? Color.primary.opacity(0.10) : Color.clear,
+                                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            )
+
+                        if isFocused {
+                            TradeBlinkingCursor(
+                                color: store.draft.side.tradeActionTint,
+                                width: 2.5,
+                                height: round(priceFontSize * 0.86)
+                            )
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52, alignment: .center)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                TradeLimitStepperButton(
+                    systemImage: "plus",
+                    accessibilityLabel: L10n.Trade.limitIncreasePrice(locale: locale)
+                ) {
+                    TradeKeypadHaptics.keyTap()
+                    focusState.commitLimitPriceEdit()
+                    store.stepLimitPrice(steps: 1)
+                }
+                .disabled(!canStepPrice)
+            }
+
+            HStack(spacing: 8) {
+                TradeLimitBookChip(
+                    title: L10n.Trade.limitBid(locale: locale),
+                    price: store.bidPrice,
+                    currencyCode: store.currencyCode
+                ) {
+                    TradeKeypadHaptics.selection()
+                    focusState.commitLimitPriceEdit()
+                    store.fillLimitFromBid()
+                }
+
+                TradeLimitBookChip(
+                    title: L10n.Trade.limitMid(locale: locale),
+                    price: store.defaultLimitReferencePrice,
+                    currencyCode: store.currencyCode
+                ) {
+                    TradeKeypadHaptics.selection()
+                    focusState.commitLimitPriceEdit()
+                    store.fillLimitFromMid()
+                }
+
+                TradeLimitBookChip(
+                    title: L10n.Trade.limitAsk(locale: locale),
+                    price: store.askPrice,
+                    currencyCode: store.currencyCode
+                ) {
+                    TradeKeypadHaptics.selection()
+                    focusState.commitLimitPriceEdit()
+                    store.fillLimitFromAsk()
+                }
+            }
+        }
+        .padding(18)
+        .background(
+            AppTheme.ColorToken.groupedSurface,
+            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(
+                    isFocused ? store.draft.side.tradeActionTint.opacity(0.55) : Color(.separator).opacity(0.16),
+                    lineWidth: isFocused ? 1.5 : 0.75
+                )
+        }
+    }
+
+    private var isFocused: Bool {
+        focusState.focusedField == .limitPrice
+    }
+
+    private var isSelectedForReplace: Bool {
+        isFocused && focusState.replaceLimitPriceOnNextDigit && hasPrice
+    }
+
+    private var hasPrice: Bool {
+        !store.draft.limitPriceText.isEmpty
+    }
+
+    private var canStepPrice: Bool {
+        hasPrice || store.defaultLimitReferencePrice != nil || store.marketReferencePrice != nil
+    }
+
+    private var priceDisplayText: String {
+        guard hasPrice else { return AppFormatter.placeholder }
+        return TradeInputFormat.formattedDisplay(store.draft.limitPriceText)
+    }
+
+    private var priceFontSize: CGFloat {
+        switch priceDisplayText.count {
+        case 0...6:
+            return 38
+        case 7...8:
+            return 32
+        default:
+            return 26
+        }
+    }
+
+    private var priceCurrencyFontSize: CGFloat {
+        max(18, round(priceFontSize * 0.58))
+    }
+
+    private var priceDeltaDisplay: (text: String, tint: Color)? {
+        guard let fraction = store.limitPriceDeltaFraction, abs(fraction) >= 0.0001 else {
+            return nil
+        }
+
+        let isPositive = fraction > 0
+        let sign = isPositive ? "+" : ""
+        let percentText = "\(sign)\(AppFormatter.percent(fraction, fractionLength: 2))"
+        let label = L10n.Trade.limitVsMarket(percentText, locale: locale)
+        let tint: Color = isPositive ? AppTheme.ColorToken.positive : AppTheme.ColorToken.negative
+        return (label, tint)
+    }
+}
+
+private struct TradeLimitQuantityCard: View {
+    let store: TradeStore
+    let focusState: TradeLimitFocusController
+
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        VStack(spacing: 14) {
+            HStack(spacing: 8) {
+                Text(L10n.Trade.limitNumberOfShares(locale: locale))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(isFocused ? .primary : .secondary)
+
+                Spacer(minLength: 8)
+
+                HStack(spacing: 5) {
+                    Text(
+                        store.draft.side == .buy
+                            ? L10n.Trade.simpleEstimatedDebit(locale: locale)
+                            : L10n.Trade.simpleEstimatedCredit(locale: locale)
+                    )
+                    .foregroundStyle(.secondary)
+
+                    Text(AppFormatter.money(store.estimatedNotional, currencyCode: store.currencyCode))
+                        .foregroundStyle(store.estimatedNotional != nil ? .primary : .secondary)
+                }
+                .font(.subheadline.weight(.semibold).monospacedDigit())
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            }
+
+            ZStack {
+                Button {
+                    TradeKeypadHaptics.selection()
+                    focusState.focusQuantity()
+                } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        HStack(alignment: .center, spacing: 2) {
+                            Text(quantityDisplayText)
+                                .font(.system(size: quantityFontSize, weight: .bold, design: .rounded).monospacedDigit())
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.68)
+
+                            if isFocused {
+                                TradeBlinkingCursor(
+                                    color: store.draft.side.tradeActionTint,
+                                    width: 2.5,
+                                    height: round(quantityFontSize * 0.86)
+                                )
+                            }
+                        }
+
+                        Text(unitLabel)
+                            .font(.system(size: quantityUnitFontSize, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                    .padding(.horizontal, 34)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 52, alignment: .center)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                if !store.draft.quantityText.isEmpty {
+                    HStack {
+                        Spacer(minLength: 0)
+                        Button {
+                            TradeKeypadHaptics.keyTap()
+                            focusState.focusQuantity()
+                            store.setLimitQuantityText("")
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundStyle(Color(.tertiaryLabel))
+                                .frame(width: 30, height: 30)
+                                .contentShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(L10n.Trade.simpleDelete(locale: locale))
+                    }
+                }
+            }
+            .frame(height: 52)
+
+            TradeSimpleQuickFillRow(
+                items: quickFillItems,
+                selectedPercent: store.activeQuickFillPercent,
+                style: .embedded,
+                isDisabled: !store.quickFillAvailable
+            ) { percent in
+                TradeKeypadHaptics.selection()
+                focusState.focusQuantity()
+                store.fillQuickAmount(percent: percent)
+            }
+        }
+        .padding(18)
+        .background(
+            AppTheme.ColorToken.groupedSurface,
+            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(
+                    isFocused ? store.draft.side.tradeActionTint.opacity(0.55) : Color(.separator).opacity(0.16),
+                    lineWidth: isFocused ? 1.5 : 0.75
+                )
+        }
+    }
+
+    private var isFocused: Bool {
+        focusState.focusedField == .quantity
+    }
+
+    private var quantityDisplayText: String {
+        TradeInputFormat.formattedDisplay(store.draft.quantityText)
+    }
+
+    private var quantityFontSize: CGFloat {
+        switch quantityDisplayText.count {
+        case 0...6:
+            return 38
+        case 7...9:
+            return 32
+        default:
+            return 26
+        }
+    }
+
+    private var quantityUnitFontSize: CGFloat {
+        max(16, round(quantityFontSize * 0.54))
+    }
+
+    private var unitLabel: String {
+        let symbol = store.normalizedSymbol
+        return symbol.isEmpty ? L10n.Trade.simpleShares(locale: locale) : symbol
+    }
+
+    private var quickFillItems: [TradeSimpleQuickFillItem] {
+        [
+            TradeSimpleQuickFillItem(title: "25%", percent: Decimal(string: "0.25")!),
+            TradeSimpleQuickFillItem(title: "50%", percent: Decimal(string: "0.50")!),
+            TradeSimpleQuickFillItem(title: "75%", percent: Decimal(string: "0.75")!),
+            TradeSimpleQuickFillItem(title: L10n.Trade.simpleMax(locale: locale), percent: Decimal(string: "1.0")!)
+        ]
+    }
+}
+
+private struct TradeLimitOptionsBar: View {
+    let store: TradeStore
+
+    @Environment(\.locale) private var locale
+
+    private let options: [TimeInForce] = [.day, .gtc]
+
+    var body: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 4) {
+                ForEach(options) { tif in
+                    let isSelected = store.draft.timeInForce == tif
+                    Button {
+                        TradeKeypadHaptics.selection()
+                        store.setTimeInForce(tif)
+                    } label: {
+                        Text(tif.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(isSelected ? .primary : .secondary)
+                            .padding(.horizontal, 16)
+                            .frame(height: 34)
+                            .background(
+                                isSelected ? Color(.tertiarySystemFill) : Color.clear,
+                                in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            )
+                            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    }
+                    .buttonStyle(TradeFlatPressButtonStyle())
+                }
+            }
+            .padding(4)
+            .background(
+                AppTheme.ColorToken.groupedSurface,
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color(.separator).opacity(0.16), lineWidth: 0.75)
+            }
+
+            Spacer(minLength: 8)
+
+            Button {
+                TradeKeypadHaptics.selection()
+                store.setExtendedHours(!store.draft.extendedHours)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: store.draft.extendedHours ? "moon.stars.fill" : "moon.stars")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(store.draft.extendedHours ? AppTheme.ColorToken.warning : .secondary)
+
+                    Text(L10n.Trade.limitExtendedHours(locale: locale))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(store.draft.extendedHours ? .primary : .secondary)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 14)
+                .frame(height: 42)
+                .background(
+                    store.draft.extendedHours
+                        ? Color(.tertiarySystemFill)
+                        : AppTheme.ColorToken.groupedSurface,
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(
+                            store.draft.extendedHours
+                                ? Color.primary.opacity(0.32)
+                                : Color(.separator).opacity(0.16),
+                            lineWidth: store.draft.extendedHours ? 1.1 : 0.75
+                        )
+                }
+                .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(TradeFlatPressButtonStyle())
+        }
+    }
+}
+
+private struct TradeLimitStatusSection: View {
+    let store: TradeStore
+    let canUseAPI: Bool
+
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        TradeInlineStatusStrip(status: status)
+            .padding(.horizontal, 4)
+    }
+
+    private var hasRequiredInputs: Bool {
+        TradeInputFormat.hasPositiveValue(store.draft.quantityText)
+            && TradeInputFormat.hasPositiveValue(store.draft.limitPriceText)
+    }
+
+    private var status: TradeSimpleStatus? {
+        if store.isLoadingContext {
+            return nil
+        }
+
+        if !canUseAPI {
+            return TradeSimpleStatus(
+                systemImage: "key",
+                text: L10n.Trade.addCredentialsBeforeOrder(locale: locale),
+                tint: AppTheme.ColorToken.warning
+            )
+        }
+
+        if hasRequiredInputs {
+            if let error = store.validation.errors.first {
+                return TradeSimpleStatus(
+                    systemImage: "exclamationmark.triangle.fill",
+                    text: error,
+                    tint: AppTheme.ColorToken.negative
+                )
+            }
+
+            if let warning = store.validation.warnings.first {
+                return TradeSimpleStatus(
+                    systemImage: "exclamationmark.circle",
+                    text: warning,
+                    tint: AppTheme.ColorToken.warning
+                )
+            }
+        }
+
+        if let message = store.message, hasRequiredInputs {
+            return TradeSimpleStatus(
+                systemImage: "info.circle",
+                text: message,
+                tint: AppTheme.ColorToken.icon
+            )
+        }
+
+        return nil
+    }
+}
+
+private struct TradeLimitActionSection: View {
+    let store: TradeStore
+    let canUseAPI: Bool
+    let review: () -> Void
+
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        TradeSimpleActionButton(state: buttonState, action: review)
+    }
+
+    private var hasRequiredInputs: Bool {
+        TradeInputFormat.hasPositiveValue(store.draft.quantityText)
+            && TradeInputFormat.hasPositiveValue(store.draft.limitPriceText)
+    }
+
+    private var buttonState: TradeSimpleActionButtonState {
+        let tint = store.draft.side.tradeActionTint
+
+        if store.isLoadingContext {
+            return TradeSimpleActionButtonState(
+                title: L10n.Trade.simpleReviewOrder(locale: locale),
+                tint: tint,
+                isEnabled: false
+            )
+        }
+
+        if store.isSubmitting {
+            return TradeSimpleActionButtonState(
+                title: L10n.Trade.simpleSubmitting(locale: locale),
+                tint: tint,
+                isEnabled: false,
+                showsProgress: true
+            )
+        }
+
+        if !canUseAPI {
+            return TradeSimpleActionButtonState(
+                title: L10n.Trade.addCredentialsBeforeOrder(locale: locale),
+                tint: AppTheme.ColorToken.warning,
+                isEnabled: false,
+                isError: true
+            )
+        }
+
+        if hasRequiredInputs, let issue = store.validation.firstIssue {
+            return TradeSimpleActionButtonState(
+                title: TradeValidationActionTitle.title(for: issue, locale: locale),
+                tint: AppTheme.ColorToken.negative,
+                isEnabled: false,
+                isError: issue.kind != .missingInput
+            )
+        }
+
+        return TradeSimpleActionButtonState(
+            title: L10n.Trade.simpleReviewOrder(locale: locale),
+            tint: tint,
+            isEnabled: store.validation.canSubmit
+        )
+    }
+}
+
+struct TradeLimitStepperButton: View {
+    let systemImage: String
+    let accessibilityLabel: String
+    let action: () -> Void
+
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(isEnabled ? .primary : Color(.tertiaryLabel))
+                .frame(width: 42, height: 42)
+                .background(
+                    Color(.tertiarySystemFill),
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(TradeFlatPressButtonStyle())
+        .accessibilityLabel(accessibilityLabel)
+    }
+}
+
+struct TradeLimitBookChip: View {
+    let title: String
+    let price: Decimal?
+    let currencyCode: String
+    var priceFormatter: ((Decimal?) -> String)? = nil
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Text(title)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(price != nil ? .secondary : Color(.tertiaryLabel))
+
+                Text(formattedPrice)
+                    .font(.caption.weight(.bold).monospacedDigit())
+                    .foregroundStyle(price != nil ? .primary : Color(.tertiaryLabel))
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity)
+            .frame(height: 38)
+            .background(
+                Color(.tertiarySystemFill).opacity(price != nil ? 0.72 : 0.35),
+                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .buttonStyle(TradeFlatPressButtonStyle())
+        .disabled(price == nil)
+    }
+
+    private var formattedPrice: String {
+        if let priceFormatter {
+            return priceFormatter(price)
+        }
+        return TradeFormat.price(price, currency: currencyCode)
+    }
+}
+
+// MARK: - Shared Controls & Flat Non-Glass Components
+
+enum TradeValidationActionTitle {
+    static func title(for issue: TradeValidationIssue, locale: Locale) -> String {
         switch issue.kind {
         case .missingInput:
             return L10n.Trade.simpleEnterAmount(locale: locale)
@@ -802,512 +1618,227 @@ private struct TradeSimpleView: View {
             return L10n.Trade.simpleOrderUnavailable(locale: locale)
         }
     }
+}
 
-    private var quickFillItems: [TradeSimpleQuickFillItem] {
-        guard let base = quickFillBase, base > 0 else {
-            return []
-        }
+struct TradeBlinkingCursor: View {
+    let color: Color
+    var width: CGFloat = 2.5
+    var height: CGFloat = 46
 
-        return [
-            TradeSimpleQuickFillItem(title: "25%", percent: Decimal(string: "0.25")!),
-            TradeSimpleQuickFillItem(title: "50%", percent: Decimal(string: "0.50")!),
-            TradeSimpleQuickFillItem(title: L10n.Trade.simpleMax(locale: locale), percent: Decimal(string: "1.0")!)
-        ]
-    }
+    @State private var isVisible = true
 
-    private var quickFillBase: Decimal? {
-        switch store.sizingMode {
-        case .notional:
-            switch store.draft.side {
-            case .buy:
-                return store.buyingPower
-            case .sell:
-                return store.sellQuickFillNotionalBase
-            }
-        case .shares:
-            switch store.draft.side {
-            case .buy:
-                guard let buyingPower = store.buyingPower,
-                      let price = store.estimatedExecutionPrice,
-                      price > 0 else {
-                    return nil
+    var body: some View {
+        RoundedRectangle(cornerRadius: width / 2, style: .continuous)
+            .fill(color)
+            .frame(width: width, height: height)
+            .opacity(isVisible ? 1 : 0.08)
+            .onAppear {
+                isVisible = true
+                withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) {
+                    isVisible = false
                 }
-                return buyingPower / price
-            case .sell:
-                return store.sellQuickFillQuantityBase
             }
-        }
-    }
-
-    private func applyQuickFill(_ percent: Decimal) {
-        store.message = nil
-        switch store.sizingMode {
-        case .shares:
-            store.fillQuantity(percent: percent)
-        case .notional:
-            guard let base = quickFillBase else { return }
-            setActiveInputText(roundedDecimalText(base * percent, scale: 2))
-        }
-    }
-
-    private func applyKey(_ key: TradeNumberPadKey) {
-        store.message = nil
-        var value = activeInputText
-
-        switch key {
-        case .digit(let digit):
-            value.append(digit)
-        case .decimal:
-            guard !value.contains(".") else { return }
-            value.append(".")
-        case .backspace:
-            guard !value.isEmpty else { return }
-            value.removeLast()
-        case .clear:
-            value = ""
-        }
-
-        setActiveInputText(value)
-    }
-
-    private func setActiveInputText(_ value: String) {
-        switch store.sizingMode {
-        case .shares:
-            store.draft.quantityText = TradeInputFormat.text(value, kind: .quantity)
-            notionalInputText = ""
-        case .notional:
-            let text = TradeInputFormat.text(value, kind: .decimal(maxFractionDigits: 2))
-            if store.supportsNotionalOrder {
-                store.draft.quantityText = ""
-                store.draft.notionalText = text
-                notionalInputText = ""
-            } else {
-                notionalInputText = text
-                store.draft.notionalText = ""
-                store.draft.quantityText = quantityText(forNotionalText: text)
+            .onDisappear {
+                isVisible = true
             }
-        }
-    }
-
-    private func setSizingMode(_ mode: TradeSizingMode) {
-        store.message = nil
-        guard store.sizingMode != mode else { return }
-
-        switch mode {
-        case .shares:
-            if store.sizingMode == .notional {
-                store.draft.quantityText = quantityText(forNotionalText: activeInputText)
-            }
-            store.sizingMode = .shares
-            store.draft.notionalText = ""
-            notionalInputText = ""
-        case .notional:
-            let text = notionalTextForCurrentInput()
-            store.sizingMode = .notional
-            setActiveInputText(text)
-        }
-    }
-
-    private func syncNotionalInputForCurrentOrder() {
-        guard store.sizingMode == .notional else { return }
-        let text: String
-        if store.supportsNotionalOrder {
-            text = notionalInputText.isEmpty ? store.draft.notionalText : notionalInputText
-        } else {
-            text = notionalInputText.isEmpty ? store.draft.notionalText : notionalInputText
-        }
-        setActiveInputText(text)
-    }
-
-    private func notionalTextForCurrentInput() -> String {
-        if store.sizingMode == .notional {
-            return activeInputText
-        }
-
-        guard let quantity = NumberParser.decimal(from: store.draft.quantityText),
-              let price = store.estimatedExecutionPrice,
-              price > 0 else {
-            return ""
-        }
-
-        return roundedDecimalText(quantity * price, scale: 2)
-    }
-
-    private func quantityText(forNotionalText text: String) -> String {
-        guard let notional = NumberParser.decimal(from: text),
-              let price = store.estimatedExecutionPrice,
-              price > 0 else {
-            return ""
-        }
-
-        return TradeInputFormat.text(roundedDecimalText(notional / price, scale: 6), kind: .quantity)
-    }
-
-    private func roundedDecimalText(_ value: Decimal, scale: Int) -> String {
-        var value = value
-        var rounded = Decimal()
-        NSDecimalRound(&rounded, &value, scale, .plain)
-        return NumberText.trimTrailingZeros(NSDecimalNumber(decimal: rounded).stringValue)
     }
 }
 
-private struct TradeSimpleTopBar: View {
-    let store: TradeStore
-    let close: () -> Void
-    let setSizingMode: (TradeSizingMode) -> Void
-    let showLimitOrder: () -> Void
-
-    @Environment(\.locale) private var locale
+struct TradeInlineStatusStrip: View {
+    let status: TradeSimpleStatus?
+    var alignment: Alignment = .leading
 
     var body: some View {
-        @Bindable var store = store
-
-        AppScreenHeader(background: AppTheme.ColorToken.pageBackground) {
-            AppGlassIconButton(
-                systemImage: "chevron.left",
-                accessibilityLabel: L10n.Common.back,
-                action: close
-            )
-        } center: {
-            Menu {
-                Button(L10n.Trade.simpleMarketOrder(locale: locale)) {
-                    store.prepareMarketOrder()
-                }
-
-                Divider()
-
-                Button(OrderType.limit.titleText(locale: locale)) {
-                    showLimitOrder()
-                }
-            } label: {
+        Group {
+            if let status {
                 HStack(spacing: 6) {
-                    Text(orderTypeTitle)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 10, weight: .bold))
+                    Image(systemName: status.systemImage)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(status.tint)
+
+                    Text(status.text)
+                        .font(AppTypography.caption.weight(.medium))
+                        .foregroundStyle(status.tint == AppTheme.ColorToken.negative ? AppTheme.ColorToken.negative : .secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.76)
                 }
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(.primary)
-                .frame(height: 44)
-                .padding(.horizontal, 8)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-        } trailing: {
-            Menu {
-                Button(L10n.Trade.simpleDollars(locale: locale)) {
-                    setSizingMode(.notional)
-                }
-
-                Button(L10n.Trade.simpleShares(locale: locale)) {
-                    setSizingMode(.shares)
-                }
-            } label: {
-                HStack(spacing: 5) {
-                    Text(sizingModeTitle)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 10, weight: .bold))
-                }
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(AppTheme.ColorToken.brandDark)
-                .frame(minWidth: 96, alignment: .trailing)
-                .frame(height: 44)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-        }
-    }
-
-    private var sizingModeTitle: String {
-        switch store.sizingMode {
-        case .shares:
-            return L10n.Trade.simpleShares(locale: locale)
-        case .notional:
-            return L10n.Trade.simpleDollars(locale: locale)
-        }
-    }
-
-    private var orderTypeTitle: String {
-        if store.draft.orderType == .market {
-            return L10n.Trade.simpleMarketOrder(locale: locale)
-        }
-
-        return L10n.Trade.simpleOrderTypeTitle(
-            orderType: store.draft.orderType.titleText(locale: locale),
-            locale: locale
-        )
-    }
-}
-
-private struct TradeSimpleDisplayRegion: View {
-    let amountText: String
-    let showsCurrencyMark: Bool
-    let unit: String?
-
-    var body: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .top) {
-                TradeSimplePrimaryAmount(
-                    text: amountText,
-                    showsCurrencyMark: showsCurrencyMark,
-                    unit: unit
-                )
-                .frame(width: proxy.size.width)
-                .position(x: proxy.size.width / 2, y: 130)
-            }
-        }
-        .frame(height: 292)
-    }
-}
-
-private struct TradeSimplePrimaryAmount: View {
-    let text: String
-    let showsCurrencyMark: Bool
-    let unit: String?
-
-    var body: some View {
-        VStack(spacing: 8) {
-            amountLine
-
-            if let unit {
-                Text(unit)
-                    .font(AppTypography.control)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: alignment)
+            } else {
+                Color.clear
             }
         }
         .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .combine)
-    }
-
-    private var amountLine: some View {
-        HStack(alignment: .top, spacing: 2) {
-            if showsCurrencyMark {
-                Text("$")
-                    .font(.system(size: 34, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.primary)
-                    .padding(.top, 9)
-            }
-
-            Text(text)
-                .font(.system(size: 78, weight: .bold, design: .rounded).monospacedDigit())
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.35)
-                .contentTransition(.numericText())
-        }
-        .frame(maxWidth: .infinity, alignment: .center)
+        .frame(height: 20, alignment: alignment)
     }
 }
 
-private struct TradeSimpleInputActionButtonState {
+struct TradeSimpleStatus {
+    let systemImage: String
+    let text: String
+    let tint: Color
+}
+
+struct TradeSimpleActionButtonState {
     let title: String
     let tint: Color
     let isEnabled: Bool
+    var isError = false
     var showsProgress = false
 }
 
-private struct TradeSimpleInputActionButton: View {
-    let state: TradeSimpleInputActionButtonState
+struct TradeSimpleActionButton: View {
+    let state: TradeSimpleActionButtonState
     let action: () -> Void
 
     var body: some View {
-        if #available(iOS 26.0, *) {
-            GlassEffectContainer(spacing: 0) {
-                button(usesGlass: true)
-            }
-        } else {
-            button(usesGlass: false)
-        }
-    }
-
-    @ViewBuilder
-    private func button(usesGlass: Bool) -> some View {
-        let button = Button(action: action) {
+        Button(action: action) {
             HStack(spacing: 8) {
                 if state.showsProgress {
                     ProgressView()
                         .controlSize(.small)
+                        .tint(.white)
                 }
 
                 Text(state.title)
-                    .font(.headline.weight(.bold))
+                    .font(.headline.weight(.semibold))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.64)
+                    .minimumScaleFactor(0.72)
             }
-            .foregroundStyle(state.tint)
+            .foregroundStyle(foregroundColor)
             .frame(maxWidth: .infinity)
-            .frame(height: 44)
+            .frame(height: 52)
+            .background(backgroundColor, in: Capsule())
             .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(TradeFlatPressButtonStyle())
         .disabled(!state.isEnabled)
+    }
 
-        if usesGlass {
-            if #available(iOS 26.0, *) {
-                button
-                    .glassEffect(
-                        .regular.tint(state.tint.opacity(state.isEnabled ? 0.22 : 0.12)).interactive(state.isEnabled),
-                        in: .capsule
-                    )
-            } else {
-                button
-            }
-        } else {
-            button
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay {
-                    Capsule()
-                        .strokeBorder(state.tint.opacity(state.isEnabled ? 0.30 : 0.18), lineWidth: 0.75)
-                }
+    private var foregroundColor: Color {
+        if state.isEnabled || state.showsProgress {
+            return .white
         }
+        if state.isError {
+            return state.tint
+        }
+        return Color(.secondaryLabel)
+    }
+
+    private var backgroundColor: Color {
+        if state.isEnabled || state.showsProgress {
+            return state.tint
+        }
+        if state.isError {
+            return state.tint.opacity(0.14)
+        }
+        return Color(.tertiarySystemFill)
     }
 }
 
-private struct TradeSimpleQuickFillRow: View {
+struct TradeSimpleQuickFillRow: View {
     enum Style {
         case regular
-        case compact
+        case embedded
 
         var height: CGFloat {
             switch self {
             case .regular:
+                40
+            case .embedded:
                 38
-            case .compact:
-                28
+            }
+        }
+
+        var cornerRadius: CGFloat {
+            switch self {
+            case .regular:
+                10
+            case .embedded:
+                10
             }
         }
 
         var spacing: CGFloat {
-            switch self {
-            case .regular:
-                10
-            case .compact:
-                8
-            }
-        }
-
-        var width: CGFloat? {
-            switch self {
-            case .regular:
-                nil
-            case .compact:
-                68
-            }
-        }
-
-        var alignment: Alignment {
-            switch self {
-            case .regular:
-                .center
-            case .compact:
-                .trailing
-            }
+            8
         }
 
         var font: Font {
-            switch self {
-            case .regular:
-                .subheadline.weight(.bold).monospacedDigit()
-            case .compact:
-                .caption.weight(.bold).monospacedDigit()
-            }
-        }
-
-        var tint: Color {
-            switch self {
-            case .regular:
-                AppTheme.ColorToken.brandDark
-            case .compact:
-                Color(.secondaryLabel)
-            }
-        }
-
-        var glassTintOpacity: Double {
-            switch self {
-            case .regular:
-                0.16
-            case .compact:
-                0.08
-            }
-        }
-
-        var strokeOpacity: Double {
-            switch self {
-            case .regular:
-                0.22
-            case .compact:
-                0.14
-            }
+            .subheadline.weight(.semibold).monospacedDigit()
         }
     }
 
     let items: [TradeSimpleQuickFillItem]
+    var selectedPercent: Decimal? = nil
     var style: Style = .regular
+    var isDisabled = false
     let action: (Decimal) -> Void
 
     var body: some View {
-        Group {
-            if !items.isEmpty {
-                if #available(iOS 26.0, *) {
-                    GlassEffectContainer(spacing: style.spacing) {
-                        quickFillButtons(usesGlass: true)
-                    }
-                } else {
-                    quickFillButtons(usesGlass: false)
-                }
-            }
-        }
-        .frame(minHeight: items.isEmpty ? 0 : style.height)
-    }
-
-    private func quickFillButtons(usesGlass: Bool) -> some View {
         HStack(spacing: style.spacing) {
             ForEach(items) { item in
-                quickFillButton(item, usesGlass: usesGlass)
+                let isSelected = !isDisabled && selectedPercent == item.percent
+                Button {
+                    action(item.percent)
+                } label: {
+                    Text(item.title)
+                        .font(style.font)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .foregroundStyle(textColor(isSelected: isSelected))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: style.height)
+                        .background(
+                            fillColor(isSelected: isSelected),
+                            in: RoundedRectangle(cornerRadius: style.cornerRadius, style: .continuous)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: style.cornerRadius, style: .continuous)
+                                .strokeBorder(borderColor(isSelected: isSelected), lineWidth: isSelected ? 1.2 : 0.75)
+                        }
+                        .contentShape(RoundedRectangle(cornerRadius: style.cornerRadius, style: .continuous))
+                }
+                .buttonStyle(TradeFlatPressButtonStyle())
+                .disabled(isDisabled)
             }
         }
-        .frame(maxWidth: .infinity, alignment: style.alignment)
+        .frame(maxWidth: .infinity)
     }
 
-    @ViewBuilder
-    private func quickFillButton(_ item: TradeSimpleQuickFillItem, usesGlass: Bool) -> some View {
-        let button = Button {
-            action(item.percent)
-        } label: {
-            Text(item.title)
-                .font(style.font)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-                .foregroundStyle(style.tint)
-                .frame(width: style.width)
-                .frame(maxWidth: style.width == nil ? .infinity : nil)
-                .frame(height: style.height)
-                .contentShape(Capsule())
+    private func textColor(isSelected: Bool) -> Color {
+        if isDisabled {
+            return Color(.tertiaryLabel)
         }
-        .buttonStyle(.plain)
+        return .primary
+    }
 
-        if usesGlass {
-            if #available(iOS 26.0, *) {
-                button
-                    .glassEffect(
-                        .regular.tint(style.tint.opacity(style.glassTintOpacity)).interactive(),
-                        in: .capsule
-                    )
-            } else {
-                button
-            }
-        } else {
-            button
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay {
-                    Capsule()
-                        .strokeBorder(style.tint.opacity(style.strokeOpacity), lineWidth: 0.75)
-                }
+    private func fillColor(isSelected: Bool) -> Color {
+        if isDisabled {
+            return style == .embedded
+                ? Color(.tertiarySystemFill).opacity(0.35)
+                : AppTheme.ColorToken.groupedSurface.opacity(0.45)
         }
+        if isSelected {
+            return Color.primary.opacity(0.10)
+        }
+        return style == .embedded
+            ? Color(.tertiarySystemFill).opacity(0.68)
+            : AppTheme.ColorToken.groupedSurface
+    }
+
+    private func borderColor(isSelected: Bool) -> Color {
+        if isDisabled {
+            return Color(.separator).opacity(0.10)
+        }
+        if isSelected {
+            return Color.primary.opacity(0.38)
+        }
+        return style == .embedded
+            ? Color.clear
+            : Color(.separator).opacity(0.22)
     }
 }
 
-private struct TradeSimpleQuickFillItem: Identifiable {
+struct TradeSimpleQuickFillItem: Identifiable {
     let title: String
     let percent: Decimal
 
@@ -1316,51 +1847,18 @@ private struct TradeSimpleQuickFillItem: Identifiable {
     }
 }
 
-private enum TradeSimpleStatusLineLayout: Equatable {
-    case leading
-    case centered
-}
-
-private struct TradeSimpleStatusLine: View {
-    let status: TradeSimpleStatus?
-    var layout: TradeSimpleStatusLineLayout = .leading
-
-    var body: some View {
-        Group {
-            if let status {
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: status.systemImage)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(status.tint)
-                        .frame(width: 18, height: 18)
-
-                    Text(status.text)
-                        .font(AppTypography.detail)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .multilineTextAlignment(layout == .centered ? .center : .leading)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    if layout == .leading {
-                        Spacer(minLength: 0)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: layout == .centered ? .center : .topLeading)
-            } else {
-                Color.clear
-            }
-        }
-        .frame(maxWidth: .infinity, minHeight: 38, alignment: layout == .centered ? .center : .topLeading)
+struct TradeFlatPressButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.78 : 1)
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
     }
 }
 
-private struct TradeSimpleStatus {
-    let systemImage: String
-    let text: String
-    let tint: Color
-}
+// MARK: - High-Performance Custom Keypad
 
-private enum TradeNumberPadKey: Identifiable, Equatable {
+enum TradeNumberPadKey: Identifiable, Equatable {
     case digit(String)
     case decimal
     case backspace
@@ -1380,12 +1878,45 @@ private enum TradeNumberPadKey: Identifiable, Equatable {
     }
 }
 
-private struct TradeNumberPad: View {
+@MainActor
+enum TradeKeypadHaptics {
+    private static let keyTapGenerator: UIImpactFeedbackGenerator = {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.prepare()
+        return generator
+    }()
+
+    private static let clearGenerator: UIImpactFeedbackGenerator = {
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.prepare()
+        return generator
+    }()
+
+    private static let selectionGenerator: UISelectionFeedbackGenerator = {
+        let generator = UISelectionFeedbackGenerator()
+        generator.prepare()
+        return generator
+    }()
+
+    static func keyTap() {
+        keyTapGenerator.impactOccurred(intensity: 0.65)
+    }
+
+    static func clear() {
+        clearGenerator.impactOccurred(intensity: 0.85)
+    }
+
+    static func selection() {
+        selectionGenerator.selectionChanged()
+    }
+}
+
+struct TradeNumberPad: View {
     let action: (TradeNumberPadKey) -> Void
 
     @Environment(\.locale) private var locale
 
-    private let rows: [[TradeNumberPadKey]] = [
+    private static let rows: [[TradeNumberPadKey]] = [
         [.digit("1"), .digit("2"), .digit("3")],
         [.digit("4"), .digit("5"), .digit("6")],
         [.digit("7"), .digit("8"), .digit("9")],
@@ -1393,30 +1924,41 @@ private struct TradeNumberPad: View {
     ]
 
     var body: some View {
-        VStack(spacing: 6) {
-            ForEach(rows.indices, id: \.self) { rowIndex in
-                HStack(spacing: 10) {
-                    ForEach(rows[rowIndex]) { key in
-                        Button {
-                            action(key)
-                        } label: {
-                            TradeNumberPadKeyLabel(key: key)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 58)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(accessibilityLabel(for: key))
-                        .simultaneousGesture(
-                            LongPressGesture(minimumDuration: 0.45)
-                                .onEnded { _ in
-                                    guard key == .backspace else { return }
-                                    action(.clear)
-                                }
-                        )
+        VStack(spacing: 4) {
+            ForEach(0..<Self.rows.count, id: \.self) { rowIndex in
+                HStack(spacing: 8) {
+                    ForEach(Self.rows[rowIndex]) { key in
+                        keyButton(for: key)
                     }
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func keyButton(for key: TradeNumberPadKey) -> some View {
+        let baseButton = Button {
+            TradeKeypadHaptics.keyTap()
+            action(key)
+        } label: {
+            TradeNumberPadKeyLabel(key: key)
+                .frame(maxWidth: .infinity)
+                .frame(height: 55)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(TradeNumberPadButtonStyle())
+        .accessibilityLabel(accessibilityLabel(for: key))
+
+        if key == .backspace {
+            baseButton.simultaneousGesture(
+                LongPressGesture(minimumDuration: 0.4)
+                    .onEnded { _ in
+                        TradeKeypadHaptics.clear()
+                        action(.clear)
+                    }
+            )
+        } else {
+            baseButton
         }
     }
 
@@ -1426,11 +1968,20 @@ private struct TradeNumberPad: View {
             return value
         case .decimal:
             return L10n.Trade.simpleDecimalPoint(locale: locale)
-        case .backspace:
-            return L10n.Trade.simpleDelete(locale: locale)
-        case .clear:
+        case .backspace, .clear:
             return L10n.Trade.simpleDelete(locale: locale)
         }
+    }
+}
+
+private struct TradeNumberPadButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                configuration.isPressed ? Color(.tertiarySystemFill) : Color.clear,
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
+            .scaleEffect(configuration.isPressed ? 0.94 : 1)
     }
 }
 
@@ -1442,86 +1993,20 @@ private struct TradeNumberPadKeyLabel: View {
             switch key {
             case .digit(let value):
                 Text(value)
-                    .font(.system(size: 34, weight: .medium, design: .rounded).monospacedDigit())
+                    .font(.system(size: 28, weight: .medium, design: .rounded).monospacedDigit())
             case .decimal:
                 Text(".")
-                    .font(.system(size: 34, weight: .medium, design: .rounded).monospacedDigit())
-            case .backspace:
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+            case .backspace, .clear:
                 Image(systemName: "delete.left")
-                    .font(.system(size: 24, weight: .semibold))
-            case .clear:
-                Image(systemName: "delete.left")
-                    .font(.system(size: 24, weight: .semibold))
+                    .font(.system(size: 22, weight: .medium))
             }
         }
-        .foregroundStyle(AppTheme.ColorToken.brandDark)
+        .foregroundStyle(.primary)
     }
 }
 
-private struct TradeSmallAction: View {
-    let title: String
-    let tint: Color
-    let action: () -> Void
-
-    @Environment(\.isEnabled) private var isEnabled
-
-    var body: some View {
-        if #available(iOS 26.0, *) {
-            button
-                .glassEffect(
-                    .regular.tint(tint.opacity(isEnabled ? 0.08 : 0.05)).interactive(isEnabled),
-                    in: .capsule
-                )
-        } else {
-            button
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay {
-                    Capsule()
-                        .strokeBorder(foreground.opacity(0.16), lineWidth: 0.8)
-                }
-        }
-    }
-
-    private var button: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.caption.weight(.bold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-                .frame(width: 76, height: 30)
-                .foregroundStyle(foreground)
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var foreground: Color {
-        isEnabled ? tint : Color(.secondaryLabel)
-    }
-}
-
-private struct TradeGlassCapsuleModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            content
-                .glassEffect(.regular.tint(Color.white.opacity(0.14)).interactive(), in: .capsule)
-        } else {
-            content
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay {
-                    Capsule()
-                        .strokeBorder(Color(.separator).opacity(0.18))
-                }
-                .shadow(color: .black.opacity(0.10), radius: 14, y: 5)
-        }
-    }
-}
-
-private extension View {
-    func tradeGlassCapsule() -> some View {
-        modifier(TradeGlassCapsuleModifier())
-    }
-}
+// MARK: - Formatting & Zero-Regex Input Sanitization
 
 private enum TradeFormat {
     static func price(_ value: Decimal?, currency: String) -> String {
@@ -1535,80 +2020,155 @@ private enum TradeFormat {
     }
 
     static func quantity(_ value: Decimal) -> String {
-        let text = NSDecimalNumber(decimal: value).stringValue
+        var copy = value
+        var rounded = Decimal()
+        NSDecimalRound(&rounded, &copy, 6, .down)
+        let text = NSDecimalNumber(decimal: rounded).stringValue
         let normalized = NumberText.trimTrailingZeros(text)
         return normalized.isEmpty ? "0" : normalized
     }
 }
 
-private enum TradeInputKind {
-    case quantity
-    case decimal(maxFractionDigits: Int)
+enum TradeInputLimit {
+    /// Up to $99,999,999.99 (10 total digits) — covers all realistic equity orders without layout overflow.
+    static let notionalMaxIntegerDigits = 8
+    static let notionalMaxTotalDigits = 10
+
+    /// Up to 9,999,999 shares or fractional quantities up to 10 total significant digits.
+    static let sharesMaxIntegerDigits = 7
+    static let sharesMaxTotalDigits = 10
+
+    /// Up to $999,999.99 (covers even BRK.A) with 2 decimals above $1 or 4 decimals below $1.
+    static let priceMaxIntegerDigits = 6
+    static let priceMaxTotalDigits = 8
 }
 
-private enum TradeInputFormat {
-    static func text(_ value: String, kind: TradeInputKind) -> String {
-        switch kind {
-        case .quantity:
-            return normalizedDecimal(value, maxFractionDigits: 6, inputPattern: #"^\d+(?:\.\d{0,6})?$"#)
-        case .decimal(let maxFractionDigits):
-            return normalizedDecimal(value, maxFractionDigits: maxFractionDigits, inputPattern: #"^\d+(?:\.\d{0,\#(maxFractionDigits)})?$"#)
+enum TradeInputFormat {
+    private static let defaultMaxIntegerDigits = 8
+
+    static func applyKey(
+        _ key: TradeNumberPadKey,
+        to current: String,
+        maxIntegerDigits: Int = defaultMaxIntegerDigits,
+        maxFractionDigits: Int,
+        maxTotalDigits: Int? = nil
+    ) -> String {
+        switch key {
+        case .digit(let digit):
+            if current.isEmpty || current == "0" {
+                return digit == "0" ? "0" : digit
+            }
+
+            if let maxTotalDigits {
+                let currentDigitCount = current.reduce(into: 0) { count, ch in
+                    if ch >= "0" && ch <= "9" { count += 1 }
+                }
+                guard currentDigitCount < maxTotalDigits else { return current }
+            }
+
+            if let dotIndex = current.firstIndex(of: ".") {
+                let fractionCount = current.distance(from: current.index(after: dotIndex), to: current.endIndex)
+                guard fractionCount < maxFractionDigits else { return current }
+                return current + digit
+            } else {
+                guard current.count < maxIntegerDigits else { return current }
+                return current + digit
+            }
+        case .decimal:
+            guard maxFractionDigits > 0, !current.contains(".") else { return current }
+            if let maxTotalDigits {
+                let currentDigitCount = current.reduce(into: 0) { count, ch in
+                    if ch >= "0" && ch <= "9" { count += 1 }
+                }
+                guard currentDigitCount < maxTotalDigits else { return current }
+            }
+            return current.isEmpty ? "0." : (current + ".")
+        case .backspace:
+            guard !current.isEmpty else { return "" }
+            var next = current
+            next.removeLast()
+            return next
+        case .clear:
+            return ""
         }
     }
 
+    static func sanitize(
+        _ value: String,
+        maxIntegerDigits: Int = defaultMaxIntegerDigits,
+        maxFractionDigits: Int
+    ) -> String {
+        var integerChars: [Character] = []
+        var fractionChars: [Character] = []
+        var seenDecimal = false
+
+        for ch in value {
+            if ch >= "0" && ch <= "9" {
+                if seenDecimal {
+                    if fractionChars.count < maxFractionDigits {
+                        fractionChars.append(ch)
+                    }
+                } else if integerChars.count < maxIntegerDigits {
+                    integerChars.append(ch)
+                }
+            } else if ch == ".", !seenDecimal, maxFractionDigits > 0 {
+                seenDecimal = true
+            }
+        }
+
+        if integerChars.isEmpty && !seenDecimal {
+            return ""
+        }
+
+        let trimmedInteger = integerChars.drop { $0 == "0" }
+        let integerPart = trimmedInteger.isEmpty ? "0" : String(trimmedInteger)
+
+        if seenDecimal {
+            return "\(integerPart).\(String(fractionChars))"
+        }
+        return integerPart
+    }
+
+    static func formattedDisplay(_ rawText: String) -> String {
+        guard !rawText.isEmpty else {
+            return "0"
+        }
+
+        if let dotIndex = rawText.firstIndex(of: ".") {
+            let integerSlice = rawText[..<dotIndex]
+            let fractionSlice = rawText[dotIndex...]
+            return groupIntegerDigits(integerSlice) + fractionSlice
+        }
+
+        return groupIntegerDigits(rawText[...])
+    }
+
     static func hasPositiveValue(_ value: String) -> Bool {
-        guard let decimal = NumberParser.decimal(from: NumberText.trimTrailingZeros(value)) else {
+        guard !value.isEmpty,
+              let decimal = NumberParser.decimal(from: NumberText.trimTrailingZeros(value)) else {
             return false
         }
 
         return decimal > 0
     }
 
-    private static func normalizedDecimal(_ value: String, maxFractionDigits: Int, inputPattern: String) -> String {
-        let digitText = value.replacingOccurrences(
-            of: #"[^0-9.]"#,
-            with: "",
-            options: .regularExpression
-        )
-        var result = ""
-        var hasDecimalSeparator = false
+    private static func groupIntegerDigits(_ digits: Substring) -> String {
+        let count = digits.count
+        guard count > 3 else {
+            return digits.isEmpty ? "0" : String(digits)
+        }
 
-        for character in digitText {
-            if let scalar = character.unicodeScalars.first, scalar.value >= 48, scalar.value <= 57 {
-                result.append(character)
-            } else if character == ".", !hasDecimalSeparator {
-                hasDecimalSeparator = true
-                result.append(character)
+        var result = ""
+        result.reserveCapacity(count + (count - 1) / 3)
+        var remaining = count
+        for ch in digits {
+            result.append(ch)
+            remaining -= 1
+            if remaining > 0, remaining % 3 == 0 {
+                result.append(",")
             }
         }
-
-        guard !result.isEmpty else {
-            return ""
-        }
-
-        let normalized: String
-        if let separatorIndex = result.firstIndex(of: ".") {
-            var integerPart = String(result[..<separatorIndex])
-            let rawFractionPart = String(result[result.index(after: separatorIndex)...])
-            let fractionPart = String(rawFractionPart.prefix(maxFractionDigits))
-            integerPart = normalizedInteger(integerPart)
-            normalized = "\(integerPart).\(fractionPart)"
-        } else {
-            normalized = normalizedInteger(result)
-        }
-
-        guard normalized.range(of: inputPattern, options: .regularExpression) != nil else {
-            return ""
-        }
-        return normalized
-    }
-
-    private static func normalizedInteger(_ value: String) -> String {
-        let trimmed = value.drop { $0 == "0" }
-        if trimmed.isEmpty {
-            return value.isEmpty ? "0" : "0"
-        }
-        return String(trimmed)
+        return result
     }
 }
 

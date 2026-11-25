@@ -6,6 +6,7 @@ struct TradeOrderConfirmationSnapshot: Identifiable {
     let order: OrderDraft
     let assetName: String
     let estimatedNotional: Decimal?
+    let estimatedQuantity: Decimal?
     let estimatedExecutionPrice: Decimal?
     let currencyCode: String
     let environment: TradeEnvironment
@@ -18,10 +19,11 @@ struct TradeOrderConfirmationSnapshot: Identifiable {
         order = store.draft
         assetName = store.assetDisplayName
         estimatedNotional = store.estimatedNotional
+        estimatedQuantity = store.estimatedQuantity
         estimatedExecutionPrice = store.estimatedExecutionPrice
         currencyCode = store.currencyCode
         self.environment = environment
-        positionQuantity = store.positionQuantity
+        positionQuantity = store.availableSellQuantity
         warnings = store.validation.warnings
     }
 
@@ -51,6 +53,10 @@ struct TradeOrderConfirmationSnapshot: Identifiable {
             return quantity
         }
 
+        if let estimatedQuantity {
+            return estimatedQuantity
+        }
+
         guard let notional = NumberParser.decimal(from: OrderDraft.normalizedSizeText(order.notionalText)),
               let estimatedExecutionPrice,
               estimatedExecutionPrice > 0 else {
@@ -73,112 +79,46 @@ struct TradeOrderConfirmationSheet: View {
     @State private var isSubmitting = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            content
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(AppTheme.ColorToken.pageBackground.ignoresSafeArea())
-        .presentationDetents([.large])
-        .presentationDragIndicator(.hidden)
-        .interactiveDismissDisabled(isSubmitting)
-    }
+        AppActionSheetContainer(
+            title: L10n.Trade.simpleReviewOrder(locale: locale),
+            isSubmitting: isSubmitting,
+            minHeight: 440,
+            maxHeight: 740,
+            fallbackHeight: 310 + CGFloat(detailItems.count) * 46 + (warningMessages.isEmpty ? 0 : 76)
+        ) {
+            VStack(spacing: 0) {
+                TradeOrderConfirmationHeroHeader(snapshot: snapshot)
+                    .padding(.top, 6)
+                    .padding(.bottom, 22)
 
-    private var header: some View {
-        VStack(spacing: 10) {
-            Capsule()
-                .fill(.tertiary)
-                .frame(width: 58, height: 5)
-                .padding(.top, 10)
-
-            HStack {
-                Button(L10n.Common.cancelText(locale: locale)) {
-                    dismiss()
-                }
-                .font(AppTypography.control)
-                .foregroundStyle(.secondary)
-                .disabled(isSubmitting)
-
-                Spacer(minLength: 12)
-
-                Text(L10n.Trade.simpleReviewOrder(locale: locale))
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-
-                Spacer(minLength: 12)
-
-                Color.clear
-                    .frame(width: 52, height: 1)
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 8)
-        }
-    }
-
-    private var content: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                TradeOrderConfirmationIdentityCard(snapshot: snapshot)
-                    .tradeConfirmationCard()
-
-                detailCard
+                AppSheetInfoCard(items: detailItems)
 
                 if !warningMessages.isEmpty {
-                    warningCard
+                    AppSheetWarningBanner(messages: warningMessages)
+                        .padding(.top, 12)
                 }
 
-                confirmationMessage
-
-                TradeOrderConfirmationActionButton(
-                    title: snapshot.order.side.titleText(locale: locale),
-                    accessibilityTitle: snapshot.order.side.titleText(locale: locale),
+                AppSheetActionButton(
+                    title: actionButtonTitle,
+                    accessibilityTitle: actionButtonTitle,
                     submittingTitle: L10n.Trade.simpleSubmitting(locale: locale),
-                    tint: snapshot.order.side.tradeActionTint,
+                    tint: sideTint,
                     isSubmitting: isSubmitting
                 ) {
                     await submit()
                 }
-                .padding(.top, 2)
+                .padding(.top, 22)
+                .padding(.bottom, 12)
             }
-            .padding(.horizontal, AppTheme.Spacing.pageHorizontal)
-            .padding(.top, 8)
-            .padding(.bottom, AppTheme.Spacing.pageBottom)
         }
     }
 
-    private var detailCard: some View {
-        VStack(spacing: 0) {
-            ForEach(detailItems.indices, id: \.self) { index in
-                TradeOrderConfirmationInfoRow(item: detailItems[index])
-
-                if index < detailItems.count - 1 {
-                    Divider()
-                }
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 4)
-        .tradeConfirmationCard(padding: EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-    }
-
-    private var warningCard: some View {
-        VStack(spacing: 12) {
-            ForEach(warningMessages, id: \.self) { warning in
-                TradeOrderConfirmationWarningRow(warning: warning)
-            }
-        }
-        .tradeConfirmationCard()
-    }
-
-    private var confirmationMessage: some View {
-        Text(L10n.Trade.confirmMessage(
-            environment: snapshot.environment.titleText(locale: locale),
+    private var actionButtonTitle: String {
+        L10n.Trade.limitTitle(
+            side: snapshot.order.side.titleText(locale: locale),
+            symbol: snapshot.order.normalizedSymbol,
             locale: locale
-        ))
-        .font(AppTypography.detail)
-        .foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
-        .tradeConfirmationCard(padding: EdgeInsets(top: 16, leading: 20, bottom: 16, trailing: 20))
+        )
     }
 
     private var warningMessages: [String] {
@@ -191,71 +131,38 @@ struct TradeOrderConfirmationSheet: View {
         return messages
     }
 
-    private var detailItems: [TradeOrderConfirmationInfoItem] {
-        var items: [TradeOrderConfirmationInfoItem] = [
-            TradeOrderConfirmationInfoItem(
-                title: L10n.Trade.confirmSide(locale: locale),
-                value: snapshot.order.side.titleText(locale: locale),
-                tint: sideTint
-            ),
-            TradeOrderConfirmationInfoItem(
-                title: L10n.Trade.confirmOrderType(locale: locale),
-                value: snapshot.order.orderType.titleText(locale: locale)
-            )
-        ]
-
-        if let quantityText = TradeOrderConfirmationFormat.quantity(snapshot.order.quantityText) {
-            items.append(TradeOrderConfirmationInfoItem(
-                title: L10n.Trade.confirmQuantity(locale: locale),
-                value: quantityText
-            ))
-        }
-
-        if let notionalText = TradeOrderConfirmationFormat.moneyText(
-            snapshot.order.notionalText,
-            currency: snapshot.currencyCode
-        ) {
-            items.append(TradeOrderConfirmationInfoItem(
-                title: L10n.Trade.confirmAmount(locale: locale),
-                value: notionalText
-            ))
-        }
-
-        items.append(TradeOrderConfirmationInfoItem(
-            title: L10n.Trade.confirmEstimatedPrice(locale: locale),
-            value: TradeOrderConfirmationFormat.price(snapshot.estimatedExecutionPrice, currency: snapshot.currencyCode)
-        ))
+    private var detailItems: [AppSheetInfoItem] {
+        var items: [AppSheetInfoItem] = []
 
         if let limitPrice = TradeOrderConfirmationFormat.priceText(
             snapshot.order.limitPriceText,
             currency: snapshot.currencyCode
         ) {
-            items.append(TradeOrderConfirmationInfoItem(
+            items.append(AppSheetInfoItem(
                 title: L10n.Trade.confirmLimitPrice(locale: locale),
                 value: limitPrice
+            ))
+        } else {
+            items.append(AppSheetInfoItem(
+                title: L10n.Trade.confirmEstimatedPrice(locale: locale),
+                value: TradeOrderConfirmationFormat.price(snapshot.estimatedExecutionPrice, currency: snapshot.currencyCode)
             ))
         }
 
         items.append(contentsOf: [
-            TradeOrderConfirmationInfoItem(
-                title: snapshot.order.side == .buy
-                    ? L10n.Trade.simpleEstimatedDebit(locale: locale)
-                    : L10n.Trade.simpleEstimatedCredit(locale: locale),
-                value: TradeOrderConfirmationFormat.money(snapshot.estimatedNotional, currency: snapshot.currencyCode)
+            AppSheetInfoItem(
+                title: L10n.Trade.confirmEnvironment(locale: locale),
+                value: snapshot.environment.titleText(locale: locale)
             ),
-            TradeOrderConfirmationInfoItem(
+            AppSheetInfoItem(
                 title: L10n.Trade.confirmTimeInForce(locale: locale),
                 value: snapshot.order.timeInForce.title
             ),
-            TradeOrderConfirmationInfoItem(
+            AppSheetInfoItem(
                 title: L10n.Trade.confirmSession(locale: locale),
                 value: snapshot.order.extendedHours
                     ? L10n.Orders.Detail.extendedSession(locale: locale)
                     : L10n.Orders.Detail.regularSession(locale: locale)
-            ),
-            TradeOrderConfirmationInfoItem(
-                title: L10n.Trade.confirmEnvironment(locale: locale),
-                value: snapshot.environment.titleText(locale: locale)
             )
         ])
 
@@ -308,196 +215,106 @@ private enum TradeOrderConfirmationFeedback {
     case error(String)
 }
 
-private struct TradeOrderConfirmationActionButton: View {
-    let title: String
-    let accessibilityTitle: String
-    let submittingTitle: String
-    let tint: Color
-    let isSubmitting: Bool
-    let action: () async -> Void
-
-    var body: some View {
-        if #available(iOS 26.0, *) {
-            glassButton
-        } else {
-            fallbackButton
-        }
-    }
-
-    @available(iOS 26.0, *)
-    private var glassButton: some View {
-        Button {
-            Task { await action() }
-        } label: {
-            label
-        }
-        .buttonStyle(.glassProminent)
-        .buttonBorderShape(.capsule)
-        .tint(tint)
-        .disabled(isSubmitting)
-        .accessibilityLabel(isSubmitting ? submittingTitle : accessibilityTitle)
-    }
-
-    private var fallbackButton: some View {
-        Button {
-            Task { await action() }
-        } label: {
-            label
-        }
-        .buttonStyle(.plain)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay {
-            Capsule()
-                .strokeBorder(tint.opacity(isSubmitting ? 0.18 : 0.34), lineWidth: 0.75)
-        }
-        .shadow(color: tint.opacity(0.12), radius: 18, y: 7)
-        .disabled(isSubmitting)
-        .accessibilityLabel(isSubmitting ? submittingTitle : accessibilityTitle)
-    }
-
-    private var label: some View {
-        ZStack {
-            Text(title)
-                .font(.headline.weight(.semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
-                .opacity(isSubmitting ? 0 : 1)
-
-            if isSubmitting {
-                ProgressView()
-                    .controlSize(.regular)
-                    .tint(.white)
-                    .frame(maxWidth: .infinity, alignment: .center)
-            }
-        }
-        .foregroundStyle(.white)
-        .frame(maxWidth: .infinity)
-        .frame(height: 52)
-        .contentShape(Capsule())
-    }
-}
-
-private extension View {
-    func tradeConfirmationCard(
-        padding: EdgeInsets = EdgeInsets(top: 20, leading: 20, bottom: 20, trailing: 20)
-    ) -> some View {
-        self
-            .padding(padding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .strokeBorder(Color(.separator).opacity(0.10))
-            }
-    }
-}
-
-private struct TradeOrderConfirmationIdentityCard: View {
+private struct TradeOrderConfirmationHeroHeader: View {
     @Environment(\.locale) private var locale
 
     let snapshot: TradeOrderConfirmationSnapshot
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(alignment: .center, spacing: 8) {
-                    Text(snapshot.order.normalizedSymbol)
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
+        VStack(alignment: .center, spacing: 0) {
+            HStack(spacing: 6) {
+                AppSheetBadgePill(title: sideOrderBadgeText, tint: sideTint)
 
-                    if snapshot.isShortSell {
-                        Text(L10n.Trade.confirmShortSellTag(locale: locale))
-                            .font(AppTypography.badge)
-                            .foregroundStyle(AppTheme.ColorToken.warning)
-                            .padding(.horizontal, 8)
-                            .frame(height: 24)
-                            .background(AppTheme.ColorToken.warning.opacity(0.12), in: Capsule())
-                    }
+                if snapshot.isShortSell {
+                    AppSheetBadgePill(
+                        title: L10n.Trade.confirmShortSellTag(locale: locale),
+                        tint: AppTheme.ColorToken.warning,
+                        horizontalPadding: 10,
+                        backgroundOpacity: 0.14
+                    )
                 }
+            }
 
-                Text(snapshot.assetName)
-                    .font(AppTypography.rowMeta)
+            Text(heroPrimaryText)
+                .font(.system(size: 42, weight: .bold, design: .rounded).monospacedDigit())
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.62)
+                .padding(.top, 14)
+
+            if let shareSummaryText {
+                Text(shareSummaryText)
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.primary.opacity(0.78))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                    .padding(.top, 6)
+            }
+
+            if let companySubtitle {
+                Text(companySubtitle)
+                    .font(AppTypography.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-            }
-
-            LabeledContent {
-                Text(TradeOrderConfirmationFormat.money(snapshot.estimatedNotional, currency: snapshot.currencyCode))
-                    .font(.title3.weight(.bold).monospacedDigit())
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            } label: {
-                Text(snapshot.order.side == .buy
-                    ? L10n.Trade.simpleEstimatedDebit(locale: locale)
-                    : L10n.Trade.simpleEstimatedCredit(locale: locale)
-                )
-                .foregroundStyle(.secondary)
+                    .padding(.top, 3)
             }
         }
-        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
     }
-}
 
-private struct TradeOrderConfirmationInfoItem {
-    let title: String
-    let value: String
-    var tint: Color = .primary
-}
-
-private struct TradeOrderConfirmationInfoRow: View {
-    let item: TradeOrderConfirmationInfoItem
-
-    var body: some View {
-        LabeledContent {
-            Text(item.value)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(item.tint)
-                .multilineTextAlignment(.trailing)
-                .lineLimit(2)
-                .minimumScaleFactor(0.82)
-        } label: {
-            Text(item.title)
-                .font(.body)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.vertical, 14)
+    private var sideTint: Color {
+        snapshot.order.side.tradeActionTint
     }
-}
 
-private struct TradeOrderConfirmationWarningRow: View {
-    let warning: String
-    var systemImage = "exclamationmark.circle.fill"
-    var tint = AppTheme.ColorToken.warning
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: systemImage)
-                .font(.callout.weight(.semibold))
-                .foregroundStyle(tint)
-                .frame(width: 18, height: 18)
-
-            Text(warning)
-                .font(AppTypography.detail)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+    private var sideOrderBadgeText: String {
+        let orderTypeLabel: String
+        if snapshot.order.orderType == .market {
+            orderTypeLabel = L10n.Trade.simpleMarketOrder(locale: locale)
+        } else {
+            orderTypeLabel = L10n.Trade.simpleOrderTypeTitle(
+                orderType: snapshot.order.orderType.titleText(locale: locale),
+                locale: locale
+            )
         }
+        return "\(snapshot.order.side.titleText(locale: locale)) · \(orderTypeLabel)"
+    }
+
+    private var heroPrimaryText: String {
+        if let notional = snapshot.estimatedNotional {
+            return TradeOrderConfirmationFormat.money(notional, currency: snapshot.currencyCode)
+        }
+        if let quantityText = TradeOrderConfirmationFormat.quantity(snapshot.order.quantityText) {
+            return "\(quantityText) \(snapshot.order.normalizedSymbol)"
+        }
+        return AppFormatter.placeholder
+    }
+
+    private var shareSummaryText: String? {
+        guard snapshot.estimatedNotional != nil else {
+            return nil
+        }
+        if let quantityText = TradeOrderConfirmationFormat.quantity(snapshot.order.quantityText) {
+            return "\(quantityText) \(snapshot.order.normalizedSymbol)"
+        }
+        if let estimatedShares = TradeOrderConfirmationFormat.quantityDecimal(snapshot.estimatedQuantity) {
+            return "≈ \(estimatedShares) \(snapshot.order.normalizedSymbol)"
+        }
+        return snapshot.order.normalizedSymbol
+    }
+
+    private var companySubtitle: String? {
+        let name = snapshot.assetName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, name != AppFormatter.placeholder else {
+            return nil
+        }
+        return name
     }
 }
 
 private enum TradeOrderConfirmationFormat {
     static func money(_ value: Decimal?, currency: String) -> String {
         AppFormatter.money(value, currencyCode: currency)
-    }
-
-    static func moneyText(_ text: String, currency: String) -> String? {
-        guard let value = NumberParser.decimal(from: OrderDraft.normalizedSizeText(text)) else {
-            return nil
-        }
-
-        return money(value, currency: currency)
     }
 
     static func price(_ value: Decimal?, currency: String) -> String {
@@ -524,12 +341,15 @@ private enum TradeOrderConfirmationFormat {
         return normalized.isEmpty ? nil : normalized
     }
 
-    static func percent(_ text: String) -> String? {
-        let normalized = NumberText.trimTrailingZeros(text)
-        guard !normalized.isEmpty else {
+    static func quantityDecimal(_ value: Decimal?) -> String? {
+        guard let value, value > 0 else {
             return nil
         }
 
-        return "\(normalized)%"
+        var copy = value
+        var rounded = Decimal()
+        NSDecimalRound(&rounded, &copy, 6, .down)
+        let normalized = NumberText.trimTrailingZeros(NSDecimalNumber(decimal: rounded).stringValue)
+        return normalized.isEmpty ? nil : normalized
     }
 }

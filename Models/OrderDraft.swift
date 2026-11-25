@@ -95,9 +95,40 @@ struct OrderDraft: Equatable, Sendable {
     }
 
     private static func requireValidStockQuantity(_ text: String) throws {
-        let pattern = #"^(?:0|[1-9]\d*)(?:\.\d{1,6})?$"#
-        guard text.range(of: pattern, options: .regularExpression) != nil else {
+        guard !text.isEmpty else {
             throw OrderDraftError.invalidQuantityFormat
+        }
+
+        let bytes = Array(text.utf8)
+        var index = 0
+
+        if bytes[index] == UInt8(ascii: "0") {
+            index += 1
+            if index < bytes.count, bytes[index] != UInt8(ascii: ".") {
+                throw OrderDraftError.invalidQuantityFormat
+            }
+        } else if bytes[index] >= UInt8(ascii: "1"), bytes[index] <= UInt8(ascii: "9") {
+            index += 1
+            while index < bytes.count, bytes[index] >= UInt8(ascii: "0"), bytes[index] <= UInt8(ascii: "9") {
+                index += 1
+            }
+        } else {
+            throw OrderDraftError.invalidQuantityFormat
+        }
+
+        if index < bytes.count {
+            guard bytes[index] == UInt8(ascii: ".") else {
+                throw OrderDraftError.invalidQuantityFormat
+            }
+            index += 1
+            let fractionStart = index
+            while index < bytes.count, bytes[index] >= UInt8(ascii: "0"), bytes[index] <= UInt8(ascii: "9") {
+                index += 1
+            }
+            let fractionCount = index - fractionStart
+            guard index == bytes.count, fractionCount >= 1, fractionCount <= 6 else {
+                throw OrderDraftError.invalidQuantityFormat
+            }
         }
     }
 

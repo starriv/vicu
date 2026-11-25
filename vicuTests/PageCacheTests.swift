@@ -101,6 +101,15 @@ extension PageCacheTests {
     }
 
     @MainActor
+    func testSubmitRequiresConfirmationForCurrentEnvironment() async {
+        let app = marketApp(api: MarketCacheFixtureAPI(), cache: MemoryPageCacheStore())
+        let result = await app.submit(OrderDraft(), clientOrderID: nil, confirmedEnvironment: .live)
+        guard case .failure(let message) = result else { return XCTFail("Wrong environment accepted") }
+        XCTAssertEqual(message, L10n.string("trade.confirm.environment_changed", locale: app.appLanguage.locale))
+        XCTAssertTrue(app.portfolio.orders.isEmpty)
+    }
+
+    @MainActor
     func testForceRefreshKeepsNewestOverviewInMemoryAndDisk() async throws {
         let firstClockStarted = expectation(description: "First overview clock is suspended")
         let api = MarketCacheFixtureAPI(firstClockStarted: firstClockStarted)

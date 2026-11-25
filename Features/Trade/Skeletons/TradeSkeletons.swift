@@ -3,20 +3,31 @@ import SwiftUI
 struct TradeSimpleContentSkeleton: View {
     var body: some View {
         VStack(spacing: 0) {
-            TradeSkeletonAmount()
-                .padding(.top, 46)
+            Spacer(minLength: 16)
 
-            Spacer(minLength: 0)
+            VStack(alignment: .center, spacing: 12) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    TradeSkeletonCapsule(width: 112, height: 64, cornerRadius: 18)
+                    TradeSkeletonCapsule(width: 68, height: 34, cornerRadius: 10)
+                }
 
-            TradeSkeletonCapsule(width: 250, height: 20)
-                .padding(.bottom, 14)
+                TradeSkeletonCapsule(width: 148, height: 32, cornerRadius: 16)
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+
+            Spacer(minLength: 16)
+
+            TradeSkeletonOrderCard()
+                .padding(.bottom, 12)
 
             TradeSkeletonQuickFillRow()
-                .frame(height: 44)
-                .padding(.bottom, 6)
+                .padding(.bottom, 10)
+
+            TradeSkeletonCapsule(height: 48, cornerRadius: 24)
+                .padding(.bottom, 8)
 
             TradeSkeletonNumberPad()
-                .padding(.bottom, 8)
+                .padding(.bottom, 6)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .redacted(reason: .placeholder)
@@ -25,25 +36,43 @@ struct TradeSimpleContentSkeleton: View {
     }
 }
 
-private struct TradeSkeletonAmount: View {
+private struct TradeSkeletonOrderCard: View {
     var body: some View {
-        GeometryReader { proxy in
-            VStack(spacing: 13) {
-                TradeSkeletonCapsule(width: 116, height: 76, cornerRadius: 28)
-                TradeSkeletonCapsule(width: 74, height: 18)
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    TradeSkeletonCapsule(width: 78, height: 14, cornerRadius: 7)
+                    TradeSkeletonCapsule(width: 124, height: 12, cornerRadius: 6)
+                }
+                Spacer(minLength: 8)
+                VStack(alignment: .trailing, spacing: 6) {
+                    TradeSkeletonCapsule(width: 68, height: 14, cornerRadius: 7)
+                    TradeSkeletonCapsule(width: 52, height: 12, cornerRadius: 6)
+                }
             }
-            .frame(width: proxy.size.width)
-            .position(x: proxy.size.width / 2, y: 130)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+
+            Divider()
+                .padding(.horizontal, 16)
+
+            HStack(spacing: 12) {
+                TradeSkeletonCapsule(width: 84, height: 14, cornerRadius: 7)
+                Spacer(minLength: 8)
+                TradeSkeletonCapsule(width: 76, height: 14, cornerRadius: 7)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
         }
-        .frame(height: 292)
+        .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 
 private struct TradeSkeletonQuickFillRow: View {
     var body: some View {
-        HStack(spacing: 10) {
-            ForEach(0..<3, id: \.self) { _ in
-                TradeSkeletonCapsule(height: 38)
+        HStack(spacing: 8) {
+            ForEach(0..<4, id: \.self) { _ in
+                TradeSkeletonCapsule(height: 38, cornerRadius: 10)
             }
         }
     }
@@ -54,13 +83,13 @@ private struct TradeSkeletonNumberPad: View {
     private let columns = 3
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 4) {
             ForEach(0..<rows, id: \.self) { _ in
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     ForEach(0..<columns, id: \.self) { _ in
-                        TradeSkeletonCapsule(width: 38, height: 38, cornerRadius: 19)
+                        TradeSkeletonCapsule(width: 34, height: 34, cornerRadius: 17)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 58)
+                            .frame(height: 52)
                     }
                 }
             }
@@ -89,6 +118,6 @@ private struct TradeSkeletonCapsule: View {
 
 #Preview {
     TradeSimpleContentSkeleton()
-        .padding(.horizontal, 22)
+        .padding(.horizontal, 20)
         .background(AppTheme.ColorToken.pageBackground)
 }

@@ -362,9 +362,15 @@ extension AppModel {
         return replacedOrder
     }
 
-    func submit(_ draft: OrderDraft, clientOrderID: String?) async -> TradeSubmitResult {
+    func submit(_ draft: OrderDraft, clientOrderID: String?, confirmedEnvironment: TradeEnvironment) async -> TradeSubmitResult {
         guard let credentials else {
             let message = L10n.Trade.addCredentialsBeforeOrder(locale: appLanguage.locale)
+            lastError = message
+            return .failure(message)
+        }
+
+        guard environment == confirmedEnvironment, credentials.environment == confirmedEnvironment else {
+            let message = L10n.string("trade.confirm.environment_changed", locale: appLanguage.locale)
             lastError = message
             return .failure(message)
         }
@@ -375,6 +381,7 @@ extension AppModel {
                 clientOrderID: clientOrderID,
                 credentials: credentials
             )
+            guard isCurrentCredentialContext(credentials) else { return .success(submittedOrder) }
             mergePortfolioOrder(submittedOrder)
             let appNotifier = services.appNotifier
             let notificationLocale = appLanguage.locale
