@@ -55,6 +55,7 @@ final class AppModel: AssetDetailServicing {
     var pageCacheScopeID: String?
     var pageCacheRevision = 0
     var isLoadingFavoriteMarketSymbols = false
+    var hasLoadedFavoriteMarketSymbols = false
     var favoriteMarketSymbolsError: String?
     var portfolio = PortfolioState()
     var lastError: String?
@@ -65,6 +66,16 @@ final class AppModel: AssetDetailServicing {
     @ObservationIgnored var credentials: AlpacaCredentials?
     @ObservationIgnored var verifiedCredentialFingerprint: String?
     @ObservationIgnored var favoritesWatchlist: AlpacaWatchlist?
+    @ObservationIgnored let marketCacheQueue = DispatchQueue(label: "vicu.market-page-cache", qos: .utility)
+    @ObservationIgnored var favoriteCacheRevision = 0
+    var cachedMarketOverviewAt: Date?
+    @ObservationIgnored var favoriteMarketSymbolsUpdatedAt: Date?
+    @ObservationIgnored var inFlightMarketOverviewTask: Task<MarketOverview, Error>?
+    @ObservationIgnored var inFlightFavoriteSymbolsTask: Task<Void, Never>?
+    @ObservationIgnored var inFlightFavoritesWatchlistTask: Task<AlpacaWatchlist, Error>?
+    /// Bumped whenever the user mutates favorites so an overlapping refresh
+    /// does not overwrite the newer optimistic or server-confirmed state.
+    @ObservationIgnored var favoriteMutationGeneration = 0
     @ObservationIgnored let assetCache = MarketAssetCache()
     @ObservationIgnored let searchCache = SearchDataCache()
     @ObservationIgnored let newsCache = NewsDataCache()

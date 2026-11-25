@@ -88,3 +88,141 @@ final class PageCacheTests: XCTestCase {
         )
     }
 }
+
+extension PageCacheTests {
+    @MainActor
+    private func marketApp(api: any APIClient, cache: MemoryPageCacheStore) -> AppModel {
+        let services = AppServices(alpaca: AlpacaClient(apiClient: api), credentialStore: KeychainCredentialStore(),
+                                   configurationStore: MemoryAppConfigurationStore(), pageCache: cache)
+        let app = AppModel(services: services)
+        app.credentials = AlpacaCredentials(keyID: "fixture", secretKey: "fixture", environment: .paper)
+        app.hasCredentials = true
+        return app
+    }
+
+    @MainActor
+    func testForceRefreshKeepsNewestOverviewInMemoryAndDisk() async throws {
+        let firstClockStarted = expectation(description: "First overview clock is suspended")
+        let api = MarketCacheFixtureAPI(firstClockStarted: firstClockStarted)
+        let cache = MemoryPageCacheStore()
+        let app = marketApp(api: api, cache: cache)
+        let first = Task { try await app.fetchMarketOverview(forceRefresh: true) }
+        await fulfillment(of: [firstClockStarted], timeout: 3)
+
+        let latest = try await app.fetchMarketOverview(forceRefresh: true)
+        await api.releaseFirstClock()
+        do {
+            _ = try await first.value
+            XCTFail("Superseded overview returned a result")
+        } catch is CancellationError {}
+        XCTAssertEqual(latest.clock.timestamp, "2026-11-25T15:00:00Z")
+        XCTAssertEqual(app.cachedMarketOverview?.clock.timestamp, latest.clock.timestamp)
+        app.resetMarketOverviewCache()
+        await app.hydrateCachedMarketsFromDisk()
+        XCTAssertEqual(app.cachedMarketOverview?.clock.timestamp, latest.clock.timestamp)
+        XCTAssertNil(app.cachedPopularMarketSymbols(sort: .trades))
+        XCTAssertNil(app.cachedPopularMarketSymbols(sort: .volume))
+        XCTAssertFalse(latest.mostActive.isEmpty)
+    }
+
+    @MainActor
+    func testExpiredFavoritesReloadAndRemovalSurviveHydration() async throws {
+        let api = MarketCacheFixtureAPI()
+        let app = marketApp(api: api, cache: MemoryPageCacheStore())
+
+        await app.refreshFavoriteMarketSymbols()
+        XCTAssertEqual(app.favoriteMarketSymbols, ["AAA"])
+        await api.changeSymbol(to: "BBB")
+        app.favoriteMarketSymbolsUpdatedAt = Date().addingTimeInterval(-PageCachePolicy.marketFavorites.freshTimeToLive - 1)
+        await app.refreshFavoriteMarketSymbols()
+        XCTAssertEqual(app.favoriteMarketSymbols, ["BBB"])
+
+        let favorites = try XCTUnwrap(app.favoritesWatchlist)
+        try await app.deleteWatchlist(favorites)
+        await app.hydrateCachedMarketsFromDisk()
+        XCTAssertTrue(app.favoriteMarketSymbols.isEmpty)
+        XCTAssertFalse(app.hasLoadedFavoriteMarketSymbols)
+    }
+
+    @MainActor
+    func testRenameInvalidatesDiskOnlyFavorites() async throws {
+        let api = MarketCacheFixtureAPI()
+        let app = marketApp(api: api, cache: MemoryPageCacheStore())
+        await app.refreshFavoriteMarketSymbols()
+        app.resetFavoriteMarketSymbols()
+        await app.hydrateCachedMarketsFromDisk()
+        XCTAssertEqual(app.favoriteMarketSymbols, ["AAA"])
+        XCTAssertNil(app.favoritesWatchlist)
+        _ = try await app.updateWatchlist(id: "f", name: "research", symbols: ["AAA"], previousName: "Favorites")
+        await app.hydrateCachedMarketsFromDisk()
+        XCTAssertFalse(app.hasLoadedFavoriteMarketSymbols)
+        XCTAssertTrue(app.favoriteMarketSymbols.isEmpty)
+    }
+
+    func testSessionUsesCurrentCalendarTimeEvenWithOldOpenClock() throws {
+        let clock = AlpacaMarketClock(timestamp: "2026-11-24T15:00:00Z", isMarketDay: true, isOpen: true,
+                                      nextOpen: nil, nextClose: "2026-11-24T21:00:00Z", phase: "open", phaseUntil: nil)
+        let day = AlpacaCalendarDay(date: "2026-11-25", coreStart: "2026-11-25T14:30:00Z", coreEnd: "2026-11-25T21:00:00Z",
+                                    preStart: nil, preEnd: nil, postStart: nil, postEnd: nil, settlementDate: nil)
+        let overview = MarketOverview(clock: clock, calendar: [day], overnightCalendar: [], indexQuotes: [], gainers: [], losers: [], mostActive: [])
+        let beforeOpen = try XCTUnwrap(AlpacaDateParser.date("2026-11-25T13:00:00Z"))
+        let open = try XCTUnwrap(AlpacaDateParser.date(day.coreStart))
+        let closed = MarketSessionSnapshot.current(for: overview, now: beforeOpen)
+        XCTAssertEqual(closed.session, .closed)
+        XCTAssertEqual(closed.nextBoundary, open)
+        XCTAssertEqual(MarketSessionSnapshot.current(for: overview, now: open).session, .regular)
+        let expired = MarketSessionSnapshot.current(for: overview, now: open.addingTimeInterval(86400))
+        XCTAssertEqual(expired.session, .unknown)
+        XCTAssertNil(expired.nextBoundary)
+    }
+}
+
+private actor MarketCacheFixtureAPI: APIClient {
+    private var symbol = "AAA"
+    private var firstClockStarted: XCTestExpectation?
+    private var firstClock: CheckedContinuation<Void, Never>?
+
+    init(firstClockStarted: XCTestExpectation? = nil) {
+        self.firstClockStarted = firstClockStarted
+    }
+
+    func changeSymbol(to symbol: String) { self.symbol = symbol }
+
+    func releaseFirstClock() {
+        firstClock?.resume()
+        firstClock = nil
+    }
+
+    func send<Response: Decodable & Sendable>(_ request: APIRequest<Response>) async throws -> Response {
+        let json: String
+        let favorites = #"{"id":"f","name":"favorites","assets":[{"id":"a","symbol":"\#(symbol)","name":"Fixture"}]}"#
+        switch request.path {
+        case APIPaths.AlpacaTrading.marketClock:
+            let time: String
+            if let expectation = firstClockStarted {
+                firstClockStarted = nil
+                await withCheckedContinuation { continuation in
+                    firstClock = continuation
+                    expectation.fulfill()
+                }
+                time = "2026-11-24T15:00:00Z"
+            } else {
+                time = "2026-11-25T15:00:00Z"
+            }
+            json = #"{"clocks":[{"market":{"acronym":"NYSE"},"is_market_day":true,"timestamp":"\#(time)","phase":"open"}]}"#
+        case let path where path.hasPrefix("v3/calendar/"):
+            json = #"{"calendar":[]}"#
+        case APIPaths.AlpacaTrading.watchlists:
+            json = "[\(favorites)]"
+        case APIPaths.AlpacaTrading.watchlist("f"):
+            switch request.method {
+            case .put: json = #"{"id":"f","name":"research","assets":[]}"#
+            case .delete: json = "{}"
+            default: json = favorites
+            }
+        default:
+            json = "{}"
+        }
+        return try JSONDecoder().decode(Response.self, from: Data(json.utf8))
+    }
+}

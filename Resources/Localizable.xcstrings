@@ -3611,6 +3611,22 @@
         }
       }
     },
+    "markets.cached_as_of_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cached market overview · %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "行情概览缓存于 %@"
+          }
+        }
+      }
+    },
     "markets.category.crypto": {
       "localizations": {
         "en": {
@@ -4043,6 +4059,22 @@
         }
       }
     },
+    "markets.schedule_unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current schedule unavailable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂无当前交易日历"
+          }
+        }
+      }
+    },
     "markets.search_no_results": {
       "localizations": {
         "en": {
@@ -4215,6 +4247,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "搜索中"
+          }
+        }
+      }
+    },
+    "markets.session_unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session unavailable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "交易时段未知"
           }
         }
       }

@@ -5,24 +5,30 @@ import UIKit
 struct MarketsView: View {
     @Environment(AppModel.self) private var app
     @Environment(AppToastCenter.self) private var toastCenter
-    @State private var overview: MarketOverview?
     @State private var isLoading = false
     @State private var hasLoadError = false
     @State private var selectedMarketList: MarketListMode = .favorites
 
+    private var overview: MarketOverview? {
+        app.cachedMarketOverview
+    }
+
     var body: some View {
         BasicLayout(L10n.Markets.title, style: .scroll(spacing: 18)) {
-            MarketTitleActions {
-                Task { await loadMarketData() }
-            }
-        } content: {
             if !app.hasCredentials {
                 AppEmptyStateView(
                     title: L10n.Common.noData,
                     systemImage: AppIcon.More.alpaca
                 )
-            } else if let overview = overview ?? app.cachedMarketOverview {
-                MarketStatusCard(overview: overview)
+            } else if let overview {
+                TimelineView(.periodic(from: .now, by: 60)) { context in
+                    MarketStatusCard(
+                        overview: overview,
+                        referenceDate: context.date,
+                        cachedAt: app.cachedMarketOverviewAt,
+                        cacheIsStale: app.isMarketOverviewFromStaleCache
+                    )
+                }
                 MarketListModePicker(selection: $selectedMarketList)
                 MarketSymbolSection(mode: selectedMarketList, overview: overview)
             } else if isLoading || !hasLoadError {
@@ -34,16 +40,42 @@ struct MarketsView: View {
                 )
             }
         }
+        .toolbar {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                NavigationLink {
+                    MarketSearchView()
+                } label: {
+                    Image(systemName: AppIcon.Market.search)
+                }
+                .accessibilityLabel(L10n.Markets.searchTitle)
+
+                Menu {
+                    NavigationLink {
+                        WatchlistsView()
+                    } label: {
+                        Label(L10n.Watchlists.title, systemImage: AppIcon.Market.watchlists)
+                    }
+
+                    Button {
+                        Task {
+                            await refreshAll(forceRefresh: true)
+                        }
+                    } label: {
+                        Label(L10n.Common.refresh, systemImage: "arrow.clockwise")
+                    }
+                } label: {
+                    Image(systemName: AppIcon.Market.more)
+                }
+            }
+        }
         .task {
-            await loadMarketDataIfNeeded()
-            await app.refreshFavoriteMarketSymbols()
+            await loadInitialOrRevalidate()
         }
         .task(id: marketBoundaryRefreshID) {
             await refreshMarketDataAtNextBoundary()
         }
         .refreshable {
-            await loadMarketData()
-            await app.refreshFavoriteMarketSymbols()
+            await refreshAll(forceRefresh: true)
         }
         .onChange(of: app.favoriteMarketSymbolsError) { _, message in
             showErrorMessage(message)
@@ -60,30 +92,43 @@ struct MarketsView: View {
         return "\(snapshot.session)-\(boundary)"
     }
 
-    private func loadMarketDataIfNeeded() async {
-        if overview == nil, let cachedOverview = app.cachedMarketOverview {
-            overview = cachedOverview
-        }
-
-        await loadMarketData()
-    }
-
-    private func loadMarketData() async {
+    private func loadInitialOrRevalidate() async {
         guard app.hasCredentials else {
             return
         }
 
-        isLoading = true
+        if app.cachedMarketOverview == nil || !app.hasLoadedFavoriteMarketSymbols {
+            await app.hydrateCachedMarketsFromDisk()
+        }
+
+        await refreshAll(forceRefresh: false)
+    }
+
+    private func refreshAll(forceRefresh: Bool) async {
+        async let overviewTask: Void = loadMarketData(forceRefresh: forceRefresh)
+        async let favoritesTask: Void = app.refreshFavoriteMarketSymbols(forceReload: forceRefresh)
+        _ = await (overviewTask, favoritesTask)
+    }
+
+    private func loadMarketData(forceRefresh: Bool) async {
+        guard app.hasCredentials else {
+            return
+        }
+
+        if app.cachedMarketOverview == nil {
+            isLoading = true
+        }
         hasLoadError = false
         defer { isLoading = false }
 
         do {
-            let latestOverview = try await app.fetchMarketOverview()
-            overview = latestOverview
+            _ = try await app.fetchMarketOverview(forceRefresh: forceRefresh)
         } catch where error.isRequestCancellation {
             return
         } catch {
-            hasLoadError = true
+            if app.cachedMarketOverview == nil {
+                hasLoadError = true
+            }
             toastCenter.showError(error, locale: app.appLanguage.locale)
         }
     }
@@ -100,7 +145,7 @@ struct MarketsView: View {
 
         let delay = nextBoundary.timeIntervalSinceNow + 2
         guard delay > 0 else {
-            await loadMarketData()
+            await loadMarketData(forceRefresh: true)
             return
         }
 
@@ -115,7 +160,7 @@ struct MarketsView: View {
             return
         }
 
-        await loadMarketData()
+        await loadMarketData(forceRefresh: true)
     }
 }
 
@@ -130,105 +175,10 @@ private extension MarketsView {
 }
 
 
-private struct MarketTitleActions: View {
-    let refresh: () -> Void
-
-    var body: some View {
-        if #available(iOS 26.0, *) {
-            glassActions
-        } else {
-            fallbackActions
-        }
-    }
-
-    @available(iOS 26.0, *)
-    private var glassActions: some View {
-        actions
-            .glassEffect(
-                .regular.tint(Color.white.opacity(0.10)).interactive(),
-                in: .capsule
-            )
-    }
-
-    private var fallbackActions: some View {
-        actions
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay {
-                Capsule()
-                    .strokeBorder(Color(.separator).opacity(0.16))
-            }
-    }
-
-    private var actions: some View {
-        HStack(spacing: 14) {
-            NavigationLink {
-                MarketSearchView()
-            } label: {
-                Image(systemName: AppIcon.Market.search)
-                    .font(.system(size: 24, weight: .semibold))
-                    .frame(width: 30, height: 34)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(L10n.Markets.searchTitle)
-
-            Menu {
-                NavigationLink {
-                    WatchlistsView()
-                } label: {
-                    Label(L10n.Watchlists.title, systemImage: AppIcon.Market.watchlists)
-                }
-
-                Button {
-                    refresh()
-                } label: {
-                    Label(L10n.Common.refresh, systemImage: "arrow.clockwise")
-                }
-            } label: {
-                Image(systemName: AppIcon.Market.more)
-                    .font(.system(size: 18, weight: .bold))
-                    .frame(width: 30, height: 34)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-        }
-        .foregroundStyle(.primary)
-        .padding(.horizontal, 14)
-        .frame(width: 112, height: 44)
-        .contentShape(Capsule())
-    }
-}
-
 private struct MarketSearchSortMenu: View {
     @Binding var selection: MarketMostActiveSort
 
     var body: some View {
-        if #available(iOS 26.0, *) {
-            glassMenu
-        } else {
-            fallbackMenu
-        }
-    }
-
-    @available(iOS 26.0, *)
-    private var glassMenu: some View {
-        menu
-            .glassEffect(
-                .regular.tint(Color.white.opacity(0.10)).interactive(),
-                in: .capsule
-            )
-    }
-
-    private var fallbackMenu: some View {
-        menu
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay {
-                Capsule()
-                    .strokeBorder(Color(.separator).opacity(0.16))
-            }
-    }
-
-    private var menu: some View {
         Menu {
             ForEach(MarketMostActiveSort.displayCases) { sort in
                 Button {
@@ -239,12 +189,7 @@ private struct MarketSearchSortMenu: View {
             }
         } label: {
             Image(systemName: selection.icon)
-                .font(.system(size: 15, weight: .semibold))
-                .frame(width: 34, height: 34)
-            .foregroundStyle(.primary)
-            .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
         .accessibilityLabel(L10n.Markets.searchPopularTitle)
     }
 }
@@ -263,10 +208,6 @@ enum MarketSearchPresentation {
 
     var hidesTabBar: Bool {
         self == .marketNavigation
-    }
-
-    var hidesNavigationBar: Bool {
-        self == .globalTab
     }
 }
 
@@ -341,7 +282,6 @@ struct MarketSearchView: View {
             }
         }
         .toolbar(presentation.hidesTabBar ? .hidden : .automatic, for: .tabBar)
-        .toolbar(presentation.hidesNavigationBar ? .hidden : .automatic, for: .navigationBar)
         .toolbar {
             if !presentation.showsPageTitle, showsPopularContent {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -372,11 +312,14 @@ struct MarketSearchView: View {
 
     private var titledBody: some View {
         BasicLayout(L10n.Markets.searchTitle, style: .scroll(spacing: 16)) {
-            if showsPopularContent {
-                popularSortPicker
-            }
-        } content: {
             searchContent
+        }
+        .toolbar {
+            if showsPopularContent {
+                ToolbarItem(placement: .topBarTrailing) {
+                    popularSortPicker
+                }
+            }
         }
     }
 
@@ -664,26 +607,28 @@ struct MarketSearchView: View {
     }
 
     @MainActor
-    private func loadPopularSymbols(forceReload: Bool = false) async {
+    private func loadPopularSymbols() async {
+        let sort = popularSort
+        popularSymbols = app.hasCredentials ? app.cachedPopularMarketSymbols(sort: sort) ?? [] : []
+        defaultSearchSymbol = AppModel.searchPlaceholderSymbol(from: popularSymbols)
         guard app.hasCredentials else {
-            popularSymbols = []
             isLoadingPopularSymbols = false
             return
         }
 
-        if !forceReload, isLoadingPopularSymbols {
-            return
-        }
-
         isLoadingPopularSymbols = true
-        defer { isLoadingPopularSymbols = false }
-
+        defer {
+            if !Task.isCancelled, popularSort == sort {
+                isLoadingPopularSymbols = false
+            }
+        }
         do {
-            popularSymbols = try await app.fetchSearchPopularMarketSymbols(limit: 12, sort: popularSort)
-            defaultSearchSymbol = AppModel.searchPlaceholderSymbol(from: popularSymbols)
-        } catch where error.isRequestCancellation {
-            return
+            let symbols = try await app.fetchSearchPopularMarketSymbols(limit: 12, sort: sort)
+            guard !Task.isCancelled, popularSort == sort else { return }
+            popularSymbols = symbols
+            defaultSearchSymbol = AppModel.searchPlaceholderSymbol(from: symbols)
         } catch {
+            guard !Task.isCancelled, popularSort == sort, !error.isRequestCancellation else { return }
             toastCenter.showError(error, locale: app.appLanguage.locale)
         }
     }
@@ -1355,10 +1300,14 @@ struct MarketListModePicker: View {
 
 struct MarketStatusCard: View {
     let overview: MarketOverview
+    @Environment(\.locale) private var locale
+    var referenceDate = Date()
+    var cachedAt: Date?
+    var cacheIsStale = false
     var usesSkeletonStyle = false
 
     private var sessionSnapshot: MarketSessionSnapshot {
-        MarketSessionSnapshot.current(for: overview)
+        MarketSessionSnapshot.current(for: overview, now: referenceDate)
     }
 
     var body: some View {
@@ -1391,7 +1340,9 @@ struct MarketStatusCard: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                NextMarketBoundaryBadge(label: nextMarketTimeLabel, time: nextMarketTime)
+                if session != .unknown {
+                    NextMarketBoundaryBadge(label: nextMarketTimeLabel, time: nextMarketTime)
+                }
             }
 
             MarketSessionTimelineView(
@@ -1400,6 +1351,13 @@ struct MarketStatusCard: View {
                 usesSkeletonStyle: usesSkeletonStyle
             )
                 .frame(height: 25)
+
+            if let cachedAt, cacheIsStale || referenceDate.timeIntervalSince(cachedAt) >= PageCachePolicy.marketOverview.freshTimeToLive {
+                Text(L10n.format("markets.cached_as_of_format", locale: locale,
+                                 cachedAt.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(locale))))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             MarketIndexProxyPanel(overview: overview)
 
@@ -1428,7 +1386,6 @@ struct MarketStatusCard: View {
     }
 
     private var sessionTimeline: MarketSessionTimeline? {
-        let referenceDate = AlpacaDateParser.date(overview.clock.timestamp) ?? Date()
         let intervals = MarketSessionSchedule.intervals(
             from: overview.calendar,
             overnightDays: overview.overnightCalendar
@@ -1439,7 +1396,7 @@ struct MarketStatusCard: View {
             overnightDays: overview.overnightCalendar
         )
             ?? intervals.first { $0.end > referenceDate }
-            ?? intervals.last
+
 
         guard let targetInterval else {
             return nil
@@ -1484,6 +1441,7 @@ enum MarketSession {
     case afterHours
     case overnight
     case closed
+    case unknown
 
     static func session(forPhase phase: String?) -> MarketSession? {
         switch normalizedPhase(phase) {
@@ -1533,6 +1491,8 @@ enum MarketSession {
             L10n.Markets.afterHours
         case .overnight:
             L10n.Markets.overnight
+        case .unknown:
+            "markets.session_unavailable"
         case .closed:
             L10n.Markets.closed
         }
@@ -1544,6 +1504,8 @@ enum MarketSession {
             L10n.Markets.regularSession
         case .preMarket, .afterHours, .overnight:
             L10n.Markets.extendedSession
+        case .unknown:
+            "markets.schedule_unavailable"
         case .closed:
             L10n.Markets.marketClosed
         }
@@ -1559,7 +1521,7 @@ enum MarketSession {
             AppIcon.Market.afterHours
         case .overnight:
             AppIcon.Market.overnight
-        case .closed:
+        case .closed, .unknown:
             AppIcon.Market.closed
         }
     }
@@ -1574,7 +1536,7 @@ enum MarketSession {
             Color.orange
         case .overnight:
             Color.indigo
-        case .closed:
+        case .closed, .unknown:
             AppTheme.ColorToken.icon
         }
     }
@@ -1589,7 +1551,7 @@ enum MarketSession {
             2
         case .overnight:
             3
-        case .closed:
+        case .closed, .unknown:
             4
         }
     }
@@ -1599,8 +1561,8 @@ struct MarketSessionSnapshot {
     let session: MarketSession
     let nextBoundary: Date?
 
-    static func current(for overview: MarketOverview) -> MarketSessionSnapshot {
-        let referenceDate = AlpacaDateParser.date(overview.clock.timestamp) ?? Date()
+    static func current(for overview: MarketOverview, now referenceDate: Date = Date()) -> MarketSessionSnapshot {
+        let nextClockOpen = AlpacaDateParser.date(overview.clock.nextOpen).flatMap { $0 > referenceDate ? $0 : nil }
         let intervals = MarketTradingInterval.intervals(
             from: overview.calendar,
             overnightDays: overview.overnightCalendar
@@ -1610,33 +1572,38 @@ struct MarketSessionSnapshot {
             return MarketSessionSnapshot(session: activeInterval.session, nextBoundary: activeInterval.end)
         }
 
-        guard !intervals.isEmpty else {
-            if let clockSession = MarketSession.session(forPhase: overview.clock.phase),
-               clockSession != .closed {
-                return MarketSessionSnapshot(
-                    session: clockSession,
-                    nextBoundary: clockBoundary(for: clockSession, clock: overview.clock)
-                )
+        if intervals.isEmpty {
+            let clock = overview.clock
+            if let clockDate = AlpacaDateParser.date(clock.timestamp),
+               let session = MarketSession.session(forPhase: clock.phase) {
+                let age = referenceDate.timeIntervalSince(clockDate)
+                let boundary = clockBoundary(for: session, clock: clock)
+                if age >= 0, let boundary, boundary > referenceDate {
+                    return MarketSessionSnapshot(session: session, nextBoundary: boundary)
+                }
+                if abs(age) < PageCachePolicy.marketOverview.freshTimeToLive, boundary == nil {
+                    return MarketSessionSnapshot(session: session, nextBoundary: nil)
+                }
             }
-
-            return MarketSessionSnapshot(
-                session: .closed,
-                nextBoundary: AlpacaDateParser.date(overview.clock.nextOpen)
-            )
+            return MarketSessionSnapshot(session: .unknown, nextBoundary: nextClockOpen)
         }
 
         let nextOpen = intervals
             .filter { $0.start > referenceDate }
             .min { $0.start < $1.start }?
             .start
-            ?? AlpacaDateParser.date(overview.clock.nextOpen)
+            ?? nextClockOpen
 
-        return MarketSessionSnapshot(session: .closed, nextBoundary: nextOpen)
+        return MarketSessionSnapshot(session: nextOpen == nil ? .unknown : .closed, nextBoundary: nextOpen)
     }
 
     private static func clockBoundary(for session: MarketSession, clock: AlpacaMarketClock) -> Date? {
-        AlpacaDateParser.date(clock.phaseUntil)
-            ?? AlpacaDateParser.date(session == .closed ? clock.nextOpen : clock.nextClose)
+        if let phaseEnd = AlpacaDateParser.date(clock.phaseUntil) { return phaseEnd }
+        switch session {
+        case .regular: return AlpacaDateParser.date(clock.nextClose)
+        case .closed: return AlpacaDateParser.date(clock.nextOpen)
+        default: return nil
+        }
     }
 }
 
@@ -1689,7 +1656,7 @@ private struct MarketSymbolSection: View {
         VStack(spacing: 0) {
             switch mode {
             case .favorites:
-                if app.isLoadingFavoriteMarketSymbols && app.favoriteMarketSymbols.isEmpty {
+                if !app.hasLoadedFavoriteMarketSymbols && app.isLoadingFavoriteMarketSymbols && app.favoriteMarketSymbols.isEmpty {
                     MarketSymbolRowsSkeleton(rowCount: 3)
                 } else if items.isEmpty {
                     EmptyFavoriteView()

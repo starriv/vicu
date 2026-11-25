@@ -21,35 +21,153 @@ enum MarketSearchLoadEvent {
 }
 
 extension AppModel {
-    func refreshFavoriteMarketSymbols(forceReload: Bool = true) async {
-        guard let credentials else {
+    func hydrateCachedMarketsFromDisk() async {
+        guard let activeCredentials = credentials else {
+            return
+        }
+
+        let overviewKey = AppPageCacheKeys.marketOverview(credentials: activeCredentials)
+        let favoritesKey = AppPageCacheKeys.marketFavorites(credentials: activeCredentials)
+
+        let pageCache = services.pageCache
+        let revision = favoriteCacheRevision
+        let (cachedOverview, cachedFavorites) = await withCheckedContinuation { continuation in
+            marketCacheQueue.async {
+                let overview = pageCache.value(MarketOverview.self, for: overviewKey, allowStale: true)
+                let favorites = pageCache.value(MarketFavoritesCacheSnapshot.self, for: favoritesKey, allowStale: true)
+                continuation.resume(returning: (overview, favorites))
+            }
+        }
+        guard isCurrentCredentialContext(activeCredentials) else {
+            return
+        }
+
+        if cachedMarketOverview == nil, let cachedOverview {
+            cachedMarketOverview = cachedOverview.value
+            cachedMarketOverviewAt = cachedOverview.cachedAt
+            isMarketOverviewFromStaleCache = !cachedOverview.isFresh
+        }
+
+        if revision == favoriteCacheRevision, !hasLoadedFavoriteMarketSymbols, let cachedFavorites {
+            favoriteMarketSymbols = Self.normalizedMarketSymbols(cachedFavorites.value.symbols)
+            favoriteMarketAssetBySymbol = cachedFavorites.value.assetsBySymbol
+            favoriteMarketQuotesBySymbol = cachedFavorites.value.quotesBySymbol
+            favoriteMarketSymbolsUpdatedAt = cachedFavorites.cachedAt
+            hasLoadedFavoriteMarketSymbols = true
+        }
+    }
+
+    func prewarmMarketsIfNeeded() {
+        guard let activeCredentials = credentials else {
+            return
+        }
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.hydrateCachedMarketsFromDisk()
+            guard self.isCurrentCredentialContext(activeCredentials) else {
+                return
+            }
+
+            async let overviewWarmup: Void = {
+                _ = try? await self.fetchMarketOverview(forceRefresh: false)
+            }()
+            async let favoritesWarmup: Void = self.refreshFavoriteMarketSymbols(forceReload: false)
+            _ = await (overviewWarmup, favoritesWarmup)
+        }
+    }
+
+    func cachedPopularMarketSymbols(sort: MarketMostActiveSort, limit: Int = 12) -> [MarketActiveSymbol]? {
+        if let cached = searchCache.popularSymbolsCache[sort], !cached.isEmpty {
+            return Array(cached.prefix(limit))
+        }
+        return nil
+    }
+
+    func refreshFavoriteMarketSymbols(forceReload: Bool = false) async {
+        guard let activeCredentials = credentials else {
             resetFavoriteMarketSymbols()
             return
         }
 
-        isLoadingFavoriteMarketSymbols = true
-        defer { isLoadingFavoriteMarketSymbols = false }
+        if !hasLoadedFavoriteMarketSymbols {
+            await hydrateCachedMarketsFromDisk()
+            guard isCurrentCredentialContext(activeCredentials) else {
+                return
+            }
+        }
+
+        if !forceReload,
+           hasLoadedFavoriteMarketSymbols,
+           let updatedAt = favoriteMarketSymbolsUpdatedAt,
+           Date().timeIntervalSince(updatedAt) < PageCachePolicy.marketFavorites.freshTimeToLive {
+            return
+        }
+
+        if let existingTask = inFlightFavoriteSymbolsTask {
+            await existingTask.value
+            return
+        }
+
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.performFavoriteMarketSymbolsRefresh(
+                credentials: activeCredentials
+            )
+        }
+        inFlightFavoriteSymbolsTask = task
+        await task.value
+        if inFlightFavoriteSymbolsTask == task {
+            inFlightFavoriteSymbolsTask = nil
+        }
+    }
+
+    private func performFavoriteMarketSymbolsRefresh(
+        credentials activeCredentials: AlpacaCredentials
+    ) async {
+        let revision = favoriteCacheRevision
+        let mutationGeneration = favoriteMutationGeneration
+        let shouldShowInitialLoading = !hasLoadedFavoriteMarketSymbols && favoriteMarketSymbols.isEmpty
+        if shouldShowInitialLoading {
+            isLoadingFavoriteMarketSymbols = true
+        }
+        defer {
+            if revision == favoriteCacheRevision { isLoadingFavoriteMarketSymbols = false }
+        }
 
         do {
-            if forceReload {
-                favoritesWatchlist = nil
+            let watchlist = try await ensureFavoritesWatchlist(credentials: activeCredentials, reload: true)
+            try Task.checkCancellation()
+            guard revision == favoriteCacheRevision, isCurrentCredentialContext(activeCredentials) else { return }
+            // A favorite toggle finished or started while this fetch was in flight;
+            // its result is newer than this snapshot, so do not apply or persist it.
+            guard mutationGeneration == favoriteMutationGeneration else { return }
+            updateFavoriteMarketSymbols(from: watchlist)
+            hasLoadedFavoriteMarketSymbols = true
+            favoriteMarketSymbolsUpdatedAt = Date()
+            favoriteMarketSymbolsError = nil
+
+            async let assetHydration: Void = hydrateFavoriteMarketAssetDetailsIfNeeded(credentials: activeCredentials)
+            async let quoteRefresh: Void = refreshFavoriteMarketQuotes(credentials: activeCredentials)
+            _ = await (assetHydration, quoteRefresh)
+
+            guard revision == favoriteCacheRevision, isCurrentCredentialContext(activeCredentials) else {
+                return
             }
 
-            let watchlist = try await ensureFavoritesWatchlist(credentials: credentials)
-            updateFavoriteMarketSymbols(from: watchlist)
-            await hydrateFavoriteMarketAssetDetailsIfNeeded(credentials: credentials)
-            await refreshFavoriteMarketQuotes(credentials: credentials)
-            favoriteMarketSymbolsError = nil
+            guard !Task.isCancelled, mutationGeneration == favoriteMutationGeneration else { return }
+            favoriteMarketSymbolsUpdatedAt = Date()
+            persistFavoriteMarketSymbolsCache(credentials: activeCredentials)
         } catch where error.isRequestCancellation {
-            favoriteMarketSymbolsError = nil
             return
         } catch {
+            guard revision == favoriteCacheRevision, isCurrentCredentialContext(activeCredentials) else { return }
             favoriteMarketSymbolsError = APIErrorDisplayMessage.message(for: error, locale: appLanguage.locale)
         }
     }
 
     func toggleFavoriteMarketSymbol(_ symbol: String) async {
-        guard let credentials else {
+        guard let activeCredentials = credentials else {
             lastError = L10n.Credentials.apiKeyRequired(locale: appLanguage.locale)
             return
         }
@@ -59,36 +177,62 @@ extension AppModel {
             return
         }
 
+        let revision = favoriteCacheRevision
+        favoriteMutationGeneration += 1
         let previousSymbols = favoriteMarketSymbols
         let previousAssetsBySymbol = favoriteMarketAssetBySymbol
         let previousQuotesBySymbol = favoriteMarketQuotesBySymbol
+        let isRemoving = favoriteMarketSymbols.contains(normalizedSymbol)
+
+        // Optimistic UI update immediately before awaiting network round-trips.
+        if let index = favoriteMarketSymbols.firstIndex(of: normalizedSymbol) {
+            favoriteMarketSymbols.remove(at: index)
+            favoriteMarketAssetBySymbol.removeValue(forKey: normalizedSymbol)
+            favoriteMarketQuotesBySymbol.removeValue(forKey: normalizedSymbol)
+        } else {
+            favoriteMarketSymbols.append(normalizedSymbol)
+        }
+        hasLoadedFavoriteMarketSymbols = true
 
         do {
-            let watchlist = try await ensureFavoritesWatchlist(credentials: credentials)
+            let watchlist = try await ensureFavoritesWatchlist(credentials: activeCredentials)
+            guard revision == favoriteCacheRevision, isCurrentCredentialContext(activeCredentials) else { return }
             let updatedWatchlist: AlpacaWatchlist
 
-            if let index = favoriteMarketSymbols.firstIndex(of: normalizedSymbol) {
-                favoriteMarketSymbols.remove(at: index)
-                favoriteMarketAssetBySymbol.removeValue(forKey: normalizedSymbol)
-                favoriteMarketQuotesBySymbol.removeValue(forKey: normalizedSymbol)
-                updatedWatchlist = try await services.watchlists.removeSymbol(normalizedSymbol, fromWatchlist: watchlist.id, credentials: credentials)
+            if isRemoving {
+                updatedWatchlist = try await services.watchlists.removeSymbol(normalizedSymbol, fromWatchlist: watchlist.id, credentials: activeCredentials)
             } else {
-                favoriteMarketSymbols.append(normalizedSymbol)
-                updatedWatchlist = try await services.watchlists.addSymbol(normalizedSymbol, toWatchlist: watchlist.id, credentials: credentials)
+                updatedWatchlist = try await services.watchlists.addSymbol(normalizedSymbol, toWatchlist: watchlist.id, credentials: activeCredentials)
             }
 
+            guard revision == favoriteCacheRevision, isCurrentCredentialContext(activeCredentials) else {
+                return
+            }
+
+            favoriteMutationGeneration += 1
             favoritesWatchlist = updatedWatchlist
             updateFavoriteMarketSymbols(from: updatedWatchlist)
-            await hydrateFavoriteMarketAssetDetailsIfNeeded(credentials: credentials)
-            await refreshFavoriteMarketQuotes(credentials: credentials)
+            favoriteMarketSymbolsUpdatedAt = Date()
             favoriteMarketSymbolsError = nil
             lastError = nil
+
+            async let assetHydration: Void = hydrateFavoriteMarketAssetDetailsIfNeeded(credentials: activeCredentials)
+            async let quoteRefresh: Void = refreshFavoriteMarketQuotes(credentials: activeCredentials)
+            _ = await (assetHydration, quoteRefresh)
+
+            guard revision == favoriteCacheRevision, isCurrentCredentialContext(activeCredentials) else {
+                return
+            }
+
+            persistFavoriteMarketSymbolsCache(credentials: activeCredentials)
         } catch where error.isRequestCancellation {
+            guard revision == favoriteCacheRevision, isCurrentCredentialContext(activeCredentials) else { return }
             favoriteMarketSymbols = previousSymbols
             favoriteMarketAssetBySymbol = previousAssetsBySymbol
             favoriteMarketQuotesBySymbol = previousQuotesBySymbol
             favoriteMarketSymbolsError = nil
         } catch {
+            guard revision == favoriteCacheRevision, isCurrentCredentialContext(activeCredentials) else { return }
             favoriteMarketSymbols = previousSymbols
             favoriteMarketAssetBySymbol = previousAssetsBySymbol
             favoriteMarketQuotesBySymbol = previousQuotesBySymbol
@@ -98,14 +242,70 @@ extension AppModel {
         }
     }
 
-    func fetchMarketOverview() async throws -> MarketOverview {
-        guard let credentials else {
+    func fetchMarketOverview(forceRefresh: Bool = false) async throws -> MarketOverview {
+        guard let activeCredentials = credentials else {
             throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
         }
 
-        let overview = try await services.markets.fetchMarketOverview(credentials: credentials)
-        cachedMarketOverview = overview
-        return overview
+        if !forceRefresh, cachedMarketOverview == nil {
+            await hydrateCachedMarketsFromDisk()
+            guard isCurrentCredentialContext(activeCredentials) else {
+                throw CancellationError()
+            }
+        }
+
+        if !forceRefresh,
+           !isMarketOverviewFromStaleCache, let cachedMarketOverview,
+           let cachedAt = cachedMarketOverviewAt,
+           Date().timeIntervalSince(cachedAt) < PageCachePolicy.marketOverview.freshTimeToLive {
+            return cachedMarketOverview
+        }
+
+        if !forceRefresh, let existingTask = inFlightMarketOverviewTask {
+            return try await existingTask.value
+        }
+
+        inFlightMarketOverviewTask?.cancel()
+        let task = Task<MarketOverview, Error> { @MainActor in
+            defer {
+                if !Task.isCancelled { inFlightMarketOverviewTask = nil }
+            }
+            do {
+                let overview = try await services.markets.fetchMarketOverview(credentials: activeCredentials)
+                try Task.checkCancellation()
+                guard isCurrentCredentialContext(activeCredentials) else { throw CancellationError() }
+
+                cachedMarketOverview = overview
+                cachedMarketOverviewAt = Date()
+                isMarketOverviewFromStaleCache = false
+                let cacheKey = AppPageCacheKeys.marketOverview(credentials: activeCredentials)
+                let pageCache = services.pageCache
+                marketCacheQueue.async {
+                    pageCache.setValue(overview, for: cacheKey, policy: .marketOverview)
+                }
+                return overview
+            } catch {
+                try Task.checkCancellation()
+                guard isCurrentCredentialContext(activeCredentials) else { throw CancellationError() }
+                isMarketOverviewFromStaleCache = cachedMarketOverview != nil
+                throw error
+            }
+        }
+        inFlightMarketOverviewTask = task
+        return try await task.value
+    }
+
+    func persistFavoriteMarketSymbolsCache(credentials activeCredentials: AlpacaCredentials) {
+        let snapshot = MarketFavoritesCacheSnapshot(
+            symbols: favoriteMarketSymbols,
+            assetsBySymbol: favoriteMarketAssetBySymbol,
+            quotesBySymbol: favoriteMarketQuotesBySymbol
+        )
+        let cacheKey = AppPageCacheKeys.marketFavorites(credentials: activeCredentials)
+        let pageCache = services.pageCache
+        marketCacheQueue.async {
+            pageCache.setValue(snapshot, for: cacheKey, policy: .marketFavorites)
+        }
     }
 
     func fetchMarketIndexQuotes(feed: AlpacaMarketDataFeed = .iex) async throws -> [MarketIndexQuote] {
@@ -720,6 +920,8 @@ extension AppModel {
         }
 
         let rankedSymbols = try await services.markets.fetchMostActiveMarketSymbols(top: limit, sort: sort, credentials: credentials)
+        try Task.checkCancellation()
+        guard isCurrentCredentialContext(credentials) else { throw CancellationError() }
         let symbols = Self.normalizedMarketSymbols(rankedSymbols.map(\.symbol))
         guard !symbols.isEmpty else {
             searchCache.popularSymbolsCache[sort] = []
@@ -751,6 +953,8 @@ extension AppModel {
             )
         }
 
+        try Task.checkCancellation()
+        guard isCurrentCredentialContext(credentials) else { throw CancellationError() }
         searchCache.popularSymbolsCache[sort] = popularSymbols
         searchCache.popularSymbolsCacheDate[sort] = Date()
         return popularSymbols
@@ -801,42 +1005,50 @@ extension AppModel {
         return assets
     }
 
-    private func ensureFavoritesWatchlist(credentials: AlpacaCredentials) async throws -> AlpacaWatchlist {
-        if let favoritesWatchlist {
+    private func ensureFavoritesWatchlist(credentials: AlpacaCredentials, reload: Bool = false) async throws -> AlpacaWatchlist {
+        if !reload, let favoritesWatchlist {
             return favoritesWatchlist
         }
 
-        let watchlists = try await services.watchlists.fetchWatchlists(credentials: credentials)
-        if let existingWatchlist = watchlists.first(where: { watchlist in
-            watchlist.name.caseInsensitiveCompare(Self.favoritesWatchlistName) == .orderedSame
-        }) {
-            let loadedWatchlist = try await services.watchlists.fetchWatchlist(id: existingWatchlist.id, credentials: credentials)
-            let normalizedNameWatchlist = try await normalizeFavoritesWatchlistNameIfNeeded(loadedWatchlist, credentials: credentials)
-            favoritesWatchlist = normalizedNameWatchlist
-            return normalizedNameWatchlist
+        // Share one lookup/create across concurrent callers (refresh + toggle) so a
+        // new account never ends up with two favorites watchlists.
+        if let existingTask = inFlightFavoritesWatchlistTask {
+            return try await existingTask.value
         }
 
-        let createdWatchlist = try await services.watchlists.createWatchlist(
-            name: Self.favoritesWatchlistName,
-            symbols: [],
-            credentials: credentials
-        )
-        favoritesWatchlist = createdWatchlist
-        return createdWatchlist
+        let revision = favoriteCacheRevision
+        let task = Task<AlpacaWatchlist, Error> { @MainActor [weak self] in
+            guard let self else { throw CancellationError() }
+            let watchlist = try await self.loadOrCreateFavoritesWatchlist(credentials: credentials, revision: revision)
+            if revision == self.favoriteCacheRevision, self.isCurrentCredentialContext(credentials) {
+                self.favoritesWatchlist = watchlist
+            }
+            return watchlist
+        }
+        inFlightFavoritesWatchlistTask = task
+        defer {
+            if inFlightFavoritesWatchlistTask == task {
+                inFlightFavoritesWatchlistTask = nil
+            }
+        }
+        return try await task.value
     }
 
-    private func normalizeFavoritesWatchlistNameIfNeeded(
-        _ watchlist: AlpacaWatchlist,
-        credentials: AlpacaCredentials
-    ) async throws -> AlpacaWatchlist {
-        guard watchlist.name != Self.favoritesWatchlistName else {
+    private func loadOrCreateFavoritesWatchlist(credentials: AlpacaCredentials, revision: Int) async throws -> AlpacaWatchlist {
+        let watchlists = try await services.watchlists.fetchWatchlists(credentials: credentials)
+        try Task.checkCancellation()
+        guard revision == favoriteCacheRevision, isCurrentCredentialContext(credentials) else { throw CancellationError() }
+        if let existing = watchlists.first(where: { $0.name.caseInsensitiveCompare(Self.favoritesWatchlistName) == .orderedSame }) {
+            let watchlist = try await services.watchlists.fetchWatchlist(id: existing.id, credentials: credentials)
+            try Task.checkCancellation()
+            guard revision == favoriteCacheRevision, isCurrentCredentialContext(credentials),
+                  watchlist.name.caseInsensitiveCompare(Self.favoritesWatchlistName) == .orderedSame else { throw CancellationError() }
             return watchlist
         }
 
-        return try await services.watchlists.updateWatchlist(
-            id: watchlist.id,
+        return try await services.watchlists.createWatchlist(
             name: Self.favoritesWatchlistName,
-            symbols: watchlist.symbols,
+            symbols: [],
             credentials: credentials
         )
     }
@@ -900,13 +1112,37 @@ extension AppModel {
         #endif
     }
 
+    func invalidateFavoritesWatchlist(credentials: AlpacaCredentials) {
+        let cacheKey = AppPageCacheKeys.marketFavorites(credentials: credentials)
+        let pageCache = services.pageCache
+        marketCacheQueue.async { pageCache.removeValue(for: cacheKey) }
+        if isCurrentCredentialContext(credentials) {
+            resetFavoriteMarketSymbols()
+        }
+    }
+
     func resetFavoriteMarketSymbols() {
+        favoriteCacheRevision += 1
+        inFlightFavoriteSymbolsTask?.cancel()
+        inFlightFavoriteSymbolsTask = nil
+        inFlightFavoritesWatchlistTask?.cancel()
+        inFlightFavoritesWatchlistTask = nil
         favoritesWatchlist = nil
         favoriteMarketSymbols = []
         favoriteMarketAssetBySymbol = [:]
         favoriteMarketQuotesBySymbol = [:]
+        favoriteMarketSymbolsUpdatedAt = nil
+        hasLoadedFavoriteMarketSymbols = false
         isLoadingFavoriteMarketSymbols = false
         favoriteMarketSymbolsError = nil
+    }
+
+    func resetMarketOverviewCache() {
+        inFlightMarketOverviewTask?.cancel()
+        inFlightMarketOverviewTask = nil
+        cachedMarketOverview = nil
+        cachedMarketOverviewAt = nil
+        isMarketOverviewFromStaleCache = false
     }
 
     func resetMarketSearchCaches() {
@@ -948,19 +1184,25 @@ extension AppModel {
         return String(Int(day.timeIntervalSince1970))
     }
 
-    private func updateFavoriteMarketSymbols(from watchlist: AlpacaWatchlist) {
+    func updateFavoriteMarketSymbols(from watchlist: AlpacaWatchlist) {
         favoriteMarketSymbols = Self.normalizedMarketSymbols(watchlist.symbols)
-        favoriteMarketAssetBySymbol = (watchlist.assets ?? []).reduce(into: [:]) { assetsBySymbol, asset in
+        let allowed = Set(favoriteMarketSymbols)
+        var mergedAssets = favoriteMarketAssetBySymbol.filter { allowed.contains($0.key) }
+        for asset in watchlist.assets ?? [] {
             let normalizedSymbol = normalizedMarketSymbol(asset.symbol)
-            guard !normalizedSymbol.isEmpty else {
-                return
+            guard !normalizedSymbol.isEmpty, allowed.contains(normalizedSymbol) else {
+                continue
             }
-
-            assetsBySymbol[normalizedSymbol] = asset
+            mergedAssets[normalizedSymbol] = asset
         }
+        favoriteMarketAssetBySymbol = mergedAssets
+        favoriteMarketQuotesBySymbol = favoriteMarketQuotesBySymbol.filter { allowed.contains($0.key) }
     }
 
+    private static let favoriteAssetHydrationConcurrency = 4
+
     private func hydrateFavoriteMarketAssetDetailsIfNeeded(credentials: AlpacaCredentials) async {
+        let revision = favoriteCacheRevision
         let missingSymbols = favoriteMarketSymbols.filter { symbol in
             let assetName = favoriteMarketAssetBySymbol[symbol]?.name?.trimmingCharacters(in: .whitespacesAndNewlines)
             return assetName?.isEmpty ?? true
@@ -970,11 +1212,41 @@ extension AppModel {
             return
         }
 
-        for symbol in missingSymbols {
-            guard let asset = try? await services.markets.fetchAsset(symbolOrAssetID: symbol, credentials: credentials) else {
-                continue
+        let marketsService = services.markets
+        let maxConcurrentRequests = Self.favoriteAssetHydrationConcurrency
+        let fetchedAssets = await withTaskGroup(of: AlpacaAsset?.self) { group in
+            var assets: [AlpacaAsset] = []
+            var pendingSymbols = missingSymbols[...]
+
+            func enqueueNext() {
+                guard let symbol = pendingSymbols.popFirst() else { return }
+                group.addTask {
+                    try? await marketsService.fetchAsset(symbolOrAssetID: symbol, credentials: credentials)
+                }
             }
 
+            // Sliding window keeps the asset lookups under Alpaca's rate limit
+            // even for large favorites lists.
+            for _ in 0..<maxConcurrentRequests {
+                enqueueNext()
+            }
+
+            while let asset = await group.next() {
+                if let asset {
+                    assets.append(asset)
+                }
+                guard !Task.isCancelled else {
+                    group.cancelAll()
+                    break
+                }
+                enqueueNext()
+            }
+            return assets
+        }
+
+        guard !Task.isCancelled, revision == favoriteCacheRevision, isCurrentCredentialContext(credentials) else { return }
+
+        for asset in fetchedAssets {
             let normalizedSymbol = normalizedMarketSymbol(asset.symbol)
             guard favoriteMarketSymbols.contains(normalizedSymbol) else {
                 continue
@@ -985,6 +1257,7 @@ extension AppModel {
     }
 
     private func refreshFavoriteMarketQuotes(credentials: AlpacaCredentials) async {
+        let revision = favoriteCacheRevision
         guard !favoriteMarketSymbols.isEmpty else {
             favoriteMarketQuotesBySymbol = [:]
             return
@@ -995,12 +1268,10 @@ extension AppModel {
                 symbols: favoriteMarketSymbols,
                 credentials: credentials
             )
+            guard !Task.isCancelled, revision == favoriteCacheRevision, isCurrentCredentialContext(credentials) else { return }
             favoriteMarketQuotesBySymbol = quotes.reduce(into: [:]) { quotesBySymbol, quote in
                 let normalizedSymbol = normalizedMarketSymbol(quote.symbol)
-                guard !normalizedSymbol.isEmpty else {
-                    return
-                }
-
+                guard favoriteMarketSymbols.contains(normalizedSymbol) else { return }
                 quotesBySymbol[normalizedSymbol] = quote
             }
         } catch where error.isRequestCancellation {

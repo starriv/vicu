@@ -122,7 +122,7 @@ extension AppModel {
             setCredentials(newCredentials)
             isCredentialBootstrapComplete = true
             selectedTab = .home
-            cachedMarketOverview = nil
+            resetMarketOverviewCache()
             resetFavoriteMarketSymbols()
             verifiedCredentialFingerprint = nil
             credentialsStatus = .connected(newCredentials.environment)
@@ -132,6 +132,7 @@ extension AppModel {
             clearCredentialMessage()
             Task { @MainActor [weak self] in
                 await self?.refresh()
+                self?.prewarmMarketsIfNeeded()
             }
             return true
         } catch {
@@ -152,7 +153,7 @@ extension AppModel {
         connectionDiagnostics = nil
         verifiedCredentialFingerprint = nil
         clearCredentialMessage()
-        cachedMarketOverview = nil
+        resetMarketOverviewCache()
         resetFavoriteMarketSymbols()
         await loadCredentials(for: newEnvironment, generation: generation)
     }
@@ -190,7 +191,7 @@ extension AppModel {
             setCredentials(nil)
             connectionDiagnostics = nil
             verifiedCredentialFingerprint = nil
-            cachedMarketOverview = nil
+            resetMarketOverviewCache()
             credentialsStatus = .missing
             portfolio.clear()
             resetFavoriteMarketSymbols()
@@ -214,7 +215,13 @@ extension AppModel {
                     return
                 }
                 setCredentials(stored)
+                await hydrateCachedMarketsFromDisk()
+                // Always finish the initial bootstrap: a newer operation started during the
+                // disk read (e.g. an environment switch) does not complete it on its own.
                 completeCredentialBootstrapIfNeeded(completesBootstrap)
+                guard isCurrentCredentialOperation(generation, environment: environment) else {
+                    return
+                }
                 await verifyStoredCredentials(stored, generation: generation)
             } else {
                 guard isCurrentCredentialOperation(generation, environment: environment) else {
@@ -222,7 +229,7 @@ extension AppModel {
                 }
                 setCredentials(nil)
                 connectionDiagnostics = nil
-                cachedMarketOverview = nil
+                resetMarketOverviewCache()
                 credentialsStatus = .missing
                 portfolio.clear()
                 resetFavoriteMarketSymbols()
@@ -236,7 +243,7 @@ extension AppModel {
             }
             setCredentials(nil)
             connectionDiagnostics = nil
-            cachedMarketOverview = nil
+            resetMarketOverviewCache()
             credentialsStatus = .missing
             verifiedCredentialFingerprint = nil
             setCredentialMessage(credentialErrorMessage(for: error))
@@ -333,6 +340,7 @@ extension AppModel {
             credentialsStatus = .connected(stored.environment)
             clearCredentialMessage()
             startAccountEventListeners(credentials: stored)
+            prewarmMarketsIfNeeded()
             await refresh()
         } catch where error.isRequestCancellation {
             guard isCurrentCredentialOperation(generation, environment: stored.environment) else {

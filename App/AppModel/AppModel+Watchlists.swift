@@ -44,11 +44,11 @@ extension AppModel {
             symbols: symbols,
             credentials: credentials
         )
-        synchronizeFavoritesWatchlistAfterUpsert(watchlist)
+        synchronizeFavoritesWatchlistAfterUpsert(watchlist, credentials: credentials)
         return watchlist
     }
 
-    func updateWatchlist(id: String, name: String, symbols: [String]) async throws -> AlpacaWatchlist {
+    func updateWatchlist(id: String, name: String, symbols: [String], previousName: String? = nil) async throws -> AlpacaWatchlist {
         guard let credentials else {
             throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
         }
@@ -64,7 +64,12 @@ extension AppModel {
             symbols: symbols,
             credentials: credentials
         )
-        synchronizeFavoritesWatchlistAfterUpsert(watchlist)
+        if previousName?.caseInsensitiveCompare(Self.favoritesWatchlistName) == .orderedSame,
+           watchlist.name.caseInsensitiveCompare(Self.favoritesWatchlistName) != .orderedSame {
+            invalidateFavoritesWatchlist(credentials: credentials)
+        } else {
+            synchronizeFavoritesWatchlistAfterUpsert(watchlist, credentials: credentials)
+        }
         return watchlist
     }
 
@@ -75,7 +80,7 @@ extension AppModel {
 
         try await services.watchlists.deleteWatchlist(id: watchlist.id, credentials: credentials)
         if isFavoritesWatchlist(watchlist) {
-            resetFavoriteMarketSymbols()
+            invalidateFavoritesWatchlist(credentials: credentials)
         }
     }
 
@@ -94,7 +99,7 @@ extension AppModel {
             toWatchlist: watchlist.id,
             credentials: credentials
         )
-        synchronizeFavoritesWatchlistAfterUpsert(updatedWatchlist)
+        synchronizeFavoritesWatchlistAfterUpsert(updatedWatchlist, credentials: credentials)
         return updatedWatchlist
     }
 
@@ -113,7 +118,7 @@ extension AppModel {
             fromWatchlist: watchlist.id,
             credentials: credentials
         )
-        synchronizeFavoritesWatchlistAfterUpsert(updatedWatchlist)
+        synchronizeFavoritesWatchlistAfterUpsert(updatedWatchlist, credentials: credentials)
         return updatedWatchlist
     }
 
@@ -133,7 +138,8 @@ extension AppModel {
         }.value
     }
 
-    private func synchronizeFavoritesWatchlistAfterUpsert(_ watchlist: AlpacaWatchlist) {
+    private func synchronizeFavoritesWatchlistAfterUpsert(_ watchlist: AlpacaWatchlist, credentials: AlpacaCredentials) {
+        guard isCurrentCredentialContext(credentials) else { return }
         let wasFavorites = favoritesWatchlist?.id == watchlist.id
         let isFavoritesName = watchlist.name.caseInsensitiveCompare(Self.favoritesWatchlistName) == .orderedSame
         guard wasFavorites || isFavoritesName else {
@@ -141,25 +147,20 @@ extension AppModel {
         }
 
         guard isFavoritesName else {
-            resetFavoriteMarketSymbols()
+            invalidateFavoritesWatchlist(credentials: credentials)
             return
         }
 
+        inFlightFavoriteSymbolsTask?.cancel()
+        inFlightFavoriteSymbolsTask = nil
+        favoriteCacheRevision += 1
+        hasLoadedFavoriteMarketSymbols = true
+        favoriteMarketSymbolsUpdatedAt = Date()
         favoritesWatchlist = watchlist
-        favoriteMarketSymbols = Self.normalizedWatchlistSymbols(watchlist.symbols)
-        favoriteMarketAssetBySymbol = (watchlist.assets ?? []).reduce(into: [:]) { assetsBySymbol, asset in
-            let normalizedSymbol = Self.normalizedWatchlistSymbol(asset.symbol)
-            guard !normalizedSymbol.isEmpty else {
-                return
-            }
-
-            assetsBySymbol[normalizedSymbol] = asset
-        }
-
-        let validSymbols = Set(favoriteMarketSymbols)
-        favoriteMarketQuotesBySymbol = favoriteMarketQuotesBySymbol.filter { symbol, _ in
-            validSymbols.contains(symbol)
-        }
+        isLoadingFavoriteMarketSymbols = false
+        favoriteMarketSymbolsError = nil
+        updateFavoriteMarketSymbols(from: watchlist)
+        persistFavoriteMarketSymbolsCache(credentials: credentials)
     }
 
     private func isFavoritesWatchlist(_ watchlist: AlpacaWatchlist) -> Bool {
@@ -183,19 +184,6 @@ extension AppModel {
         assetCache.watchlistAssets = assets
         assetCache.watchlistAssetsDate = Date()
         return assets
-    }
-
-    private static func normalizedWatchlistSymbols(_ symbols: [String]) -> [String] {
-        var seenSymbols = Set<String>()
-        return symbols.compactMap { symbol in
-            let normalizedSymbol = normalizedWatchlistSymbol(symbol)
-            guard !normalizedSymbol.isEmpty, !seenSymbols.contains(normalizedSymbol) else {
-                return nil
-            }
-
-            seenSymbols.insert(normalizedSymbol)
-            return normalizedSymbol
-        }
     }
 
     private static func normalizedWatchlistSymbol(_ symbol: String) -> String {

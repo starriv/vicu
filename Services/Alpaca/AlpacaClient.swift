@@ -224,12 +224,10 @@ struct AlpacaClient: AlpacaServicing {
     func fetchMarketOverview(credentials: AlpacaCredentials) async throws -> MarketOverview {
         let indexSymbols = Self.indexProxies.map(\.symbol)
         let snapshotSymbols = Array(Set(indexSymbols + Self.marketCapLeaders.map(\.symbol)))
+        let calendarStart = Self.marketCalendarDateString(daysAfter: -1, from: nil)
+        let calendarEnd = Self.marketCalendarDateString(daysAfter: 14, from: nil)
 
         async let clockRequest: AlpacaMarketClockResponse = request(.marketClock, credentials: credentials)
-        let clockResponse = try await clockRequest
-        let clock = try clockResponse.clock(market: "NYSE")
-        let calendarStart = Self.marketCalendarDateString(from: clock.timestamp)
-        let calendarEnd = Self.marketCalendarDateString(daysAfter: 14, from: clock.timestamp)
         async let calendarRequest = fetchMarketCalendar(
             market: "NYSE",
             start: calendarStart,
@@ -241,12 +239,15 @@ struct AlpacaClient: AlpacaServicing {
             end: calendarEnd,
             credentials: credentials
         )
-        let calendar = try await calendarRequest
-        let overnightCalendar = await overnightCalendarRequest
-        let snapshots: AlpacaStockSnapshotsResponse = (try? await marketDataRequest(
+        async let snapshotsRequest: AlpacaStockSnapshotsResponse? = try? marketDataRequest(
             .stockSnapshots(symbols: snapshotSymbols, feed: .iex),
             credentials: credentials
-        )) ?? AlpacaStockSnapshotsResponse(snapshots: [:])
+        )
+
+        let (clockResponse, calendar) = try await (clockRequest, calendarRequest)
+        let clock = try clockResponse.clock(market: "NYSE")
+        let overnightCalendar = await overnightCalendarRequest
+        let snapshots = await snapshotsRequest ?? AlpacaStockSnapshotsResponse(snapshots: [:])
         let indexQuotes = Self.indexProxies.map { proxy in
             Self.indexQuote(title: proxy.title, symbol: proxy.symbol, snapshot: snapshots.snapshots[proxy.symbol])
         }

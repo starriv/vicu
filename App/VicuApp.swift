@@ -112,11 +112,13 @@ private struct RootView: View {
             }
         }
         .task {
+            // Handle navigation first so a notification deep link is not delayed
+            // by the placeholder network request.
+            openPendingOrderDetail(app.pendingOrderDetailRequest)
             if app.selectedTab == .search {
-                await refreshSearchPlaceholderSymbol()
                 activateSearchTab()
             }
-            openPendingOrderDetail(app.pendingOrderDetailRequest)
+            await refreshSearchPlaceholderSymbol()
         }
         .onChange(of: app.pendingOrderDetailRequest) { _, request in
             openPendingOrderDetail(request)
@@ -127,10 +129,7 @@ private struct RootView: View {
                 return
             }
 
-            Task {
-                await refreshSearchPlaceholderSymbol()
-                activateSearchTab()
-            }
+            activateSearchTab()
         }
     }
 

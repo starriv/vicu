@@ -15,7 +15,7 @@ final class MarketIndexProxyStore {
     private(set) var liveQuotes: [MarketIndexQuote] = []
     private(set) var lastRealtimeUpdateAt: Date?
 
-    let overview: MarketOverview
+    private(set) var overview: MarketOverview
     private weak var app: AppModel?
     private var realtimeDisposeBag = DisposeBag()
 
@@ -39,8 +39,13 @@ final class MarketIndexProxyStore {
         return Date().timeIntervalSince(lastRealtimeUpdateAt) >= Self.streamQuietThreshold
     }
 
-    func seedInitialQuotes() {
-        liveQuotes = overview.indexQuotes
+    func sync(overview newOverview: MarketOverview) {
+        self.overview = newOverview
+        if liveQuotes.isEmpty {
+            liveQuotes = newOverview.indexQuotes
+        } else {
+            apply(newOverview.indexQuotes)
+        }
     }
 
     func bindRealtime() {
@@ -171,7 +176,7 @@ struct MarketIndexProxyPanel: View {
             if store == nil {
                 store = MarketIndexProxyStore(overview: overview, app: app)
             }
-            store?.seedInitialQuotes()
+            store?.sync(overview: overview)
         }
         .task(id: realtimeStreamID) {
             store?.bindRealtime()

@@ -75,7 +75,8 @@ final class WatchlistsStore {
         let watchlist = try await app.updateWatchlist(
             id: id,
             name: name,
-            symbols: WatchlistSymbolParser.symbols(from: symbols)
+            symbols: WatchlistSymbolParser.symbols(from: symbols),
+            previousName: self.watchlist(id: id)?.name
         )
         upsert(watchlist)
         return watchlist
