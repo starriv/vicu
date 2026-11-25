@@ -17,9 +17,15 @@ English | [简体中文](#简体中文)
 
 ## Screenshots / 截图
 
-Current UI, captured on iPhone 17 Pro (iOS 26.5) with a Paper Trading account. Light and dark appearances are shown side by side.
+Current UI, captured on iPhone 17 Pro (iOS 26.5). Portfolio and trading screenshots use a Paper Trading account. Light and dark appearances are shown side by side.
 
-使用 Paper Trading 账户在 iPhone 17 Pro（iOS 26.5）上截取的新版界面，浅色与深色对照展示。
+在 iPhone 17 Pro（iOS 26.5）上截取的新版界面，浅色与深色对照展示。投资组合与交易截图使用 Paper Trading 账户。
+
+### Sign In / 登录
+
+| Light | Dark |
+|:---:|:---:|
+| <img src="docs/screenshots/light/account-sign-in.png" width="250" alt="Alpaca sign-in — Light"> | <img src="docs/screenshots/dark/account-sign-in.png" width="250" alt="Alpaca sign-in — Dark"> |
 
 ### Home / 首页
 
