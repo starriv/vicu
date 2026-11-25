@@ -46,14 +46,14 @@ Current UI, captured on iPhone 17 Pro (iOS 26.5) with a Paper Trading account. L
 
 ### Trade & Options / 交易与期权
 
-| Page / 页面 | Light | Dark |
-|:---|:---:|:---:|
-| Stock market order / 股票市价单 | <img src="docs/screenshots/light/stock-market-entry.png" width="250" alt="Stock market order entry — Light"> | <img src="docs/screenshots/dark/stock-market-entry.png" width="250" alt="Stock market order entry — Dark"> |
-| Stock limit order / 股票限价单 | <img src="docs/screenshots/light/stock-limit-entry.png" width="250" alt="Stock limit order with bid, mid and ask — Light"> | <img src="docs/screenshots/dark/stock-limit-entry.png" width="250" alt="Stock limit order with bid, mid and ask — Dark"> |
-| Stock order review / 股票订单确认 | <img src="docs/screenshots/light/stock-order-review.png" width="250" alt="Stock order review and Paper environment — Light"> | <img src="docs/screenshots/dark/stock-order-review.png" width="250" alt="Stock order review and Paper environment — Dark"> |
-| Options chain / 期权链 | <img src="docs/screenshots/light/option-chain.png" width="250" alt="Options chain by expiration — Light"> | <img src="docs/screenshots/dark/option-chain.png" width="250" alt="Options chain by expiration — Dark"> |
-| Option payoff / 期权盈亏预览 | <img src="docs/screenshots/light/option-order-payoff.png" width="250" alt="Option order with expiration payoff chart — Light"> | <img src="docs/screenshots/dark/option-order-payoff.png" width="250" alt="Option order with expiration payoff chart — Dark"> |
-| Option order review / 期权订单确认 | <img src="docs/screenshots/light/option-order-review.png" width="250" alt="Option contract and order review — Light"> | <img src="docs/screenshots/dark/option-order-review.png" width="250" alt="Option contract and order review — Dark"> |
+| Light | Dark |
+|:---:|:---:|
+| <img src="docs/screenshots/light/stock-market-entry.png" width="250" alt="Stock market order entry — Light"> | <img src="docs/screenshots/dark/stock-market-entry.png" width="250" alt="Stock market order entry — Dark"> |
+| <img src="docs/screenshots/light/stock-limit-entry.png" width="250" alt="Stock limit order with bid, mid and ask — Light"> | <img src="docs/screenshots/dark/stock-limit-entry.png" width="250" alt="Stock limit order with bid, mid and ask — Dark"> |
+| <img src="docs/screenshots/light/stock-order-review.png" width="250" alt="Stock order review and Paper environment — Light"> | <img src="docs/screenshots/dark/stock-order-review.png" width="250" alt="Stock order review and Paper environment — Dark"> |
+| <img src="docs/screenshots/light/option-chain.png" width="250" alt="Options chain by expiration — Light"> | <img src="docs/screenshots/dark/option-chain.png" width="250" alt="Options chain by expiration — Dark"> |
+| <img src="docs/screenshots/light/option-order-payoff.png" width="250" alt="Option order with expiration payoff chart — Light"> | <img src="docs/screenshots/dark/option-order-payoff.png" width="250" alt="Option order with expiration payoff chart — Dark"> |
+| <img src="docs/screenshots/light/option-order-review.png" width="250" alt="Option contract and order review — Light"> | <img src="docs/screenshots/dark/option-order-review.png" width="250" alt="Option contract and order review — Dark"> |
 
 ### Orders / 订单
 
