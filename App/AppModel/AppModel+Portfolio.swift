@@ -249,6 +249,27 @@ extension AppModel {
         }
     }
 
+    func analyzePortfolioIntelligence() async -> PortfolioIntelligenceSnapshot {
+        await services.intelligence.analyze(
+            portfolio: portfolio,
+            environment: environment,
+            locale: appLanguage.locale
+        )
+    }
+
+    func askPortfolioCopilot(
+        _ query: String,
+        snapshot: PortfolioIntelligenceSnapshot
+    ) async -> PortfolioCopilotMessage {
+        await services.intelligence.respond(
+            to: query,
+            portfolio: portfolio,
+            snapshot: snapshot,
+            environment: environment,
+            locale: appLanguage.locale
+        )
+    }
+
     func fetchAccountDetails() async throws -> AlpacaAccount {
         guard let credentials else {
             throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))

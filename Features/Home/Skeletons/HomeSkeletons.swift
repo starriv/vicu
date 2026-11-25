@@ -2,20 +2,19 @@ import SwiftUI
 
 struct HomeHeroSkeleton: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
-                HomeSkeletonBlock(width: 188, height: 48, fill: Color(.secondarySystemFill), cornerRadius: 14)
-                HomeSkeletonBlock(width: 116, height: 14, fill: Color(.tertiarySystemFill), cornerRadius: 5)
-            }
+                HomeSkeletonBlock(width: 188, height: 44, fill: Color(.secondarySystemFill), cornerRadius: 14)
 
-            HStack(spacing: 8) {
-                HomeSkeletonBlock(width: 74, height: 16, fill: Color(.secondarySystemFill), cornerRadius: 5)
-                HomeSkeletonBlock(width: 58, height: 16, fill: Color(.tertiarySystemFill), cornerRadius: 5)
-                HomeSkeletonBlock(width: 38, height: 16, fill: Color(.tertiarySystemFill), cornerRadius: 5)
+                HStack(spacing: 8) {
+                    HomeSkeletonBlock(width: 74, height: 16, fill: Color(.secondarySystemFill), cornerRadius: 5)
+                    HomeSkeletonBlock(width: 58, height: 16, fill: Color(.tertiarySystemFill), cornerRadius: 5)
+                    HomeSkeletonBlock(width: 38, height: 16, fill: Color(.tertiarySystemFill), cornerRadius: 5)
+                }
             }
 
             HomeChartSkeleton()
-                .frame(height: 230)
+                .frame(height: 216)
 
             HStack(spacing: 12) {
                 HomeRangePickerSkeleton()
@@ -26,6 +25,77 @@ struct HomeHeroSkeleton: View {
             }
         }
         .padding(.top, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .homeSkeletonPresentation()
+    }
+}
+
+struct HomeOverviewMetricsSkeleton: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.group) {
+            HomeSkeletonSectionHeader(titleWidth: 86)
+
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    overviewCellSkeleton(titleWidth: 72, valueWidth: 92)
+                    Divider().padding(.vertical, 12)
+                    overviewCellSkeleton(titleWidth: 46, valueWidth: 96)
+                }
+
+                Divider().padding(.horizontal, 16)
+
+                HStack(spacing: 0) {
+                    overviewCellSkeleton(titleWidth: 78, valueWidth: 94)
+                    Divider().padding(.vertical, 12)
+                    overviewCellSkeleton(titleWidth: 84, valueWidth: 82)
+                }
+            }
+            .background(
+                AppTheme.ColorToken.groupedSurface,
+                in: RoundedRectangle(cornerRadius: AppTheme.CornerRadius.groupedSurface, style: .continuous)
+            )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .homeSkeletonPresentation()
+    }
+
+    private func overviewCellSkeleton(titleWidth: CGFloat, valueWidth: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HomeSkeletonBlock(width: titleWidth, height: 12, fill: Color(.tertiarySystemFill), cornerRadius: 4)
+            HomeSkeletonBlock(width: valueWidth, height: 18, fill: Color(.secondarySystemFill), cornerRadius: 5)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+    }
+}
+
+struct HomeAllocationSkeleton: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.group) {
+            HomeSkeletonSectionHeader(titleWidth: 92)
+
+            VStack(alignment: .leading, spacing: 14) {
+                HomeSkeletonBlock(height: 6, fill: Color(.secondarySystemFill), cornerRadius: 3)
+
+                ForEach(0..<3, id: \.self) { index in
+                    HStack(spacing: 10) {
+                        HomeSkeletonBlock(width: 8, height: 8, fill: Color(.tertiarySystemFill), cornerRadius: 4)
+                        HomeSkeletonBlock(width: [68, 48, 56][index], height: 15, fill: Color(.secondarySystemFill), cornerRadius: 5)
+                        Spacer()
+                        HomeSkeletonBlock(width: [76, 68, 60][index], height: 15, fill: Color(.secondarySystemFill), cornerRadius: 5)
+                        HomeSkeletonBlock(width: 44, height: 13, fill: Color(.tertiarySystemFill), cornerRadius: 4)
+                    }
+                    .padding(.vertical, 4)
+
+                    if index < 2 {
+                        Divider().padding(.leading, 20)
+                    }
+                }
+            }
+            .padding(16)
+            .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: AppTheme.CornerRadius.groupedSurface, style: .continuous))
+        }
         .frame(maxWidth: .infinity, alignment: .leading)
         .homeSkeletonPresentation()
     }

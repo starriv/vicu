@@ -8,6 +8,7 @@ import Foundation
 struct AppServices: Sendable {
     let alpaca: any AlpacaServicing
     let home: any HomeServicing
+    let intelligence: any PortfolioIntelligenceServicing
     let portfolio: any PortfolioServicing
     let orders: any OrdersServicing
     let markets: any MarketsServicing
@@ -25,6 +26,7 @@ struct AppServices: Sendable {
     init(
         alpaca: any AlpacaServicing,
         home: (any HomeServicing)? = nil,
+        intelligence: (any PortfolioIntelligenceServicing)? = nil,
         portfolio: (any PortfolioServicing)? = nil,
         orders: (any OrdersServicing)? = nil,
         markets: (any MarketsServicing)? = nil,
@@ -43,6 +45,7 @@ struct AppServices: Sendable {
     ) {
         self.alpaca = alpaca
         self.home = home ?? HomeService(alpaca: alpaca)
+        self.intelligence = intelligence ?? LocalPortfolioIntelligenceService()
         self.portfolio = portfolio ?? PortfolioService(alpaca: alpaca)
         self.orders = orders ?? OrdersService(alpaca: alpaca)
         self.markets = markets ?? MarketsService(alpaca: alpaca)

@@ -1,6 +1,6 @@
 import Foundation
 
-struct AlpacaAccount: Codable, Sendable {
+struct AlpacaAccount: Codable, Hashable, Sendable {
     let id: String
     let accountNumber: String?
     let createdAt: String?

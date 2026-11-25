@@ -3,6 +3,7 @@ import SwiftUI
 struct PositionsSummaryView: View {
     @Environment(AppModel.self) private var app
     var showsInitialSkeleton = false
+    var positionWeights: [String: Double] = [:]
     @State private var selectedCategory: PositionAssetCategory?
 
     var body: some View {
@@ -46,7 +47,7 @@ struct PositionsSummaryView: View {
                     AppEmptyStateView(
                         title: L10n.Common.noData,
                         systemImage: AppIcon.Position.empty,
-                        minHeight: 190
+                        minHeight: 160
                     )
                 } else {
                     if let selectedCategory = snapshot.selectedCategory {
@@ -76,13 +77,17 @@ struct PositionsSummaryView: View {
                 NavigationLink {
                     PositionDetailView(position: position)
                 } label: {
-                    PositionRow(position: position, locale: locale)
+                    PositionRow(
+                        position: position,
+                        weight: positionWeights[position.symbol.uppercased()],
+                        locale: locale
+                    )
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(position.accessibilityTitle(locale: locale))
 
                 if position.id != lastPositionID {
-                    Divider().padding(.leading, 16)
+                    Divider().padding(.leading, 56)
                 }
             }
         }
@@ -97,6 +102,7 @@ struct PositionsSummaryView: View {
 
 private struct PositionRow: View {
     let position: AlpacaPosition
+    let weight: Double?
     let locale: Locale
 
     private var profitLossColor: Color {
@@ -106,28 +112,53 @@ private struct PositionRow: View {
         return value >= 0 ? AppTheme.ColorToken.positive : AppTheme.ColorToken.negative
     }
 
+    private var subtitleText: String {
+        let qty = PositionDisplay.quantityText(
+            position.quantity,
+            assetClass: position.assetClass,
+            symbol: position.symbol,
+            locale: locale
+        )
+        if let weight, weight > 0 {
+            return "\(qty) · \(AppFormatter.percent(weight, fractionLength: 1))"
+        }
+        return qty
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
+        HStack(spacing: 12) {
+            SymbolLogoView(symbol: position.symbol, size: 36)
+
+            VStack(alignment: .leading, spacing: 4) {
                 Text(position.symbol)
                     .font(.headline)
-                Spacer()
-                Text(AppFormatter.compactMoney(position.marketValue))
-                    .font(AppTypography.rowValue)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Text(subtitleText)
+                    .font(AppTypography.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
 
-            HStack {
-                Text("\(L10n.string("positions.quantity_prefix", locale: locale)) \(PositionDisplay.quantityText(position.quantity, assetClass: position.assetClass, symbol: position.symbol, locale: locale))")
-                Spacer()
-                Text("\(L10n.string("positions.profit_loss_prefix", locale: locale)) \(PositionDisplay.signedCompactMoney(position.unrealizedPL))")
+            Spacer(minLength: 12)
+
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(AppFormatter.compactMoney(position.marketValue))
+                    .font(AppTypography.rowValue)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Text(PositionDisplay.signedCompactMoney(position.unrealizedPL))
+                    .font(AppTypography.caption.monospacedDigit())
                     .foregroundStyle(profitLossColor)
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-                    .accessibilityHidden(true)
+                    .lineLimit(1)
             }
-            .font(AppTypography.rowMeta)
-            .foregroundStyle(.secondary)
+
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
         }
         .padding(.vertical, AppTheme.Spacing.rowVertical)
         .frame(maxWidth: .infinity, alignment: .leading)

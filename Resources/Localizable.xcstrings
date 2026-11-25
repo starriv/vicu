@@ -3563,6 +3563,1590 @@
         }
       }
     },
+    "home_ai.action.balanced.detail_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All %d positions sit within standard concentration and liquidity guardrails. Use AI Copilot to stress-test scenarios."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部 %d 笔持仓均处于合理集中度与流动性区间内，可通过 AI 助手做情景压力测试。"
+          }
+        }
+      }
+    },
+    "home_ai.action.balanced.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Portfolio Risk Looks Balanced"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前组合结构保持均衡"
+          }
+        }
+      }
+    },
+    "home_ai.action.cash.detail_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cash sits at %1$@ (%2$@) of equity. Consider staging entries across core ETFs or underweight themes."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前现金占净资产 %1$@（%2$@），可考虑分批配置核心 ETF 或低配板块。"
+          }
+        }
+      }
+    },
+    "home_ai.action.cash.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Idle Cash Ready to Deploy"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "闲置现金比例偏高"
+          }
+        }
+      }
+    },
+    "home_ai.action.concentration.detail_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ represents %2$@ of portfolio exposure. Trimming about %3$@ would bring it back toward a 25%% single-name cap."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 占持仓敞口的 %2$@，超出常规单票上限。减仓约 %3$@ 可将权重回归 25%% 附近。"
+          }
+        }
+      }
+    },
+    "home_ai.action.concentration.title_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "High Concentration in %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 单一持仓集中度过高"
+          }
+        }
+      }
+    },
+    "home_ai.action.empty.detail_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You currently hold %@ in cash with no open positions. Ask AI to plan an initial core allocation."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前持有现金 %@ 且暂无持仓，可让 AI 协助规划初始核心仓位结构。"
+          }
+        }
+      }
+    },
+    "home_ai.action.empty.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready to Build Your Portfolio"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "准备好构建你的投资组合"
+          }
+        }
+      }
+    },
+    "home_ai.action.loss_review.detail_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ is down %2$@ (%3$@). Verify whether your thesis still holds or tighten downside exposure."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 当前浮亏 %2$@（%3$@），建议复核投资逻辑并控制下行敞口。"
+          }
+        }
+      }
+    },
+    "home_ai.action.loss_review.title_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drawdown Check on %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "复核 %@ 回撤风险"
+          }
+        }
+      }
+    },
+    "home_ai.action.margin.detail_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gross exposure is %1$@ of equity with %2$@ buying power left. Consider trimming leveraged holdings to restore buffer."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前总敞口为净资产的 %1$@，剩余购买力仅 %2$@。建议适度降杠杆以恢复安全垫。"
+          }
+        }
+      }
+    },
+    "home_ai.action.margin.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Margin Exposure Elevated"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "杠杆与保证金压力偏高"
+          }
+        }
+      }
+    },
+    "home_ai.action.open_orders.detail_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Among your recent orders, %1$d are open, including %2$@. Review their limit prices and reserved funds."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "近期订单中有 %1$d 笔挂单（含 %2$@）。可查看这些订单的限价与资金占用。"
+          }
+        }
+      }
+    },
+    "home_ai.action.open_orders.title_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d Open Among Recent Orders"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "近期订单中有 %d 笔挂单"
+          }
+        }
+      }
+    },
+    "home_ai.action.take_profit.detail_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ is up %2$@ (%3$@). Locking in partial profits or trailing risk can protect portfolio gains."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 当前浮盈 %2$@（%3$@），可考虑分批落袋或设置风控保护收益。"
+          }
+        }
+      }
+    },
+    "home_ai.action.take_profit.title_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review Gains in %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "评估 %@ 的阶段性止盈"
+          }
+        }
+      }
+    },
+    "home_ai.actions.section_title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Action Plan"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 策略建议"
+          }
+        }
+      }
+    },
+    "home_ai.ask_ai_button": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask AI"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "问 AI"
+          }
+        }
+      }
+    },
+    "home_ai.ask_placeholder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask AI about risk, rebalance, or holdings..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "问 AI 风险、再平衡或任意持仓…"
+          }
+        }
+      }
+    },
+    "home_ai.attribution.top_contributors": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Top Contributors"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "主要盈利贡献"
+          }
+        }
+      }
+    },
+    "home_ai.attribution.top_detractors": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Top Detractors"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "主要拖累持仓"
+          }
+        }
+      }
+    },
+    "home_ai.attribution.total_unrealized_pl": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total Unrealized P/L"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "累计浮动盈亏"
+          }
+        }
+      }
+    },
+    "home_ai.badge.execution": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Execution"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "执行监控"
+          }
+        }
+      }
+    },
+    "home_ai.badge.insight": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Insight"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "组合洞察"
+          }
+        }
+      }
+    },
+    "home_ai.badge.opportunity": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opportunity"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配置机会"
+          }
+        }
+      }
+    },
+    "home_ai.badge.rebalance": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rebalance"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "再平衡"
+          }
+        }
+      }
+    },
+    "home_ai.badge.risk": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Risk Alert"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "风控预警"
+          }
+        }
+      }
+    },
+    "home_ai.briefing.balanced_headline": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Portfolio is steady with targeted tuning opportunities"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "组合整体均衡，存在局部优化空间"
+          }
+        }
+      }
+    },
+    "home_ai.briefing.caution_headline": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Portfolio has concentration or liquidity pressure"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "组合存在集中度或流动性压力"
+          }
+        }
+      }
+    },
+    "home_ai.briefing.empty_headline": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect or fund your portfolio to activate AI insights"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同步账户持仓后即可激活 AI 实时诊断"
+          }
+        }
+      }
+    },
+    "home_ai.briefing.empty_summary": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live health scoring, concentration guardrails, and attribution appear automatically once data loads."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "数据加载完成后，将自动计算组合健康度、集中度风控与盈亏归因。"
+          }
+        }
+      }
+    },
+    "home_ai.briefing.equity_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Net equity stands at %@."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前组合净资产为 %@。"
+          }
+        }
+      }
+    },
+    "home_ai.briefing.laggard_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ is the largest drag at %2$@."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 为当前主要拖累项（%2$@）。"
+          }
+        }
+      }
+    },
+    "home_ai.briefing.leader_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ is the top P/L driver at %2$@."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 为最大盈利贡献标的（%2$@）。"
+          }
+        }
+      }
+    },
+    "home_ai.briefing.leverage_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leverage stands at %@ — monitor margin cushion closely."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前杠杆 %@，请重点关注保证金安全垫。"
+          }
+        }
+      }
+    },
+    "home_ai.briefing.risk_headline": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Defensive rebalance recommended to reduce risk"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "建议尽快防御性再平衡以降低敞口"
+          }
+        }
+      }
+    },
+    "home_ai.briefing.strong_headline": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Portfolio structure is healthy and well cushioned"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "组合结构健康，风险缓冲充足"
+          }
+        }
+      }
+    },
+    "home_ai.briefing.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Portfolio Brief"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 组合诊断"
+          }
+        }
+      }
+    },
+    "home_ai.briefing.top_holding_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ leads exposure at %2$@."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 为第一大重仓（占比 %2$@）。"
+          }
+        }
+      }
+    },
+    "home_ai.cockpit_title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Portfolio"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "投资组合"
+          }
+        }
+      }
+    },
+    "home_ai.copilot.analyzing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analyzing live portfolio..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在分析实时组合数据…"
+          }
+        }
+      }
+    },
+    "home_ai.copilot.reply.attribution_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total unrealized P/L across open holdings is %1$@. Top contributor: %2$@. Largest drag: %3$@."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前持仓累计浮动盈亏为 %1$@。最大正向贡献：%2$@；主要拖累持仓：%3$@。"
+          }
+        }
+      }
+    },
+    "home_ai.copilot.reply.health_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your composite Health Score is %1$d/100 — built from Diversification (%2$d), Liquidity (%3$d), and Momentum (%4$d). Improving the lowest sub-score yields the fastest risk-adjusted gain."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你的综合组合健康度为 %1$d/100，由分散度（%2$d）、流动性（%3$d）和动量表现（%4$d）加权得出。优先补齐最低分项可最快改善风险收益比。"
+          }
+        }
+      }
+    },
+    "home_ai.copilot.reply.liquidity_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buying power is %1$@, cash is %2$@, and gross leverage is %3$@ (Liquidity score: %4$d/100). Keep leverage near 1.0x and positive cash buffer to avoid margin squeeze."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前购买力为 %1$@，现金余额 %2$@，总杠杆 %3$@（流动性评分 %4$d/100）。建议将杠杆维持在 1.0x 附近并保留正向现金缓冲，以防范波动期保证金压力。"
+          }
+        }
+      }
+    },
+    "home_ai.copilot.reply.orders_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Of the %2$d most recent orders loaded, %1$d are open. Review their prices against your target weights."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近载入的 %2$d 笔订单中有 %1$d 笔挂单。可核对这些订单的价格与目标权重。"
+          }
+        }
+      }
+    },
+    "home_ai.copilot.reply.overview_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Net equity is %1$@ with a Health Score of %2$d/100. %3$@ — %4$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前组合净资产 %1$@，AI 健康度评分 %2$d/100。%3$@——%4$@"
+          }
+        }
+      }
+    },
+    "home_ai.copilot.reply.position_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ currently accounts for %2$@ of your holdings (%3$@ market value) with %4$@ (%5$@) unrealized P/L. Tap below to inspect position details or adjust exposure."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 目前占持仓总敞口的 %2$@（市值 %3$@），累计浮动盈亏 %4$@（%5$@）。点击下方可直接进入持仓详情复核或调整仓位。"
+          }
+        }
+      }
+    },
+    "home_ai.copilot.reply.rebalance_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ is your largest position at %2$@ weight, giving a diversification score of %3$d/100. Trimming roughly %4$@ would align it closer to a 25%% single-position ceiling."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 是你的第一大重仓（占比 %2$@），当前分散度评分 %3$d/100。若减仓约 %4$@，可将其权重收敛至 25%% 左右的稳健单票上限。"
+          }
+        }
+      }
+    },
+    "home_ai.copilot.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vicu AI Copilot"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vicu AI 投研助手"
+          }
+        }
+      }
+    },
+    "home_ai.copilot.welcome_subtitle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask about health scores, concentration, margin usage, attribution, or any ticker in your portfolio."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可随时询问组合健康度、仓位集中度、保证金杠杆、盈亏归因或任意持仓诊断。"
+          }
+        }
+      }
+    },
+    "home_ai.copilot.welcome_title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your AI Portfolio Manager"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你的 AI 投资组合管家"
+          }
+        }
+      }
+    },
+    "home_ai.cta.ask_copilot": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discuss with AI"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "与 AI 深入分析"
+          }
+        }
+      }
+    },
+    "home_ai.cta.inspect_symbol_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inspect %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查看 %@ 持仓"
+          }
+        }
+      }
+    },
+    "home_ai.cta.plan_deployment": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Draft Allocation Plan"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生成资金配置方案"
+          }
+        }
+      }
+    },
+    "home_ai.cta.review_margin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review Margin & Cash"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检查保证金与现金"
+          }
+        }
+      }
+    },
+    "home_ai.cta.review_orders": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review Open Orders"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查看活跃委托"
+          }
+        }
+      }
+    },
+    "home_ai.cta.trim_position_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trim %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "部分止盈/减仓 %@"
+          }
+        }
+      }
+    },
+    "home_ai.engine_badge": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quant Engine"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "量化引擎"
+          }
+        }
+      }
+    },
+    "home_ai.grade.at_risk": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elevated Risk"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "风险偏高"
+          }
+        }
+      }
+    },
+    "home_ai.grade.balanced": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Balanced Posture"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "均衡配置"
+          }
+        }
+      }
+    },
+    "home_ai.grade.caution": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs Attention"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要关注"
+          }
+        }
+      }
+    },
+    "home_ai.grade.empty": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Awaiting Portfolio Data"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待组合数据"
+          }
+        }
+      }
+    },
+    "home_ai.grade.strong": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Strong Structure"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "结构稳健"
+          }
+        }
+      }
+    },
+    "home_ai.health.score_title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Health Score"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "组合健康度"
+          }
+        }
+      }
+    },
+    "home_ai.metric.leverage": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leverage"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "杠杆倍数"
+          }
+        }
+      }
+    },
+    "home_ai.metric.net_equity": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Net Equity"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "净资产"
+          }
+        }
+      }
+    },
+    "home_ai.metric.open_orders": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in Recent Orders"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "近期订单中的挂单"
+          }
+        }
+      }
+    },
+    "home_ai.metric.unrealized_pl": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unrealized P/L"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "浮动盈亏"
+          }
+        }
+      }
+    },
+    "home_ai.metric.weight": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Weight"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仓位占比"
+          }
+        }
+      }
+    },
+    "home_ai.overview.market_value": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Market Value"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "持仓市值"
+          }
+        }
+      }
+    },
+    "home_ai.overview.section_title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Overview"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "资产概览"
+          }
+        }
+      }
+    },
+    "home_ai.prompt.attribution": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Which holdings are driving my portfolio gains and losses?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目前哪些持仓是主要的盈利贡献和拖累？"
+          }
+        }
+      }
+    },
+    "home_ai.prompt.cash": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How should I think about my cash balance and liquidity?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "如何看待我当前的现金占比与配置节奏？"
+          }
+        }
+      }
+    },
+    "home_ai.prompt.health": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Why is my portfolio health score at this level?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "为什么我的组合健康度是这个分数？请拆解原因。"
+          }
+        }
+      }
+    },
+    "home_ai.prompt.margin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analyze my margin usage, cash buffer, and buying power risk."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分析我当前的保证金杠杆、现金缓冲与购买力风险。"
+          }
+        }
+      }
+    },
+    "home_ai.prompt.orders": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Summarize open orders in my recent order history."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "总结近期订单中的挂单。"
+          }
+        }
+      }
+    },
+    "home_ai.prompt.rebalance_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How should I rebalance %@ to reduce concentration?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应该如何对 %@ 做再平衡以降低集中度？"
+          }
+        }
+      }
+    },
+    "home_ai.prompt.starter_allocation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suggest how to structure an initial balanced portfolio with my cash."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "基于当前现金，建议如何搭建初始均衡投资组合？"
+          }
+        }
+      }
+    },
+    "home_ai.prompt_chip.attribution": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Top movers"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "盈亏归因"
+          }
+        }
+      }
+    },
+    "home_ai.prompt_chip.cash": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deploy cash"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "现金配置"
+          }
+        }
+      }
+    },
+    "home_ai.prompt_chip.health": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Explain score"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解读健康度"
+          }
+        }
+      }
+    },
+    "home_ai.prompt_chip.margin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Margin & risk"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保证金与风险"
+          }
+        }
+      }
+    },
+    "home_ai.prompt_chip.orders": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recent open orders"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "近期挂单"
+          }
+        }
+      }
+    },
+    "home_ai.prompt_chip.rebalance_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rebalance %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "调仓 %@"
+          }
+        }
+      }
+    },
+    "home_ai.rebalance.sole_holding": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is your only holding. While any remains, it represents 100%% of invested assets. A 25%% weight requires other holdings."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 是唯一持仓。只要仍有持仓，它就占已投资资产的 100%%。要达到 25%% 的权重，需要配置其他持仓。"
+          }
+        }
+      }
+    },
+    "home_ai.rebalance.within_limit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is within the 25%% target weight for invested assets."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 占已投资资产的比例已处于 25%% 的目标范围内。"
+          }
+        }
+      }
+    },
+    "home_ai.structure.section_title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Portfolio Structure"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "组合结构"
+          }
+        }
+      }
+    },
+    "home_ai.structure.tab.allocation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allocation"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "资产配置"
+          }
+        }
+      }
+    },
+    "home_ai.structure.tab.attribution": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Attribution"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "归因"
+          }
+        }
+      }
+    },
+    "home_ai.structure.tab.liquidity": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Liquidity"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "资金"
+          }
+        }
+      }
+    },
+    "home_ai.structure.view_full_account": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Full Account & Margin Details"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查看完整账户与保证金明细"
+          }
+        }
+      }
+    },
+    "home_ai.subscore.diversification": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diversification"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分散度"
+          }
+        }
+      }
+    },
+    "home_ai.subscore.liquidity": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Liquidity"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "流动性"
+          }
+        }
+      }
+    },
+    "home_ai.subscore.momentum": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Momentum"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "动量"
+          }
+        }
+      }
+    },
+    "home_ai.tag.cash_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cash %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "现金 %@"
+          }
+        }
+      }
+    },
+    "home_ai.tag.leverage_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leverage %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "杠杆 %@"
+          }
+        }
+      }
+    },
+    "home_ai.tag.open_orders_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%d Open in Recent Orders"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "近期订单中 %d 笔挂单"
+          }
+        }
+      }
+    },
+    "home_ai.tag.top_weight_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Top: %1$@ %2$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重仓 %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "home_ai.tag.win_rate_format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Win Rate %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "持仓胜率 %@"
+          }
+        }
+      }
+    },
     "markets.after_hours": {
       "localizations": {
         "en": {

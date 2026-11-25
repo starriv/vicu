@@ -1,6 +1,6 @@
 import Foundation
 
-struct AlpacaPosition: Codable, Identifiable, Sendable {
+struct AlpacaPosition: Codable, Hashable, Identifiable, Sendable {
     let assetID: String?
     let symbol: String
     let exchange: String?

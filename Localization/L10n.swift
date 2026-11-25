@@ -186,6 +186,375 @@ enum L10n {
         static var chartAccessibility: LocalizedStringKey { "portfolio.chart_accessibility" }
     }
 
+    enum HomeAI {
+        static var cockpitTitle: LocalizedStringKey { "home_ai.cockpit_title" }
+        static var askAIButton: LocalizedStringKey { "home_ai.ask_ai_button" }
+        static var copilotTitle: LocalizedStringKey { "home_ai.copilot.title" }
+        static var copilotWelcomeTitle: LocalizedStringKey { "home_ai.copilot.welcome_title" }
+        static var copilotWelcomeSubtitle: LocalizedStringKey { "home_ai.copilot.welcome_subtitle" }
+        static var copilotAnalyzing: LocalizedStringKey { "home_ai.copilot.analyzing" }
+        static var briefingTitle: LocalizedStringKey { "home_ai.briefing.title" }
+        static var engineBadge: LocalizedStringKey { "home_ai.engine_badge" }
+        static var healthScoreTitle: LocalizedStringKey { "home_ai.health.score_title" }
+        static var askPlaceholder: LocalizedStringKey { "home_ai.ask_placeholder" }
+
+        static var gradeStrong: LocalizedStringKey { "home_ai.grade.strong" }
+        static var gradeBalanced: LocalizedStringKey { "home_ai.grade.balanced" }
+        static var gradeCaution: LocalizedStringKey { "home_ai.grade.caution" }
+        static var gradeAtRisk: LocalizedStringKey { "home_ai.grade.at_risk" }
+        static var gradeEmpty: LocalizedStringKey { "home_ai.grade.empty" }
+
+        static var subscoreDiversificationTitle: LocalizedStringKey { "home_ai.subscore.diversification" }
+        static var subscoreLiquidityTitle: LocalizedStringKey { "home_ai.subscore.liquidity" }
+        static var subscoreMomentumTitle: LocalizedStringKey { "home_ai.subscore.momentum" }
+
+        static var actionsSectionTitle: LocalizedStringKey { "home_ai.actions.section_title" }
+        static var overviewSectionTitle: LocalizedStringKey { "home_ai.overview.section_title" }
+        static var overviewMarketValue: LocalizedStringKey { "home_ai.overview.market_value" }
+        static var structureSectionTitle: LocalizedStringKey { "home_ai.structure.section_title" }
+        static var tabAllocation: LocalizedStringKey { "home_ai.structure.tab.allocation" }
+        static var tabAttribution: LocalizedStringKey { "home_ai.structure.tab.attribution" }
+        static var tabLiquidity: LocalizedStringKey { "home_ai.structure.tab.liquidity" }
+        static var totalUnrealizedPL: LocalizedStringKey { "home_ai.attribution.total_unrealized_pl" }
+        static var unrealizedPLTitle: LocalizedStringKey { "home_ai.metric.unrealized_pl" }
+        static var topContributors: LocalizedStringKey { "home_ai.attribution.top_contributors" }
+        static var topDetractors: LocalizedStringKey { "home_ai.attribution.top_detractors" }
+        static var viewFullAccount: LocalizedStringKey { "home_ai.structure.view_full_account" }
+        static var metricLeverageTitle: LocalizedStringKey { "home_ai.metric.leverage" }
+
+        static func healthScoreLabel(locale: Locale = .current) -> String {
+            L10n.string("home_ai.health.score_title", locale: locale)
+        }
+
+        static func subscoreDiversification(locale: Locale = .current) -> String {
+            L10n.string("home_ai.subscore.diversification", locale: locale)
+        }
+
+        static func subscoreLiquidity(locale: Locale = .current) -> String {
+            L10n.string("home_ai.subscore.liquidity", locale: locale)
+        }
+
+        static func subscoreMomentum(locale: Locale = .current) -> String {
+            L10n.string("home_ai.subscore.momentum", locale: locale)
+        }
+
+        static func metricWeight(locale: Locale = .current) -> String {
+            L10n.string("home_ai.metric.weight", locale: locale)
+        }
+
+        static func metricUnrealizedPL(locale: Locale = .current) -> String {
+            L10n.string("home_ai.metric.unrealized_pl", locale: locale)
+        }
+
+        static func metricBuyingPower(locale: Locale = .current) -> String {
+            L10n.string("account.buying_power", locale: locale)
+        }
+
+        static func metricLeverage(locale: Locale = .current) -> String {
+            L10n.string("home_ai.metric.leverage", locale: locale)
+        }
+
+        static func metricOpenOrders(locale: Locale = .current) -> String {
+            L10n.string("home_ai.metric.open_orders", locale: locale)
+        }
+
+        static func metricNetEquity(locale: Locale = .current) -> String {
+            L10n.string("home_ai.metric.net_equity", locale: locale)
+        }
+
+        static func badgeOpportunity(locale: Locale = .current) -> String {
+            L10n.string("home_ai.badge.opportunity", locale: locale)
+        }
+
+        static func badgeRisk(locale: Locale = .current) -> String {
+            L10n.string("home_ai.badge.risk", locale: locale)
+        }
+
+        static func badgeRebalance(locale: Locale = .current) -> String {
+            L10n.string("home_ai.badge.rebalance", locale: locale)
+        }
+
+        static func badgeExecution(locale: Locale = .current) -> String {
+            L10n.string("home_ai.badge.execution", locale: locale)
+        }
+
+        static func badgeInsight(locale: Locale = .current) -> String {
+            L10n.string("home_ai.badge.insight", locale: locale)
+        }
+
+        static func ctaAskCopilot(locale: Locale = .current) -> String {
+            L10n.string("home_ai.cta.ask_copilot", locale: locale)
+        }
+
+        static func ctaReviewMargin(locale: Locale = .current) -> String {
+            L10n.string("home_ai.cta.review_margin", locale: locale)
+        }
+
+        static func ctaInspectSymbol(symbol: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.cta.inspect_symbol_format", locale: locale, symbol)
+        }
+
+        static func ctaTrimPosition(symbol: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.cta.trim_position_format", locale: locale, symbol)
+        }
+
+        static func ctaReviewOrders(locale: Locale = .current) -> String {
+            L10n.string("home_ai.cta.review_orders", locale: locale)
+        }
+
+        static func ctaPlanDeployment(locale: Locale = .current) -> String {
+            L10n.string("home_ai.cta.plan_deployment", locale: locale)
+        }
+
+        static func actionEmptyTitle(locale: Locale = .current) -> String {
+            L10n.string("home_ai.action.empty.title", locale: locale)
+        }
+
+        static func actionEmptyDetail(cash: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.action.empty.detail_format", locale: locale, cash)
+        }
+
+        static func actionMarginTitle(locale: Locale = .current) -> String {
+            L10n.string("home_ai.action.margin.title", locale: locale)
+        }
+
+        static func actionMarginDetail(leverage: String, buyingPower: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.action.margin.detail_format", locale: locale, leverage, buyingPower)
+        }
+
+        static func actionConcentrationTitle(symbol: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.action.concentration.title_format", locale: locale, symbol)
+        }
+
+        static func actionConcentrationDetail(symbol: String, weight: String, trimAmount: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.action.concentration.detail_format", locale: locale, symbol, weight, trimAmount)
+        }
+
+        static func actionTakeProfitTitle(symbol: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.action.take_profit.title_format", locale: locale, symbol)
+        }
+
+        static func actionTakeProfitDetail(symbol: String, gainPercent: String, gainAmount: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.action.take_profit.detail_format", locale: locale, symbol, gainPercent, gainAmount)
+        }
+
+        static func actionLossReviewTitle(symbol: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.action.loss_review.title_format", locale: locale, symbol)
+        }
+
+        static func actionLossReviewDetail(symbol: String, lossPercent: String, lossAmount: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.action.loss_review.detail_format", locale: locale, symbol, lossPercent, lossAmount)
+        }
+
+        static func actionOpenOrdersTitle(count: Int, locale: Locale = .current) -> String {
+            L10n.format("home_ai.action.open_orders.title_format", locale: locale, count)
+        }
+
+        static func actionOpenOrdersDetail(count: Int, firstSymbol: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.action.open_orders.detail_format", locale: locale, count, firstSymbol)
+        }
+
+        static func actionCashTitle(locale: Locale = .current) -> String {
+            L10n.string("home_ai.action.cash.title", locale: locale)
+        }
+
+        static func actionCashDetail(cashRatio: String, cashAmount: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.action.cash.detail_format", locale: locale, cashRatio, cashAmount)
+        }
+
+        static func actionBalancedTitle(locale: Locale = .current) -> String {
+            L10n.string("home_ai.action.balanced.title", locale: locale)
+        }
+
+        static func actionBalancedDetail(count: Int, locale: Locale = .current) -> String {
+            L10n.format("home_ai.action.balanced.detail_format", locale: locale, count)
+        }
+
+        static func briefingEmptyHeadline(locale: Locale = .current) -> String {
+            L10n.string("home_ai.briefing.empty_headline", locale: locale)
+        }
+
+        static func briefingEmptySummary(locale: Locale = .current) -> String {
+            L10n.string("home_ai.briefing.empty_summary", locale: locale)
+        }
+
+        static func briefingStrongHeadline(locale: Locale = .current) -> String {
+            L10n.string("home_ai.briefing.strong_headline", locale: locale)
+        }
+
+        static func briefingBalancedHeadline(locale: Locale = .current) -> String {
+            L10n.string("home_ai.briefing.balanced_headline", locale: locale)
+        }
+
+        static func briefingCautionHeadline(locale: Locale = .current) -> String {
+            L10n.string("home_ai.briefing.caution_headline", locale: locale)
+        }
+
+        static func briefingRiskHeadline(locale: Locale = .current) -> String {
+            L10n.string("home_ai.briefing.risk_headline", locale: locale)
+        }
+
+        static func briefingTopHoldingClause(symbol: String, weight: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.briefing.top_holding_format", locale: locale, symbol, weight)
+        }
+
+        static func briefingLeverageClause(leverage: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.briefing.leverage_format", locale: locale, leverage)
+        }
+
+        static func briefingLeaderClause(symbol: String, amount: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.briefing.leader_format", locale: locale, symbol, amount)
+        }
+
+        static func briefingLaggardClause(symbol: String, amount: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.briefing.laggard_format", locale: locale, symbol, amount)
+        }
+
+        static func briefingEquityClause(equity: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.briefing.equity_format", locale: locale, equity)
+        }
+
+        static func tagTopWeight(symbol: String, weight: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.tag.top_weight_format", locale: locale, symbol, weight)
+        }
+
+        static func tagLeverage(leverage: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.tag.leverage_format", locale: locale, leverage)
+        }
+
+        static func tagCash(percent: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.tag.cash_format", locale: locale, percent)
+        }
+
+        static func tagWinRate(percent: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.tag.win_rate_format", locale: locale, percent)
+        }
+
+        static func tagOpenOrders(count: Int, locale: Locale = .current) -> String {
+            L10n.format("home_ai.tag.open_orders_format", locale: locale, count)
+        }
+
+        static func promptChipHealth(locale: Locale = .current) -> String {
+            L10n.string("home_ai.prompt_chip.health", locale: locale)
+        }
+
+        static func promptHealthDiagnosis(locale: Locale = .current) -> String {
+            L10n.string("home_ai.prompt.health", locale: locale)
+        }
+
+        static func promptChipRebalance(symbol: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.prompt_chip.rebalance_format", locale: locale, symbol)
+        }
+
+        static func promptRebalanceSymbol(symbol: String, locale: Locale = .current) -> String {
+            L10n.format("home_ai.prompt.rebalance_format", locale: locale, symbol)
+        }
+
+        static func promptChipMargin(locale: Locale = .current) -> String {
+            L10n.string("home_ai.prompt_chip.margin", locale: locale)
+        }
+
+        static func promptMarginRisk(locale: Locale = .current) -> String {
+            L10n.string("home_ai.prompt.margin", locale: locale)
+        }
+
+        static func promptChipCash(locale: Locale = .current) -> String {
+            L10n.string("home_ai.prompt_chip.cash", locale: locale)
+        }
+
+        static func promptCashPlan(locale: Locale = .current) -> String {
+            L10n.string("home_ai.prompt.cash", locale: locale)
+        }
+
+        static func promptChipAttribution(locale: Locale = .current) -> String {
+            L10n.string("home_ai.prompt_chip.attribution", locale: locale)
+        }
+
+        static func promptAttribution(locale: Locale = .current) -> String {
+            L10n.string("home_ai.prompt.attribution", locale: locale)
+        }
+
+        static func promptChipOrders(locale: Locale = .current) -> String {
+            L10n.string("home_ai.prompt_chip.orders", locale: locale)
+        }
+
+        static func promptOrders(locale: Locale = .current) -> String {
+            L10n.string("home_ai.prompt.orders", locale: locale)
+        }
+
+        static func promptStarterAllocation(locale: Locale = .current) -> String {
+            L10n.string("home_ai.prompt.starter_allocation", locale: locale)
+        }
+
+        static func copilotPositionReply(
+            symbol: String,
+            weight: String,
+            marketValue: String,
+            plAmount: String,
+            plPercent: String,
+            locale: Locale = .current
+        ) -> String {
+            L10n.format("home_ai.copilot.reply.position_format", locale: locale, symbol, weight, marketValue, plAmount, plPercent)
+        }
+
+        static func copilotRebalanceReply(
+            symbol: String,
+            weight: String,
+            divScore: Int,
+            trimAmount: String,
+            locale: Locale = .current
+        ) -> String {
+            L10n.format("home_ai.copilot.reply.rebalance_format", locale: locale, symbol, weight, divScore, trimAmount)
+        }
+
+        static func copilotLiquidityReply(
+            buyingPower: String,
+            cash: String,
+            leverage: String,
+            liquidityScore: Int,
+            locale: Locale = .current
+        ) -> String {
+            L10n.format("home_ai.copilot.reply.liquidity_format", locale: locale, buyingPower, cash, leverage, liquidityScore)
+        }
+
+        static func copilotAttributionReply(
+            totalPL: String,
+            leader: String,
+            laggard: String,
+            locale: Locale = .current
+        ) -> String {
+            L10n.format("home_ai.copilot.reply.attribution_format", locale: locale, totalPL, leader, laggard)
+        }
+
+        static func copilotOrdersReply(
+            openCount: Int,
+            totalRecent: Int,
+            locale: Locale = .current
+        ) -> String {
+            L10n.format("home_ai.copilot.reply.orders_format", locale: locale, openCount, totalRecent)
+        }
+
+        static func copilotHealthReply(
+            score: Int,
+            diversification: Int,
+            liquidity: Int,
+            momentum: Int,
+            locale: Locale = .current
+        ) -> String {
+            L10n.format("home_ai.copilot.reply.health_format", locale: locale, score, diversification, liquidity, momentum)
+        }
+
+        static func copilotOverviewReply(
+            equity: String,
+            score: Int,
+            headline: String,
+            summary: String,
+            locale: Locale = .current
+        ) -> String {
+            L10n.format("home_ai.copilot.reply.overview_format", locale: locale, equity, score, headline, summary)
+        }
+    }
+
     enum PortfolioEmpty {
         static var noHistory: LocalizedStringKey { "portfolio.empty.no_history" }
         static var connectAlpaca: LocalizedStringKey { "portfolio.empty.connect_alpaca" }

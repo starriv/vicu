@@ -26,6 +26,12 @@
 		0A0000000000000000000110 /* Services/Alpaca/AlpacaClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000210 /* Services/Alpaca/AlpacaClient.swift */; };
 		0A0000000000000000000111 /* Services/Credentials/CredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000211 /* Services/Credentials/CredentialStore.swift */; };
 		0A0000000000000000000113 /* Features/Home/HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000213 /* Features/Home/HomeView.swift */; };
+		0A0F90000000000000000101 /* Models/Portfolio/PortfolioIntelligence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F90000000000000000201 /* Models/Portfolio/PortfolioIntelligence.swift */; };
+		0A0F90000000000000000102 /* Services/Intelligence/PortfolioIntelligenceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F90000000000000000202 /* Services/Intelligence/PortfolioIntelligenceService.swift */; };
+		0A0F90000000000000000103 /* Features/Home/HomeOverviewMetricsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F90000000000000000203 /* Features/Home/HomeOverviewMetricsCard.swift */; };
+		0A0F90000000000000000105 /* Features/Home/HomeAllocationCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F90000000000000000205 /* Features/Home/HomeAllocationCard.swift */; };
+		0A0F90000000000000000106 /* Features/Home/HomeAICopilotSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F90000000000000000206 /* Features/Home/HomeAICopilotSheet.swift */; };
+		0C0F90000000000000000101 /* vicuTests/PortfolioIntelligenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0F90000000000000000201 /* PortfolioIntelligenceTests.swift */; };
 		0A0000000000000000000114 /* Features/Markets/MarketsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000214 /* Features/Markets/MarketsView.swift */; };
 		0A0F60000000000000000103 /* Features/Markets/MarketIndexProxyPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F60000000000000000203 /* Features/Markets/MarketIndexProxyPanel.swift */; };
 		0A0000000000000000000115 /* Features/Trade/TradeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000215 /* Features/Trade/TradeView.swift */; };
@@ -238,6 +244,12 @@
 		0A0000000000000000000210 /* Services/Alpaca/AlpacaClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Alpaca/AlpacaClient.swift; sourceTree = "<group>"; };
 		0A0000000000000000000211 /* Services/Credentials/CredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Credentials/CredentialStore.swift; sourceTree = "<group>"; };
 		0A0000000000000000000213 /* Features/Home/HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Home/HomeView.swift; sourceTree = "<group>"; };
+		0A0F90000000000000000201 /* Models/Portfolio/PortfolioIntelligence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/Portfolio/PortfolioIntelligence.swift; sourceTree = "<group>"; };
+		0A0F90000000000000000202 /* Services/Intelligence/PortfolioIntelligenceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Intelligence/PortfolioIntelligenceService.swift; sourceTree = "<group>"; };
+		0A0F90000000000000000203 /* Features/Home/HomeOverviewMetricsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Home/HomeOverviewMetricsCard.swift; sourceTree = "<group>"; };
+		0A0F90000000000000000205 /* Features/Home/HomeAllocationCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Home/HomeAllocationCard.swift; sourceTree = "<group>"; };
+		0A0F90000000000000000206 /* Features/Home/HomeAICopilotSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Home/HomeAICopilotSheet.swift; sourceTree = "<group>"; };
+		0C0F90000000000000000201 /* PortfolioIntelligenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = vicuTests/PortfolioIntelligenceTests.swift; sourceTree = "<group>"; };
 		0A0000000000000000000214 /* Features/Markets/MarketsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Markets/MarketsView.swift; sourceTree = "<group>"; };
 		0A0F60000000000000000203 /* Features/Markets/MarketIndexProxyPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Markets/MarketIndexProxyPanel.swift; sourceTree = "<group>"; };
 		0A0000000000000000000215 /* Features/Trade/TradeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Trade/TradeView.swift; sourceTree = "<group>"; };
@@ -478,6 +490,12 @@
 				0A0F5000000000000001009 /* Services/Alpaca/Models/AlpacaPortfolioModels.swift */,
 				0A0000000000000000000211 /* Services/Credentials/CredentialStore.swift */,
 				0A0000000000000000000213 /* Features/Home/HomeView.swift */,
+				0A0F90000000000000000201 /* Models/Portfolio/PortfolioIntelligence.swift */,
+				0A0F90000000000000000202 /* Services/Intelligence/PortfolioIntelligenceService.swift */,
+				0A0F90000000000000000203 /* Features/Home/HomeOverviewMetricsCard.swift */,
+				0A0F90000000000000000205 /* Features/Home/HomeAllocationCard.swift */,
+				0A0F90000000000000000206 /* Features/Home/HomeAICopilotSheet.swift */,
+				0C0F90000000000000000201 /* PortfolioIntelligenceTests.swift */,
 				0A0000000000000000000260 /* Features/Home/AccountView.swift */,
 				0A0000000000000000000268 /* Features/Home/AccountActivityView.swift */,
 				0A0000000000000000000262 /* Features/Home/HomeAccountPolling.swift */,
@@ -850,6 +868,11 @@
 				0A0F5000000000000000009 /* Services/Alpaca/Models/AlpacaPortfolioModels.swift in Sources */,
 				0A0000000000000000000111 /* Services/Credentials/CredentialStore.swift in Sources */,
 				0A0000000000000000000113 /* Features/Home/HomeView.swift in Sources */,
+				0A0F90000000000000000101 /* Models/Portfolio/PortfolioIntelligence.swift in Sources */,
+				0A0F90000000000000000102 /* Services/Intelligence/PortfolioIntelligenceService.swift in Sources */,
+				0A0F90000000000000000103 /* Features/Home/HomeOverviewMetricsCard.swift in Sources */,
+				0A0F90000000000000000105 /* Features/Home/HomeAllocationCard.swift in Sources */,
+				0A0F90000000000000000106 /* Features/Home/HomeAICopilotSheet.swift in Sources */,
 				0A0000000000000000000160 /* Features/Home/AccountView.swift in Sources */,
 				0A0000000000000000000168 /* Features/Home/AccountActivityView.swift in Sources */,
 				0A0000000000000000000162 /* Features/Home/HomeAccountPolling.swift in Sources */,
@@ -986,6 +1009,7 @@
 				0C0000000000000000000102 /* vicuTests/AssetPositionSharePerformanceTests.swift in Sources */,
 				0C0F60000000000000000103 /* vicuTests/OrderDraftTests.swift in Sources */,
 				0C0F80000000000000000101 /* vicuTests/FinancialChartEngineTests.swift in Sources */,
+				0C0F90000000000000000101 /* vicuTests/PortfolioIntelligenceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

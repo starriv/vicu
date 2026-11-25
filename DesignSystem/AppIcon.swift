@@ -12,6 +12,18 @@ enum AppIcon {
         static let warning = "exclamationmark.triangle.fill"
         static let history = "chart.xyaxis.line"
         static let missingCredentials = "key.slash"
+        static let allocation = "chart.pie.fill"
+        static let leverage = "gauge.with.dots.needle.67percent"
+    }
+
+    enum Intelligence {
+        static let copilot = "sparkles"
+        static let health = "waveform.path.ecg.rectangle"
+        static let rebalance = "scale.3d"
+        static let attribution = "chart.bar.xaxis"
+        static let shield = "shield.lefthalf.filled"
+        static let insight = "lightbulb.max.fill"
+        static let send = "arrow.up.circle.fill"
     }
 
     enum Account {
