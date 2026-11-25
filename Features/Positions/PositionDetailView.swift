@@ -21,11 +21,18 @@ struct PositionDetailView: View {
     }
 
     var body: some View {
-        BasicLayout(L10n.PositionDetail.title, style: .scroll(spacing: 20)) {
+        BasicLayout(L10n.PositionDetail.title, titleDisplayMode: .inline, style: .scroll(spacing: 20)) {
             content
         }
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
+            if isLoading {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+
             if !displaySymbol.isEmpty {
                 if let position {
                     ToolbarItem(placement: .topBarTrailing) {
@@ -50,14 +57,6 @@ struct PositionDetailView: View {
                     }
                     .accessibilityLabel(L10n.PositionDetail.viewAsset)
                 }
-            }
-        }
-        .overlay(alignment: .topTrailing) {
-            if isLoading {
-                ProgressView()
-                    .controlSize(.small)
-                    .padding(.top, 18)
-                    .padding(.trailing, AppTheme.Spacing.pageHorizontal)
             }
         }
         .refreshable {
@@ -244,91 +243,42 @@ private struct PositionCloseConfirmationSheet: View {
     @State private var isSubmitting = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
+        AppActionSheetContainer(
+            title: L10n.PositionDetail.closeSheetTitle(locale: locale),
+            isSubmitting: isSubmitting,
+            minHeight: 400,
+            maxHeight: 680,
+            fallbackHeight: 460
+        ) {
+            VStack(spacing: 0) {
+                PositionCloseHeroHeader(snapshot: snapshot)
+                    .padding(.top, 6)
+                    .padding(.bottom, 22)
 
-            VStack(spacing: 14) {
-                summaryCard
-                warningMessage
-                PositionCloseConfirmButton(
+                AppSheetInfoCard(items: detailItems)
+
+                AppSheetWarningBanner(
+                    message: L10n.PositionDetail.closeSheetMessage(symbol: snapshot.symbol, locale: locale)
+                )
+                .padding(.top, 12)
+
+                AppSheetActionButton(
                     title: L10n.PositionDetail.closeConfirmAction(locale: locale),
                     submittingTitle: L10n.Trade.simpleSubmitting(locale: locale),
+                    tint: AppTheme.ColorToken.negative,
                     isSubmitting: isSubmitting
                 ) {
                     await submit()
                 }
-                .padding(.top, 2)
+                .padding(.top, 22)
+                .padding(.bottom, 12)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 20)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(AppTheme.ColorToken.pageBackground.ignoresSafeArea())
-        .presentationDetents([.height(350)])
-        .presentationDragIndicator(.hidden)
-        .interactiveDismissDisabled(isSubmitting)
-    }
-
-    private var header: some View {
-        VStack(spacing: 10) {
-            Capsule()
-                .fill(.tertiary)
-                .frame(width: 58, height: 5)
-                .padding(.top, 10)
-
-            HStack {
-                Button(L10n.Common.cancelText(locale: locale)) {
-                    dismiss()
-                }
-                .font(AppTypography.control)
-                .foregroundStyle(.secondary)
-                .disabled(isSubmitting)
-
-                Spacer(minLength: 12)
-
-                Text(L10n.PositionDetail.closeSheetTitle(locale: locale))
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-
-                Spacer(minLength: 12)
-
-                Color.clear
-                    .frame(width: 52, height: 1)
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 8)
         }
     }
 
-    private var summaryCard: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(snapshot.symbol)
-                        .font(.title3.weight(.semibold))
-                        .lineLimit(1)
-
-                    Text(PositionDisplay.sideText(snapshot.position.side, locale: locale))
-                        .font(AppTypography.detail.weight(.semibold))
-                        .foregroundStyle(PositionDisplay.sideTint(snapshot.position.side))
-                }
-
-                Spacer(minLength: 12)
-
-                AppPriceText(
-                    snapshot.position.marketValue,
-                    font: .title3.monospacedDigit().weight(.semibold),
-                    minimumScaleFactor: 0.76,
-                    notation: .compact
-                )
-                .foregroundStyle(.primary)
-            }
-            .padding(.vertical, 14)
-
-            Divider()
-
-            PositionCloseSummaryRow(
+    private var detailItems: [AppSheetInfoItem] {
+        var items: [AppSheetInfoItem] = [
+            AppSheetInfoItem(
                 title: L10n.PositionDetail.quantity,
                 value: PositionDisplay.quantityText(
                     snapshot.position.quantity,
@@ -337,18 +287,24 @@ private struct PositionCloseConfirmationSheet: View {
                     locale: locale
                 )
             )
-        }
-        .padding(.horizontal, 18)
-        .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: AppTheme.CornerRadius.groupedSurface, style: .continuous))
-    }
+        ]
 
-    private var warningMessage: some View {
-        Text(L10n.PositionDetail.closeSheetMessage(symbol: snapshot.symbol, locale: locale))
-            .font(AppTypography.detail)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 2)
+        if let currentPrice = NumberParser.decimal(from: snapshot.position.currentPrice) {
+            items.append(AppSheetInfoItem(
+                title: L10n.PositionDetail.currentPrice,
+                value: AppFormatter.money(currentPrice)
+            ))
+        }
+
+        if let unrealizedPL = NumberParser.double(from: snapshot.position.unrealizedPL) {
+            items.append(AppSheetInfoItem(
+                title: L10n.PositionDetail.unrealizedPL,
+                value: AppFormatter.signedMoney(unrealizedPL),
+                tint: PositionDisplay.tint(for: unrealizedPL)
+            ))
+        }
+
+        return items
     }
 
     private func submit() async {
@@ -377,65 +333,51 @@ private struct PositionCloseConfirmationSheet: View {
     }
 }
 
-private struct PositionCloseSummaryRow: View {
-    let title: LocalizedStringKey
-    let value: String
+private struct PositionCloseHeroHeader: View {
+    @Environment(\.locale) private var locale
+
+    let snapshot: PositionCloseConfirmationSnapshot
 
     var body: some View {
-        HStack(spacing: 12) {
-            Text(title)
-                .font(.body)
-                .foregroundStyle(.secondary)
+        VStack(alignment: .center, spacing: 0) {
+            AppSheetBadgePill(
+                title: PositionDisplay.sideText(snapshot.position.side, locale: locale),
+                tint: PositionDisplay.sideTint(snapshot.position.side)
+            )
 
-            Spacer(minLength: 12)
-
-            Text(value)
-                .font(.body.monospacedDigit().weight(.semibold))
+            Text(heroPrimaryText)
+                .font(.system(size: 40, weight: .bold, design: .rounded).monospacedDigit())
                 .foregroundStyle(.primary)
                 .lineLimit(1)
-                .minimumScaleFactor(0.78)
-        }
-        .padding(.vertical, 13)
-    }
-}
+                .minimumScaleFactor(0.58)
+                .padding(.top, 14)
 
-private struct PositionCloseConfirmButton: View {
-    let title: String
-    let submittingTitle: String
-    let isSubmitting: Bool
-    let action: () async -> Void
-
-    var body: some View {
-        Button {
-            Task { await action() }
-        } label: {
-            ZStack {
-                Text(title)
-                    .font(.headline.weight(.bold))
+            if let heroSubtitleText {
+                Text(heroSubtitleText)
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.primary.opacity(0.78))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-                    .opacity(isSubmitting ? 0 : 1)
-
-                if isSubmitting {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                            .tint(.white)
-
-                        Text(submittingTitle)
-                            .font(.headline.weight(.bold))
-                    }
-                }
+                    .minimumScaleFactor(0.78)
+                    .padding(.top, 6)
             }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 52)
-            .contentShape(Capsule())
         }
-        .buttonStyle(.plain)
-        .background(AppTheme.ColorToken.negative, in: Capsule())
-        .disabled(isSubmitting)
-        .accessibilityLabel(isSubmitting ? submittingTitle : title)
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var hasMarketValue: Bool {
+        NumberParser.decimal(from: snapshot.position.marketValue) != nil
+    }
+
+    private var heroPrimaryText: String {
+        if hasMarketValue {
+            return AppFormatter.money(snapshot.position.marketValue)
+        }
+        return snapshot.symbol
+    }
+
+    private var heroSubtitleText: String? {
+        hasMarketValue ? snapshot.symbol : nil
     }
 }
 

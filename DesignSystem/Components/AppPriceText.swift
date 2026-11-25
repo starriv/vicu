@@ -13,6 +13,7 @@ struct AppPriceText: View {
     let font: Font
     let minimumScaleFactor: CGFloat
     let isAnimated: Bool
+    let animationDuration: Double
     let isSigned: Bool
     let notation: AppPriceTextNotation
     let usesCompactFormatting: Bool
@@ -25,6 +26,7 @@ struct AppPriceText: View {
         font: Font,
         minimumScaleFactor: CGFloat = 0.8,
         isAnimated: Bool = false,
+        animationDuration: Double = 0.18,
         isSigned: Bool = false,
         notation: AppPriceTextNotation = .standard,
         usesCompactFormatting: Bool = true
@@ -36,6 +38,7 @@ struct AppPriceText: View {
         self.font = font
         self.minimumScaleFactor = minimumScaleFactor
         self.isAnimated = isAnimated
+        self.animationDuration = animationDuration
         self.isSigned = isSigned
         self.notation = notation
         self.usesCompactFormatting = usesCompactFormatting
@@ -49,6 +52,7 @@ struct AppPriceText: View {
         font: Font,
         minimumScaleFactor: CGFloat = 0.8,
         isAnimated: Bool = false,
+        animationDuration: Double = 0.18,
         isSigned: Bool = false,
         notation: AppPriceTextNotation = .standard,
         usesCompactFormatting: Bool = true
@@ -61,6 +65,7 @@ struct AppPriceText: View {
             font: font,
             minimumScaleFactor: minimumScaleFactor,
             isAnimated: isAnimated,
+            animationDuration: animationDuration,
             isSigned: isSigned,
             notation: notation,
             usesCompactFormatting: usesCompactFormatting
@@ -74,7 +79,7 @@ struct AppPriceText: View {
             .lineLimit(1)
             .minimumScaleFactor(minimumScaleFactor)
             .contentTransition(isAnimated ? .numericText(value: value ?? 0) : .identity)
-            .animation(isAnimated ? .snappy(duration: 0.18) : nil, value: value)
+            .animation(isAnimated ? .snappy(duration: animationDuration) : nil, value: value)
             .accessibilityLabel(accessibilityText)
     }
 

@@ -19,7 +19,7 @@ struct OrderDetailView: View {
     }
 
     var body: some View {
-        BasicLayout(L10n.Orders.Detail.navigationTitle, style: .scroll(spacing: 26)) {
+        BasicLayout(L10n.Orders.Detail.navigationTitle, titleDisplayMode: .inline, style: .scroll(spacing: 26)) {
             VStack(alignment: .leading, spacing: 26) {
                 OrderDetailSection(title: L10n.Orders.Detail.title) {
                     OrderDetailRows(fields: primaryFields)
@@ -34,12 +34,12 @@ struct OrderDetailView: View {
             }
         }
         .toolbar(.hidden, for: .tabBar)
-        .overlay(alignment: .topTrailing) {
+        .toolbar {
             if isLoading {
-                ProgressView()
-                    .controlSize(.small)
-                    .padding(.top, 18)
-                    .padding(.trailing, AppTheme.Spacing.pageHorizontal)
+                ToolbarItem(placement: .topBarTrailing) {
+                    ProgressView()
+                        .controlSize(.small)
+                }
             }
         }
         .refreshable {

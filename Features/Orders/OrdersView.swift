@@ -37,11 +37,14 @@ struct OrdersView: View {
 
     var body: some View {
         BasicLayout(L10n.Orders.title, style: layoutStyle) {
-            OrdersFilterButton(criteria: filterState) {
-                presentedSheet = .filters
-            }
-        } content: {
             content
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                OrdersFilterButton(criteria: filterState) {
+                    presentedSheet = .filters
+                }
+            }
         }
         .refreshable {
             await app.refresh()
@@ -264,141 +267,84 @@ private struct OrderCancellationConfirmationSheet: View {
 
     let draft: OrderCancellationDraft
     let onConfirm: () async -> Bool
+
     @State private var isSubmitting = false
 
     private var order: AlpacaOrder { draft.order }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    orderSnapshot
-                    details
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 18)
-            }
-            .scrollContentBackground(.hidden)
-        }
-        .background(AppTheme.ColorToken.pageBackground.ignoresSafeArea())
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            footer
-        }
-        .presentationDetents([.height(520), .large])
-        .presentationDragIndicator(.hidden)
-        .interactiveDismissDisabled(isSubmitting)
-    }
-
-    private var header: some View {
-        VStack(spacing: 10) {
-            Capsule()
-                .fill(.tertiary)
-                .frame(width: 58, height: 5)
-                .padding(.top, 10)
-
-            HStack {
-                Button(L10n.Common.cancelText(locale: locale)) {
-                    dismiss()
-                }
-                .font(AppTypography.control)
-                .foregroundStyle(.secondary)
-                .disabled(isSubmitting)
-
-                Spacer(minLength: 12)
-
-                Text(L10n.Orders.cancelSheetTitle(locale: locale))
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-
-                Spacer(minLength: 12)
-
-                Color.clear
-                    .frame(width: 52, height: 1)
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 8)
-        }
-    }
-
-    private var orderSnapshot: some View {
-        OrderCancellationIdentityCard(order: order)
-        .padding(.horizontal, 16)
-        .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: AppTheme.CornerRadius.groupedSurface, style: .continuous))
-    }
-
-    private var details: some View {
-        VStack(spacing: 0) {
-            if let limitPrice = OrderDisplay.moneyIfPresent(order.limitPrice) {
-                OrderCancellationInfoRow(title: L10n.Orders.Detail.limitPrice, value: limitPrice)
-                divider
-            }
-
-            if let stopPrice = OrderDisplay.moneyIfPresent(order.stopPrice) {
-                OrderCancellationInfoRow(title: L10n.Orders.Detail.stopPrice, value: stopPrice)
-                divider
-            }
-
-            OrderCancellationInfoRow(
-                title: L10n.Orders.Detail.side,
-                value: OrderDisplay.sideText(order.side, locale: locale),
-                tint: OrderDisplay.sideTint(order.side)
-            )
-            divider
-
-            OrderCancellationInfoRow(
-                title: L10n.Orders.Detail.quantity,
-                value: quantityText
-            )
-            divider
-
-            OrderCancellationInfoRow(
-                title: L10n.Orders.Detail.orderType,
-                value: OrderDisplay.orderTypeText(order.type ?? order.orderType, locale: locale)
-            )
-            divider
-
-            OrderCancellationInfoRow(
-                title: L10n.Orders.Detail.createdAt,
-                value: OrderDisplay.dateTime(order.createdAt, locale: locale)
-            )
-        }
-        .padding(.horizontal, 16)
-        .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: AppTheme.CornerRadius.groupedSurface, style: .continuous))
-    }
-
-    private var footer: some View {
-        HoldToConfirmButton(
-            title: L10n.Orders.cancelHoldAction(locale: locale),
-            progressTitle: L10n.Orders.cancelHoldProgress(locale: locale),
-            submittingTitle: L10n.Orders.cancelHoldSubmitting(locale: locale),
-            tint: AppTheme.ColorToken.negative,
-            isSubmitting: isSubmitting
+        AppActionSheetContainer(
+            title: L10n.Orders.cancelSheetTitle(locale: locale),
+            isSubmitting: isSubmitting,
+            minHeight: 380,
+            maxHeight: 660,
+            fallbackHeight: 290 + CGFloat(detailItems.count) * 46
         ) {
-            await submit()
+            VStack(spacing: 0) {
+                OrderCancellationHeroHeader(order: order)
+                    .padding(.top, 6)
+                    .padding(.bottom, 22)
+
+                AppSheetInfoCard(items: detailItems)
+
+                AppSheetActionButton(
+                    title: L10n.Orders.cancelOrder(locale: locale),
+                    submittingTitle: L10n.Orders.cancelHoldSubmitting(locale: locale),
+                    tint: AppTheme.ColorToken.negative,
+                    isSubmitting: isSubmitting
+                ) {
+                    await submit()
+                }
+                .padding(.top, 22)
+                .padding(.bottom, 12)
+            }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 10)
-        .padding(.bottom, 16)
     }
 
-    private var divider: some View {
-        Divider()
-            .padding(.leading, 122)
-    }
+    private var detailItems: [AppSheetInfoItem] {
+        var items: [AppSheetInfoItem] = []
 
-    private var quantityText: String {
-        if let quantity = order.quantity {
-            return AppFormatter.numberText(quantity)
+        if let limitPrice = OrderDisplay.moneyIfPresent(order.limitPrice) {
+            items.append(AppSheetInfoItem(
+                title: L10n.Orders.Detail.limitPrice,
+                value: limitPrice
+            ))
         }
 
-        if let notional = order.notional {
-            return AppFormatter.money(notional)
+        if let stopPrice = OrderDisplay.moneyIfPresent(order.stopPrice) {
+            items.append(AppSheetInfoItem(
+                title: L10n.Orders.Detail.stopPrice,
+                value: stopPrice
+            ))
         }
 
-        return AppFormatter.placeholder
+        if let filled = NumberParser.decimal(from: order.filledQuantity), filled > 0 {
+            items.append(AppSheetInfoItem(
+                title: L10n.Orders.Detail.filledQuantity,
+                value: AppFormatter.numberText(order.filledQuantity)
+            ))
+        }
+
+        if OrderDisplay.clean(order.timeInForce) != nil {
+            items.append(AppSheetInfoItem(
+                title: L10n.Orders.Detail.timeInForce,
+                value: OrderDisplay.timeInForceText(order.timeInForce, locale: locale)
+            ))
+        }
+
+        if order.extendedHours == true {
+            items.append(AppSheetInfoItem(
+                title: L10n.Orders.Detail.extendedHours,
+                value: OrderDisplay.sessionText(extendedHours: true, locale: locale)
+            ))
+        }
+
+        items.append(AppSheetInfoItem(
+            title: L10n.Orders.Detail.createdAt,
+            value: OrderDisplay.dateTime(order.createdAt, locale: locale)
+        ))
+
+        return items
     }
 
     private func submit() async {
@@ -416,63 +362,79 @@ private struct OrderCancellationConfirmationSheet: View {
     }
 }
 
-private struct OrderCancellationIdentityCard: View {
+private struct OrderCancellationHeroHeader: View {
     @Environment(\.locale) private var locale
 
     let order: AlpacaOrder
 
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(order.symbol)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
+        VStack(alignment: .center, spacing: 0) {
+            HStack(spacing: 6) {
+                AppSheetBadgePill(
+                    title: sideOrderBadgeText,
+                    tint: OrderDisplay.sideTint(order.side)
+                )
 
-                Text(assetClassText)
-                    .font(AppTypography.rowMeta)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                AppSheetBadgePill(
+                    title: OrderDisplay.statusText(order.status, locale: locale),
+                    tint: OrderDisplay.statusTint(order.status),
+                    horizontalPadding: 10,
+                    backgroundOpacity: 0.14
+                )
             }
 
-            Spacer(minLength: 12)
+            Text(heroPrimaryText)
+                .font(.system(size: 40, weight: .bold, design: .rounded).monospacedDigit())
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.58)
+                .padding(.top, 14)
 
-            VStack(alignment: .trailing, spacing: 6) {
-                Text(OrderDisplay.statusText(order.status, locale: locale))
-                    .font(AppTypography.badge)
-                    .foregroundStyle(OrderDisplay.statusTint(order.status))
+            if let heroSubtitleText {
+                Text(heroSubtitleText)
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.primary.opacity(0.78))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                    .padding(.top, 6)
             }
         }
-        .padding(.vertical, AppTheme.Spacing.rowVertical)
+        .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
     }
 
-    private var assetClassText: String {
-        OrderDisplay.apiValueIfPresent(order.assetClass) ?? AppFormatter.placeholder
+    private var sideOrderBadgeText: String {
+        let side = OrderDisplay.sideText(order.side, locale: locale)
+        let type = OrderDisplay.orderTypeText(order.type ?? order.orderType, locale: locale)
+        return "\(side) · \(type)"
     }
-}
 
-private struct OrderCancellationInfoRow: View {
-    let title: LocalizedStringKey
-    let value: String
-    var tint: Color = .primary
+    private var hasNotional: Bool {
+        NumberParser.decimal(from: order.notional) != nil
+    }
 
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(title)
-                .font(.body)
-                .foregroundStyle(.secondary)
+    private var hasQuantity: Bool {
+        NumberParser.decimal(from: order.quantity) != nil
+    }
 
-            Spacer(minLength: 12)
-
-            Text(value)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(tint)
-                .multilineTextAlignment(.trailing)
-                .lineLimit(2)
+    private var heroPrimaryText: String {
+        if hasNotional {
+            return AppFormatter.money(order.notional)
         }
-        .padding(.vertical, 14)
+        if hasQuantity, order.symbol.count <= 10 {
+            return "\(AppFormatter.numberText(order.quantity)) \(order.symbol)"
+        }
+        return order.symbol
+    }
+
+    private var heroSubtitleText: String? {
+        if hasNotional {
+            return order.symbol
+        }
+        if hasQuantity, order.symbol.count > 10 {
+            return "\(L10n.Orders.quantityPrefix(locale: locale)) \(AppFormatter.numberText(order.quantity))"
+        }
+        return nil
     }
 }
 
@@ -503,77 +465,118 @@ private struct OrderPriceReplacementSheet: View {
         _priceText = State(initialValue: draft.initialPriceText)
     }
 
+    private var order: AlpacaOrder { draft.order }
+
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    HStack {
-                        Text(L10n.Orders.priceSymbol)
-                        Spacer()
-                        Text(draft.order.symbol)
-                            .fontWeight(.semibold)
-                    }
+        AppActionSheetContainer(
+            title: L10n.Orders.replacePriceTitle,
+            isSubmitting: isSubmitting,
+            minHeight: 380,
+            maxHeight: 560,
+            fallbackHeight: 410
+        ) {
+            VStack(spacing: 0) {
+                heroHeader
+                    .padding(.top, 6)
+                    .padding(.bottom, 22)
 
-                    HStack {
-                        Text(L10n.Orders.currentPrice)
-                        Spacer()
-                        Text(AppFormatter.money(draft.field.currentValue(in: draft.order)))
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.secondary)
-                    }
+                priceInputCard
 
-                    HStack(spacing: 12) {
-                        Text(draft.field.title(locale: locale))
-
-                        TextField(
-                            "$0.00",
-                            text: $priceText
-                        )
-                        .font(.title3.weight(.semibold).monospacedDigit())
-                        .multilineTextAlignment(.trailing)
-                        .keyboardType(.decimalPad)
-                        .focused($isFocused)
-                        .onChange(of: priceText) { _, value in
-                            let normalized = Self.normalizedDecimalInput(value)
-                            if normalized != value {
-                                priceText = normalized
-                            }
-                        }
-                    }
+                AppSheetActionButton(
+                    title: L10n.Orders.savePrice(locale: locale),
+                    submittingTitle: L10n.Trade.simpleSubmitting(locale: locale),
+                    tint: AppTheme.ColorToken.brand,
+                    isEnabled: canSubmit,
+                    isSubmitting: isSubmitting
+                ) {
+                    await submit()
                 }
-            }
-            .navigationTitle(L10n.Orders.replacePriceTitle)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(L10n.Common.cancelText(locale: locale)) {
-                        dismiss()
-                    }
-                    .disabled(isSubmitting)
-                }
-
-                ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        Task {
-                            await submit()
-                        }
-                    } label: {
-                        if isSubmitting {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Text(L10n.Orders.savePrice(locale: locale))
-                        }
-                    }
-                    .disabled(!canSubmit || isSubmitting)
-                }
+                .padding(.top, 22)
+                .padding(.bottom, 12)
             }
         }
-        .presentationDetents([.medium])
-        .interactiveDismissDisabled(isSubmitting)
         .task {
             isFocused = true
         }
+    }
+
+    private var heroHeader: some View {
+        VStack(alignment: .center, spacing: 0) {
+            AppSheetBadgePill(
+                title: sideOrderBadgeText,
+                tint: OrderDisplay.sideTint(order.side)
+            )
+
+            Text(order.symbol)
+                .font(.system(size: 36, weight: .bold, design: .rounded))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.58)
+                .padding(.top, 12)
+
+            HStack(spacing: 6) {
+                Text(L10n.Orders.currentPrice)
+                    .foregroundStyle(.secondary)
+
+                Text(AppFormatter.money(draft.field.currentValue(in: order)))
+                    .foregroundStyle(.primary.opacity(0.82))
+            }
+            .font(.subheadline.weight(.semibold).monospacedDigit())
+            .lineLimit(1)
+            .padding(.top, 6)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var priceInputCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(draft.field.title(locale: locale))
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                if !priceText.isEmpty {
+                    Button {
+                        priceText = ""
+                        isFocused = true
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(L10n.Common.clear)
+                }
+            }
+
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text("$")
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .foregroundStyle(.secondary)
+
+                TextField("0.00", text: $priceText)
+                    .font(.system(size: 34, weight: .bold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(.primary)
+                    .keyboardType(.decimalPad)
+                    .focused($isFocused)
+                    .onChange(of: priceText) { _, value in
+                        let normalized = Self.normalizedDecimalInput(value)
+                        if normalized != value {
+                            priceText = normalized
+                        }
+                    }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .appSheetCard(horizontalPadding: 18, verticalPadding: 16)
+    }
+
+    private var sideOrderBadgeText: String {
+        let side = OrderDisplay.sideText(order.side, locale: locale)
+        let type = OrderDisplay.orderTypeText(order.type ?? order.orderType, locale: locale)
+        return "\(side) · \(type)"
     }
 
     private var canSubmit: Bool {
@@ -602,15 +605,10 @@ private struct OrderPriceReplacementSheet: View {
     }
 
     private static func normalizedDecimalInput(_ value: String) -> String {
-        let digitText = value.replacingOccurrences(
-            of: #"[^0-9.]"#,
-            with: "",
-            options: .regularExpression
-        )
         var result = ""
         var hasDecimalSeparator = false
 
-        for character in digitText {
+        for character in value {
             if let scalar = character.unicodeScalars.first, scalar.value >= 48, scalar.value <= 57 {
                 result.append(character)
             } else if character == ".", !hasDecimalSeparator {
@@ -634,10 +632,7 @@ private struct OrderPriceReplacementSheet: View {
 
     private static func normalizedInteger(_ value: String) -> String {
         let trimmed = value.drop { $0 == "0" }
-        if trimmed.isEmpty {
-            return value.isEmpty ? "0" : "0"
-        }
-        return String(trimmed)
+        return trimmed.isEmpty ? "0" : String(trimmed)
     }
 }
 
@@ -781,60 +776,19 @@ private struct OrdersFilterButton: View {
 
     var body: some View {
         Button(action: action) {
-            label
+            HStack(spacing: 4) {
+                Image(systemName: criteria.activeFilterCount > 0
+                    ? "line.3.horizontal.decrease.circle.fill"
+                    : "line.3.horizontal.decrease.circle")
+
+                if criteria.activeFilterCount > 0 {
+                    Text("\(criteria.activeFilterCount)")
+                        .font(.footnote.weight(.semibold).monospacedDigit())
+                }
+            }
         }
-        .buttonStyle(.plain)
         .accessibilityLabel(L10n.Orders.filterTitle(locale: locale))
         .accessibilityValue(L10n.Orders.filterActiveCount(criteria.activeFilterCount, locale: locale))
-    }
-
-    @ViewBuilder
-    private var label: some View {
-        if #available(iOS 26.0, *) {
-            content
-                .glassEffect(
-                    .regular.tint(Color.white.opacity(0.10)).interactive(),
-                    in: .capsule
-                )
-        } else {
-            content
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay {
-                    Capsule()
-                        .strokeBorder(Color(.separator).opacity(0.16))
-                }
-        }
-    }
-
-    private var content: some View {
-        HStack(spacing: 0) {
-            filterIcon
-                .frame(width: 44, height: 44)
-                .overlay(alignment: .topTrailing) {
-                    if criteria.activeFilterCount > 0 {
-                        filterBadge
-                            .offset(x: 3, y: 4)
-                    }
-                }
-
-            Spacer(minLength: 0)
-        }
-        .frame(width: criteria.activeFilterCount > 0 ? 60 : 44, height: 44)
-        .contentShape(Capsule())
-    }
-
-    private var filterIcon: some View {
-        Image(systemName: "line.3.horizontal.decrease.circle")
-            .font(.system(size: 16, weight: .semibold))
-            .foregroundStyle(.secondary)
-    }
-
-    private var filterBadge: some View {
-        Text("\(criteria.activeFilterCount)")
-            .font(.system(size: 10, weight: .bold).monospacedDigit())
-            .foregroundStyle(AppTheme.ColorToken.brandForeground)
-            .frame(minWidth: 16, minHeight: 16)
-            .background(AppTheme.ColorToken.brand, in: Circle())
     }
 }
 

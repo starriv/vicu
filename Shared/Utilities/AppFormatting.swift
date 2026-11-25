@@ -276,22 +276,28 @@ enum NumberParser {
 enum NumberText {
     static func trimTrailingZeros(_ text: String) -> String {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.contains(".") else {
-            return trimmed
+        guard let dotIndex = trimmed.firstIndex(of: ".") else {
+            return trimmed == "-0" ? "0" : trimmed
         }
 
-        let withoutZeros = trimmed.replacingOccurrences(
-            of: #"0+$"#,
-            with: "",
-            options: .regularExpression
-        )
+        var endIndex = trimmed.endIndex
+        while endIndex > dotIndex {
+            let prev = trimmed.index(before: endIndex)
+            if trimmed[prev] == "0" {
+                endIndex = prev
+            } else {
+                break
+            }
+        }
 
-        let normalized = withoutZeros.replacingOccurrences(
-            of: #"\.$"#,
-            with: "",
-            options: .regularExpression
-        )
+        if endIndex > dotIndex {
+            let prev = trimmed.index(before: endIndex)
+            if prev == dotIndex {
+                endIndex = dotIndex
+            }
+        }
 
+        let normalized = String(trimmed[..<endIndex])
         return normalized == "-0" ? "0" : normalized
     }
 

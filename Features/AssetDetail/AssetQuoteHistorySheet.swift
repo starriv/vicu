@@ -1,4 +1,3 @@
-import Charts
 import SwiftUI
 
 struct AssetQuoteHistorySheet: View {
@@ -45,17 +44,12 @@ struct AssetQuoteHistorySheet: View {
                 .padding(.top, 10)
                 .padding(.bottom, 28)
             }
-            .background(Color(.systemBackground))
+            .background(AppTheme.ColorToken.pageBackground.ignoresSafeArea())
             .navigationTitle("Quote history")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(L10n.Common.close)
+                    AppSheetCloseButton()
                 }
             }
         }
@@ -328,16 +322,33 @@ private struct QuoteHistorySpreadCard: View {
             }
 
             if points.count >= 2 {
-                Chart(points) { point in
-                    LineMark(
-                        x: .value("Time", point.date),
-                        y: .value("Spread", point.spread)
-                    )
-                    .interpolationMethod(.catmullRom)
-                    .foregroundStyle(AppTheme.ColorToken.brand)
-                }
-                .chartXAxis(.hidden)
-                .chartYAxis(.hidden)
+                let series = FinancialChartSeries(
+                    kind: .line,
+                    points: points.map { point in
+                        FinancialChartPoint(
+                            date: point.date,
+                            x: point.date.timeIntervalSince1970,
+                            value: point.spread
+                        )
+                    },
+                    baselinePolicy: .none,
+                    yScaleConfig: .nonNegativeMetric,
+                    allowsZoomAndPan: false
+                )
+
+                StaticSparklineChartView(
+                    series: series,
+                    style: FinancialChartStyle(
+                        lineColor: AppTheme.ColorToken.brand,
+                        lineWidth: 2.2,
+                        showsGrid: false,
+                        showsVolume: false,
+                        showsEndpointPulse: false,
+                        interpolation: .linear
+                    ),
+                    insets: .minimal,
+                    showsEndpointDot: false
+                )
                 .frame(height: 84)
             } else {
                 Text("No data")

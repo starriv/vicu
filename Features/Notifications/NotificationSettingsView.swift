@@ -6,7 +6,7 @@ struct NotificationSettingsView: View {
     var body: some View {
         @Bindable var app = app
 
-        BasicLayout(L10n.NotificationSettings.title, style: .form) {
+        BasicLayout(L10n.NotificationSettings.title, titleDisplayMode: .inline, style: .form) {
             Section {
                 Toggle(isOn: $app.notificationPreferences.isEnabled) {
                     NotificationSettingsLabel(

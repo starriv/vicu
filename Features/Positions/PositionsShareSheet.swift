@@ -203,15 +203,16 @@ struct PositionsShareSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
+            ScrollView(showsIndicators: false) {
                 VStack(spacing: 22) {
                     preview
                     shareActions
                 }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, AppTheme.Spacing.pageHorizontal)
                 .padding(.top, 12)
                 .padding(.bottom, 26)
             }
+            .scrollBounceBehavior(.basedOnSize)
             .background(Color.clear)
             .scrollContentBackground(.hidden)
             .task(id: "\(payload.id)-\(locale.identifier)-\(colorScheme)") {
@@ -244,11 +245,7 @@ struct PositionsShareSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Text(L10n.AssetPositionShare.done)
-                    }
+                    AppSheetCloseButton()
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)

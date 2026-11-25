@@ -118,6 +118,7 @@
 		0A00000000000000000001D0 /* Features/Trade/TradeOrderConfirmationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002D0 /* Features/Trade/TradeOrderConfirmationSheet.swift */; };
 		0A00000000000000000001D1 /* Features/Trade/Skeletons/TradeSkeletons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002D1 /* Features/Trade/Skeletons/TradeSkeletons.swift */; };
 		0A00000000000000000001D2 /* DesignSystem/Components/HoldToConfirmButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002D2 /* DesignSystem/Components/HoldToConfirmButton.swift */; };
+		0A0F8000000000000000010F /* DesignSystem/Components/AppConfirmationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F8000000000000000020F /* DesignSystem/Components/AppConfirmationSheet.swift */; };
 		0C0000000000000000000101 /* PageCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0000000000000000000201 /* PageCacheTests.swift */; };
 		0C0000000000000000000102 /* AssetPositionSharePerformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0000000000000000000202 /* AssetPositionSharePerformanceTests.swift */; };
 		0C0F60000000000000000103 /* OrderDraftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0F60000000000000000203 /* OrderDraftTests.swift */; };
@@ -312,6 +313,7 @@
 		0A00000000000000000002D0 /* Features/Trade/TradeOrderConfirmationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Trade/TradeOrderConfirmationSheet.swift; sourceTree = "<group>"; };
 		0A00000000000000000002D1 /* Features/Trade/Skeletons/TradeSkeletons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Trade/Skeletons/TradeSkeletons.swift; sourceTree = "<group>"; };
 		0A00000000000000000002D2 /* DesignSystem/Components/HoldToConfirmButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/HoldToConfirmButton.swift; sourceTree = "<group>"; };
+		0A0F8000000000000000020F /* DesignSystem/Components/AppConfirmationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppConfirmationSheet.swift; sourceTree = "<group>"; };
 		0C0000000000000000000201 /* PageCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = vicuTests/PageCacheTests.swift; sourceTree = "<group>"; };
 		0C0000000000000000000202 /* AssetPositionSharePerformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = vicuTests/AssetPositionSharePerformanceTests.swift; sourceTree = "<group>"; };
 		0C0F60000000000000000203 /* OrderDraftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = vicuTests/OrderDraftTests.swift; sourceTree = "<group>"; };
@@ -523,6 +525,7 @@
 				0A0000000000000000000295 /* DesignSystem/Components/AppRangePicker.swift */,
 				0A0000000000000000000297 /* DesignSystem/Components/AppEmptyStateView.swift */,
 				0A00000000000000000002D2 /* DesignSystem/Components/HoldToConfirmButton.swift */,
+				0A0F8000000000000000020F /* DesignSystem/Components/AppConfirmationSheet.swift */,
 				0C0000000000000000000201 /* PageCacheTests.swift */,
 				0C0000000000000000000202 /* AssetPositionSharePerformanceTests.swift */,
 				0C0F60000000000000000203 /* OrderDraftTests.swift */,
@@ -874,6 +877,7 @@
 				0A0000000000000000000195 /* DesignSystem/Components/AppRangePicker.swift in Sources */,
 				0A0000000000000000000197 /* DesignSystem/Components/AppEmptyStateView.swift in Sources */,
 				0A00000000000000000001D2 /* DesignSystem/Components/HoldToConfirmButton.swift in Sources */,
+				0A0F8000000000000000010F /* DesignSystem/Components/AppConfirmationSheet.swift in Sources */,
 				0A92A92A92A92A92A92A9201 /* DesignSystem/Components/AppScreenHeader.swift in Sources */,
 				0A90A90A90A90A90A90A9001 /* DesignSystem/Components/QuoteSizeRatioBar.swift in Sources */,
 				0A91A91A91A91A91A91A9101 /* DesignSystem/Components/AppMarqueeText.swift in Sources */,

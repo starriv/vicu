@@ -13,25 +13,30 @@ struct PositionsView: View {
             selectedCategory: selectedCategory
         )
 
-        BasicLayout(L10n.Positions.title, style: .scroll(spacing: 18)) {
-            if !app.portfolio.positions.isEmpty {
-                PositionsShareHeaderButton {
-                    positionsSharePayload = PositionsSharePayload(
-                        positions: app.portfolio.positions,
-                        account: app.portfolio.account
-                    )
-                }
-            }
-        } content: {
+        BasicLayout(L10n.Positions.title, titleDisplayMode: .inline, style: .scroll(spacing: 18)) {
             content(snapshot: snapshot)
         }
         .toolbar(.hidden, for: .tabBar)
-        .overlay(alignment: .topTrailing) {
+        .toolbar {
             if app.portfolio.isRefreshing && hasLoaded {
-                ProgressView()
-                    .controlSize(.small)
-                    .padding(.top, 18)
-                    .padding(.trailing, AppTheme.Spacing.pageHorizontal)
+                ToolbarItem(placement: .topBarTrailing) {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+
+            if !app.portfolio.positions.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        positionsSharePayload = PositionsSharePayload(
+                            positions: app.portfolio.positions,
+                            account: app.portfolio.account
+                        )
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .accessibilityLabel(L10n.Common.share)
+                }
             }
         }
         .refreshable {

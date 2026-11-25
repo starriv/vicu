@@ -32,12 +32,7 @@ struct AssetNewsSheet: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button(action: { dismiss() }) {
-                            Image(systemName: "xmark")
-                                .font(.subheadline.weight(.semibold))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(L10n.Common.close)
+                        AppSheetCloseButton()
                     }
                 }
         }

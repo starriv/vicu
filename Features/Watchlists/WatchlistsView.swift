@@ -79,20 +79,10 @@ struct WatchlistsView: View {
                 WatchlistSymbolSheet(store: store, watchlist: watchlist)
             }
         }
-        .confirmationDialog(
-            L10n.Watchlists.deleteConfirmTitle,
-            isPresented: isDeleteConfirmationPresented,
-            titleVisibility: .visible,
-            presenting: pendingDelete
-        ) { watchlist in
-            Button(role: .destructive) {
-                pendingDelete = nil
-                Task { await delete(watchlist) }
-            } label: {
-                Text(L10n.Watchlists.deleteAction)
+        .sheet(item: $pendingDelete) { watchlist in
+            WatchlistDeleteConfirmationSheet(watchlist: watchlist) {
+                await delete(watchlist)
             }
-        } message: { watchlist in
-            Text(L10n.Watchlists.deleteConfirmMessage(name: watchlist.name, locale: locale))
         }
     }
 
@@ -188,17 +178,6 @@ struct WatchlistsView: View {
         }
     }
 
-    private var isDeleteConfirmationPresented: Binding<Bool> {
-        Binding(
-            get: { pendingDelete != nil },
-            set: { isPresented in
-                if !isPresented {
-                    pendingDelete = nil
-                }
-            }
-        )
-    }
-
     private func presentPrimaryAdd() {
         if let selectedWatchlist {
             presentedSheet = .addSymbol(selectedWatchlist)
@@ -233,7 +212,7 @@ struct WatchlistsView: View {
         }
     }
 
-    private func delete(_ watchlist: AlpacaWatchlist) async {
+    private func delete(_ watchlist: AlpacaWatchlist) async -> Bool {
         do {
             try await store.delete(watchlist, app: app)
             editMode = .inactive
@@ -241,8 +220,10 @@ struct WatchlistsView: View {
                 L10n.Watchlists.deletedToast(name: watchlist.name, locale: locale),
                 systemImage: "trash"
             )
+            return true
         } catch {
             toastCenter.showError(error, locale: locale)
+            return false
         }
     }
 
@@ -670,20 +651,18 @@ private struct WatchlistEditorSheet: View {
             .scrollDismissesKeyboard(.interactively)
             .interactiveDismissDisabled(isSaving)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(L10n.Common.cancel) {
-                        dismiss()
-                    }
-                    .disabled(isSaving)
+                ToolbarItem(placement: .topBarLeading) {
+                    AppSheetCloseButton(isDisabled: isSaving)
                 }
 
-                ToolbarItem(placement: .confirmationAction) {
+                ToolbarItem(placement: .topBarTrailing) {
                     if isSaving {
                         ProgressView()
                     } else {
                         Button(mode.actionTitle) {
                             Task { await save() }
                         }
+                        .fontWeight(.semibold)
                         .disabled(!canSave)
                     }
                 }
@@ -698,6 +677,7 @@ private struct WatchlistEditorSheet: View {
                 await searchAssets()
             }
         }
+        .presentationDragIndicator(.visible)
     }
 
     private func save() async {
@@ -963,11 +943,8 @@ private struct WatchlistSymbolSheet: View {
             )
             .interactiveDismissDisabled(isSaving)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(L10n.Common.cancel) {
-                        dismiss()
-                    }
-                    .disabled(isSaving)
+                ToolbarItem(placement: .topBarTrailing) {
+                    AppSheetCloseButton(isDisabled: isSaving)
                 }
             }
             .tint(AppTheme.ColorToken.brand)
@@ -975,6 +952,7 @@ private struct WatchlistSymbolSheet: View {
                 await searchAssets()
             }
         }
+        .presentationDragIndicator(.visible)
     }
 
     private func searchAssets() async {
@@ -1151,6 +1129,75 @@ private struct WatchlistAssetRow: View {
         .frame(minHeight: 62)
         .padding(.vertical, 8)
         .contentShape(Rectangle())
+    }
+}
+
+private struct WatchlistDeleteConfirmationSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.locale) private var locale
+
+    let watchlist: AlpacaWatchlist
+    let onConfirm: () async -> Bool
+
+    @State private var isSubmitting = false
+
+    var body: some View {
+        AppActionSheetContainer(
+            title: L10n.Watchlists.deleteConfirmTitle,
+            isSubmitting: isSubmitting,
+            minHeight: 340,
+            maxHeight: 520,
+            fallbackHeight: 370
+        ) {
+            VStack(spacing: 0) {
+                VStack(alignment: .center, spacing: 0) {
+                    AppSheetBadgePill(
+                        title: L10n.Watchlists.assetCount(watchlist.symbols.count, locale: locale),
+                        tint: AppTheme.ColorToken.negative
+                    )
+
+                    Text(watchlist.name)
+                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                        .minimumScaleFactor(0.68)
+                        .padding(.top, 14)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 6)
+                .padding(.bottom, 22)
+
+                AppSheetWarningBanner(
+                    message: L10n.Watchlists.deleteConfirmMessage(name: watchlist.name, locale: locale)
+                )
+
+                AppSheetActionButton(
+                    title: L10n.Watchlists.deleteAction,
+                    submittingTitle: L10n.Trade.simpleSubmitting(locale: locale),
+                    tint: AppTheme.ColorToken.negative,
+                    isSubmitting: isSubmitting
+                ) {
+                    await submit()
+                }
+                .padding(.top, 22)
+                .padding(.bottom, 12)
+            }
+        }
+    }
+
+    private func submit() async {
+        guard !isSubmitting else {
+            return
+        }
+
+        isSubmitting = true
+        let succeeded = await onConfirm()
+        isSubmitting = false
+
+        if succeeded {
+            dismiss()
+        }
     }
 }
 

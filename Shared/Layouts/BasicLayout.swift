@@ -8,51 +8,44 @@ enum BasicLayoutStyle {
 
 struct BasicLayout<TitleAccessory: View, Content: View>: View {
     private let title: LocalizedStringKey?
+    private let titleDisplayMode: NavigationBarItem.TitleDisplayMode
     private let style: BasicLayoutStyle
+    private let hasTitleAccessory: Bool
     private let titleAccessory: TitleAccessory
     private let content: Content
 
     init(
         _ title: LocalizedStringKey,
+        titleDisplayMode: NavigationBarItem.TitleDisplayMode = .large,
         style: BasicLayoutStyle = .scroll(),
         @ViewBuilder titleAccessory: () -> TitleAccessory,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
+        self.titleDisplayMode = titleDisplayMode
         self.style = style
+        self.hasTitleAccessory = TitleAccessory.self != EmptyView.self
         self.titleAccessory = titleAccessory()
         self.content = content()
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if let title {
-                pageTitle(title)
+        contentBody
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(AppTheme.ColorToken.pageBackground.ignoresSafeArea())
+            .modifier(
+                BasicLayoutNavigationTitleModifier(
+                    title: title,
+                    titleDisplayMode: titleDisplayMode
+                )
+            )
+            .toolbar {
+                if hasTitleAccessory {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        titleAccessory
+                    }
+                }
             }
-            contentBody
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(AppTheme.ColorToken.pageBackground.ignoresSafeArea())
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
-    }
-
-    private func pageTitle(_ title: LocalizedStringKey) -> some View {
-        HStack(alignment: .center, spacing: 16) {
-            Text(title)
-                .font(AppTypography.pageTitle)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-
-            Spacer(minLength: 12)
-
-            titleAccessory
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, AppTheme.Spacing.pageHorizontal)
-        .padding(.top, AppTheme.Spacing.pageTitleTop)
-        .padding(.bottom, AppTheme.Spacing.pageTitleBottom)
     }
 
     @ViewBuilder
@@ -77,14 +70,30 @@ struct BasicLayout<TitleAccessory: View, Content: View>: View {
             }
             .formStyle(.grouped)
             .scrollContentBackground(.hidden)
-            .contentMargins(.top, 0, for: .scrollContent)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case .list:
             content
                 .scrollContentBackground(.hidden)
-                .contentMargins(.top, 0, for: .scrollContent)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
+private struct BasicLayoutNavigationTitleModifier: ViewModifier {
+    let title: LocalizedStringKey?
+    let titleDisplayMode: NavigationBarItem.TitleDisplayMode
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let title {
+            content
+                .navigationTitle(title)
+                .navigationBarTitleDisplayMode(titleDisplayMode)
+        } else {
+            content
+                .navigationTitle("")
+                .navigationBarTitleDisplayMode(.inline)
         }
     }
 }
@@ -95,18 +104,22 @@ extension BasicLayout where TitleAccessory == EmptyView {
         @ViewBuilder content: () -> Content
     ) {
         self.title = nil
+        self.titleDisplayMode = .inline
         self.style = style
+        self.hasTitleAccessory = false
         self.titleAccessory = EmptyView()
         self.content = content()
     }
 
     init(
         _ title: LocalizedStringKey,
+        titleDisplayMode: NavigationBarItem.TitleDisplayMode = .large,
         style: BasicLayoutStyle = .scroll(),
         @ViewBuilder content: () -> Content
     ) {
         self.init(
             title,
+            titleDisplayMode: titleDisplayMode,
             style: style,
             titleAccessory: { EmptyView() },
             content: content

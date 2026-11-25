@@ -26,68 +26,59 @@ struct OrdersFilterSheet: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
+        NavigationStack {
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 16) {
                     sideSection
                     statusSection
                     timeSection
                     symbolSection
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
+                .padding(.horizontal, AppTheme.Spacing.pageHorizontal)
+                .padding(.top, 10)
                 .padding(.bottom, 20)
             }
-            .scrollContentBackground(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollDismissesKeyboard(.interactively)
+            .background(AppTheme.ColorToken.pageBackground.ignoresSafeArea())
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                applyFooter
+            }
+            .navigationTitle(L10n.Orders.filterTitle(locale: locale))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(L10n.Orders.filterReset(locale: locale)) {
+                        withAnimation(.snappy) {
+                            draft = OrdersFilterCriteria()
+                        }
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(draft.isDefault ? Color(.tertiaryLabel) : AppTheme.ColorToken.brand)
+                    .disabled(draft.isDefault)
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    AppSheetCloseButton()
+                }
+            }
         }
-        .background(AppTheme.ColorToken.pageBackground.ignoresSafeArea())
-        .presentationDetents([.height(520), .large])
-        .presentationDragIndicator(.hidden)
+        .presentationDetents([.height(580), .large])
+        .presentationDragIndicator(.visible)
     }
 
-    private var header: some View {
-        VStack(spacing: 10) {
-            Capsule()
-                .fill(.tertiary)
-                .frame(width: 58, height: 5)
-                .padding(.top, 10)
-
-            HStack(alignment: .center) {
-                Button(L10n.Orders.filterReset(locale: locale)) {
-                    withAnimation(.snappy) {
-                        draft = OrdersFilterCriteria()
-                    }
-                }
-                .font(AppTypography.control)
-                .foregroundStyle(draft.isDefault ? Color(.tertiaryLabel) : AppTheme.ColorToken.brand)
-                .disabled(draft.isDefault)
-
-                Spacer(minLength: 12)
-
-                VStack(spacing: 2) {
-                    Text(L10n.Orders.filterTitle(locale: locale))
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-
-                    Text("\(draftResultCount) / \(orders.count)")
-                        .font(AppTypography.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 12)
-
-                Button(L10n.Orders.filterApply(locale: locale)) {
-                    criteria = draft.normalized()
-                    dismiss()
-                }
-                .font(AppTypography.control)
-                .foregroundStyle(AppTheme.ColorToken.brand)
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 8)
+    private var applyFooter: some View {
+        AppSheetActionButton(
+            title: "\(L10n.Orders.filterApply(locale: locale)) (\(draftResultCount))",
+            tint: AppTheme.ColorToken.brand
+        ) {
+            criteria = draft.normalized()
+            dismiss()
         }
+        .padding(.horizontal, AppTheme.Spacing.pageHorizontal)
+        .padding(.top, 10)
+        .padding(.bottom, 12)
+        .background(AppTheme.ColorToken.pageBackground)
     }
 
     private var statusSection: some View {
@@ -227,9 +218,7 @@ private struct CompactFilterSection<Content: View>: View {
         switch style {
         case .card:
             content
-                .padding(10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .appSheetCard(horizontalPadding: 12, verticalPadding: 12, cornerRadius: 20)
         case .plain:
             content
                 .frame(maxWidth: .infinity, alignment: .leading)

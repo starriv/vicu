@@ -13,7 +13,7 @@ struct AccountActivityView: View {
     private let pageSize = 100
 
     var body: some View {
-        BasicLayout(L10n.AccountActivity.title, style: .list) {
+        BasicLayout(L10n.AccountActivity.title, titleDisplayMode: .inline, style: .list) {
             AppInfiniteScrollView(
                 spacing: 18,
                 canLoadMore: nextPageToken != nil,
