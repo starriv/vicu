@@ -2,7 +2,7 @@ import SwiftUI
 
 struct AlpacaView: View {
     var body: some View {
-        BasicLayout(L10n.Alpaca.title, style: .form) {
+        BasicLayout(L10n.Alpaca.title, titleDisplayMode: .inline, style: .form) {
             AlpacaCredentialConfigurationView(mode: .settings)
         }
         .scrollDismissesKeyboard(.interactively)
@@ -13,7 +13,13 @@ struct AlpacaView: View {
 struct AlpacaCredentialOnboardingView: View {
     var body: some View {
         ScrollView {
-            AlpacaCredentialConfigurationView(mode: .onboarding)
+            VStack(spacing: 24) {
+                AlpacaCredentialConfigurationView(mode: .onboarding)
+
+                Link(L10n.Settings.privacyPolicy, destination: URL(string: "https://gist.github.com/starriv/a9184e0b2752f7a3c73204d5229fde1b")!)
+                    .font(AppTypography.detail)
+                    .accessibilityIdentifier("onboarding.privacyPolicy")
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .scrollDismissesKeyboard(.interactively)
@@ -186,6 +192,7 @@ private struct AlpacaCredentialConfigurationView: View {
             .animation(.snappy, value: isConnectInProgress)
             .animation(.snappy, value: hasCredentialInput)
             .accessibilityHint(L10n.Alpaca.saveToKeychainHint)
+
         }
         .frame(maxWidth: 430, alignment: .leading)
         .frame(maxWidth: .infinity)

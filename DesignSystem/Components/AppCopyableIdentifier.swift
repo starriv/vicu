@@ -1,6 +1,11 @@
 import SwiftUI
 import UIKit
 
+enum AppCopyableIdentifierStyle {
+    case glass
+    case plain
+}
+
 struct AppCopyableIdentifier: View {
     @Environment(AppToastCenter.self) private var toastCenter
     @Environment(\.locale) private var locale
@@ -9,6 +14,7 @@ struct AppCopyableIdentifier: View {
     var displayValue: String?
     var copyLabel: LocalizedStringKey = L10n.Common.copy
     var accessibilityLabel: LocalizedStringKey?
+    var style: AppCopyableIdentifierStyle = .glass
 
     var body: some View {
         copyableContent
@@ -25,16 +31,38 @@ struct AppCopyableIdentifier: View {
 
     @ViewBuilder
     private var copyableContent: some View {
-        if #available(iOS 26.0, *) {
-            content
-                .glassEffect(.regular.tint(Color.white.opacity(0.14)).interactive(), in: .capsule)
-        } else {
-            content
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay {
-                    Capsule()
-                        .strokeBorder(Color(.separator).opacity(0.14))
+        switch style {
+        case .plain:
+            Button(action: copy) {
+                HStack(spacing: 5) {
+                    Text(visibleValue)
+                        .font(AppTypography.rowMeta.monospaced())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .minimumScaleFactor(0.82)
+
+                    Image(systemName: "doc.on.doc")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
                 }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+        case .glass:
+            if #available(iOS 26.0, *) {
+                content
+                    .glassEffect(.regular.tint(Color.white.opacity(0.14)).interactive(), in: .capsule)
+            } else {
+                content
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(Color(.separator).opacity(0.14))
+                    }
+            }
         }
     }
 

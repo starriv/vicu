@@ -164,6 +164,7 @@
 		0A90A90A90A90A90A90A9001 /* DesignSystem/Components/QuoteSizeRatioBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A90A90A90A90A90A90A9002 /* DesignSystem/Components/QuoteSizeRatioBar.swift */; };
 		0A91A91A91A91A91A91A9101 /* DesignSystem/Components/AppMarqueeText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A91A91A91A91A91A91A9102 /* DesignSystem/Components/AppMarqueeText.swift */; };
 		0A92A92A92A92A92A92A9201 /* DesignSystem/Components/AppScreenHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A92A92A92A92A92A92A9202 /* DesignSystem/Components/AppScreenHeader.swift */; };
+		0A93A93A93A93A93A93A9301 /* DesignSystem/Components/AppSettingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A93A93A93A93A93A93A9302 /* DesignSystem/Components/AppSettingsComponents.swift */; };
 		0AC0000000000000000C0002 /* Resources/AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0AC0000000000000000C0001 /* Resources/AppIcon.icon */; };
 		0AC0000000000000000C0004 /* Resources/PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 0AC0000000000000000C0003 /* Resources/PrivacyInfo.xcprivacy */; };
 		0B0000000000000000000101 /* Services/LiveActivities/OrderActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000000000000000000201 /* Services/LiveActivities/OrderActivityAttributes.swift */; };
@@ -360,6 +361,7 @@
 		0A90A90A90A90A90A90A9002 /* DesignSystem/Components/QuoteSizeRatioBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/QuoteSizeRatioBar.swift; sourceTree = "<group>"; };
 		0A91A91A91A91A91A91A9102 /* DesignSystem/Components/AppMarqueeText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppMarqueeText.swift; sourceTree = "<group>"; };
 		0A92A92A92A92A92A92A9202 /* DesignSystem/Components/AppScreenHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppScreenHeader.swift; sourceTree = "<group>"; };
+		0A93A93A93A93A93A93A9302 /* DesignSystem/Components/AppSettingsComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Components/AppSettingsComponents.swift; sourceTree = "<group>"; };
 		0AC0000000000000000C0001 /* Resources/AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = Resources/AppIcon.icon; sourceTree = "<group>"; };
 		0AC0000000000000000C0003 /* Resources/PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Resources/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		0B0000000000000000000201 /* Services/LiveActivities/OrderActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/LiveActivities/OrderActivityAttributes.swift; sourceTree = "<group>"; };
@@ -530,6 +532,7 @@
 				0C0000000000000000000202 /* AssetPositionSharePerformanceTests.swift */,
 				0C0F60000000000000000203 /* OrderDraftTests.swift */,
 				0A92A92A92A92A92A92A9202 /* DesignSystem/Components/AppScreenHeader.swift */,
+				0A93A93A93A93A93A93A9302 /* DesignSystem/Components/AppSettingsComponents.swift */,
 				0A90A90A90A90A90A90A9002 /* DesignSystem/Components/QuoteSizeRatioBar.swift */,
 				0A91A91A91A91A91A91A9102 /* DesignSystem/Components/AppMarqueeText.swift */,
 				0A0000000000000000000263 /* Shared/Reactive/RxPolling.swift */,
@@ -879,6 +882,7 @@
 				0A00000000000000000001D2 /* DesignSystem/Components/HoldToConfirmButton.swift in Sources */,
 				0A0F8000000000000000010F /* DesignSystem/Components/AppConfirmationSheet.swift in Sources */,
 				0A92A92A92A92A92A92A9201 /* DesignSystem/Components/AppScreenHeader.swift in Sources */,
+				0A93A93A93A93A93A93A9301 /* DesignSystem/Components/AppSettingsComponents.swift in Sources */,
 				0A90A90A90A90A90A90A9001 /* DesignSystem/Components/QuoteSizeRatioBar.swift in Sources */,
 				0A91A91A91A91A91A91A9101 /* DesignSystem/Components/AppMarqueeText.swift in Sources */,
 				0A0000000000000000000163 /* Shared/Reactive/RxPolling.swift in Sources */,

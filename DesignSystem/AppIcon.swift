@@ -42,6 +42,7 @@ enum AppIcon {
     enum More {
         static let orders = "list.bullet.rectangle"
         static let alpaca = "key.fill"
+        static let activity = "clock.arrow.circlepath"
         static let notifications = "bell.badge.fill"
         static let settings = "gearshape.fill"
     }
@@ -61,6 +62,10 @@ enum AppIcon {
         static let appearance = "circle.lefthalf.filled"
         static let language = "globe"
         static let logoDev = "photo.on.rectangle.angled"
+        static let apiKey = "key.horizontal.fill"
+        static let privacyPolicy = "hand.raised.fill"
+        static let support = "questionmark.circle.fill"
+        static let version = "info.circle.fill"
         static let notifications = "bell.badge.fill"
         static let tradeNotifications = "paperplane.fill"
         static let orderStatusNotifications = "checklist"

@@ -633,6 +633,15 @@ enum L10n {
 
     enum More {
         static var title: LocalizedStringKey { "more.title" }
+        static var brokerageSection: LocalizedStringKey { "more.section.brokerage" }
+        static var preferencesSection: LocalizedStringKey { "more.section.preferences" }
+        static var accountDefaultTitle: LocalizedStringKey { "more.account.default_title" }
+        static var accountHint: LocalizedStringKey { "more.account.hint" }
+        static var alpacaRowTitle: LocalizedStringKey { "more.alpaca.title" }
+        static var notificationsRowTitle: LocalizedStringKey { "more.notifications.title" }
+        static var settingsRowTitle: LocalizedStringKey { "more.settings.title" }
+        static func notificationsOn(locale: Locale) -> String { L10n.string("more.notifications.on", locale: locale) }
+        static func notificationsOff(locale: Locale) -> String { L10n.string("more.notifications.off", locale: locale) }
         static func ordersTitle(locale: Locale) -> String { L10n.string("more.orders.title", locale: locale) }
         static func ordersSubtitle(locale: Locale) -> String { L10n.string("more.orders.subtitle", locale: locale) }
         static func riskTitle(locale: Locale) -> String { L10n.string("more.risk.title", locale: locale) }
@@ -650,6 +659,11 @@ enum L10n {
     }
 
     enum Settings {
+        static var privacyPolicy: LocalizedStringKey { "settings.privacy_policy" }
+        static var support: LocalizedStringKey { "settings.support" }
+        static var privacyAndSupport: LocalizedStringKey { "settings.privacy_and_support" }
+        static var about: LocalizedStringKey { "settings.about" }
+        static var version: LocalizedStringKey { "settings.version" }
         static var title: LocalizedStringKey { "settings.title" }
         static var appearance: LocalizedStringKey { "settings.appearance" }
         static var themeMode: LocalizedStringKey { "settings.theme_mode" }
