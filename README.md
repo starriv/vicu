@@ -88,7 +88,7 @@ Vicu is a native iOS app for your Alpaca brokerage account. It's written entirel
 - Order history with filters and live status
 - Market browser and symbol search
 - Asset pages with charts, quotes, level-one book, news, and options
-- Order updates on the Lock Screen and Dynamic Island via Live Activities
+- Live Activities for order progress and the US trading session on the Lock Screen and Dynamic Island
 - Light and dark themes, plus Liquid Glass on iOS 26
 - API keys stored in the Keychain, with optional Face ID
 
@@ -112,7 +112,7 @@ Vicu 是一个用 SwiftUI 写的 Alpaca 券商账户原生 iOS 客户端,没有�
 - 订单记录,支持筛选与实时状态
 - 行情浏览与代码搜索
 - 资产页:图表、报价、一档盘口、新闻、期权
-- 锁屏与灵动岛上的订单实时活动(Live Activities)
+- 锁屏与灵动岛上的订单进度与交易日时段实时活动(Live Activities)
 - 浅色/深色主题,iOS 26 上支持 Liquid Glass
 - API 密钥存于钥匙串,可选 Face ID
 

@@ -441,3 +441,51 @@ for activity in Activity<OrderActivityAttributes>.activities {
 | `vicuTests/LiveActivityTests.swift` | 新增：状态机 / 时段 / coordinator 三组单测 |
 
 > 建议按此顺序施工：先是纯模型 + 策略 + 测试（不碰 ActivityKit），再接 Widget，最后接 UI 触发点——每一步都能单独编译通过。
+
+---
+
+## 附录 B · 实现状态（2026-11-26）
+
+### 已落地
+
+| 计划项 | 状态 |
+|---|---|
+| P0 地基：三组 `ActivityAttributes`、`LiveActivityPolicy`、`LiveActivityPresentation`、`LiveActivityCoordinator`、`LiveActivitySettings` | ✅ |
+| P0 文案：Widget 不再包含任何用户可见字符串，全部由 App 侧本地化后写入 `ContentState`；旧 4 条 stale 键已删除 | ✅ |
+| P0 孤儿清理：启动时接管同类型活动、结束多余活动、终态订单不再复活 | ✅ |
+| P1 订单卡：下单 / 改价 / 平仓触发；trade_updates 驱动；多单聚合（`+N 笔在途`）；终态停留 15 分钟后自动消失 | ✅ |
+| P1 深链：`vicu://order/<id>[?action=cancel]`，点卡片进详情、点「撤单」进入确认弹窗 | ✅ |
+| P2 交易日卡：时段模型、`Text(timerInterval:)` 倒计时、`ProgressView(timerInterval:)` 全天进度、账户日内盈亏 + 挂单数 | ✅ |
+| P4 Apple Watch：`.supplementalActivityFamilies([.small, .medium])` | ✅（未在手表实机验证） |
+| 设置项：启用 / 订单卡 / 交易日卡 + 系统关闭提示 + DEBUG 预览入口 | ✅ |
+| 单元测试：状态映射、代表单选择、成交进度、陈旧/消失时间、深链、时段分段（9 条） | ✅ |
+
+### 与计划的偏差
+
+1. **「一键撤单」改为「一键进入确认」**：Live Activity 的撤单按钮走深链，App 打开订单撤单确认弹窗，而不是用 `LiveActivityIntent` 在后台直接撤单。原因：券商撤单属于不可撤销的资金操作，App 内已有确认流程，锁屏直接执行风险过高且与 App 内交互不一致。
+2. **盯盘卡（P3）未实现**：按计划建议延后，等 P1/P2 反馈。
+3. **Coordinator 未做 `LiveActivityClient` 协议替身测试**：当前以纯函数单测覆盖决策逻辑，ActivityKit 调用通过真机与模拟器实测验证。
+
+### 已知限制（与设计一致）
+
+- App 挂起后无法刷新数值；卡片用 `asOf` + 系统陈旧态表达。
+- 交易日卡的自动结束依赖下一次 App 启动或前台刷新，因为后台无法执行 `end`。
+- `BGAppRefreshTask` 未引入。
+
+### 验证记录
+
+- 真机（iPhone 17 Pro Max，iOS 27.2）：编译通过并安装成功。
+- 单元测试：`vicuTests/LiveActivityTests` 9/9 通过。
+- 模拟器（iPhone 17 Pro Max）：真实 `Activity.request` 成功，灵动岛紧凑态显示 `AAPL` + 成交进度环（见 `docs/live-activities-dynamic-island.png`）；卡片样式见 `docs/live-activities-preview-cards.png`。
+
+### 真机反馈修正（2026-11-26 16:30）
+
+真机锁屏首版出现「破版」：卡片内容自然高度约 192pt，超过系统锁屏实时活动的约 158pt 上限，系统把整张卡等比缩小并裁掉底部留白，导致按钮贴边、撤销按钮被压扁、`--` 占位符和几乎不可见的进度轨道。
+
+修正：
+
+- 锁屏订单卡改为一屏紧凑布局（标题行 / 数量+更新时间行 / 进度条 / 状态+价格行 / 按钮行），实测自然高度 **144pt**，落在系统预算内；
+- 进度轨道不透明度 0.12 → 0.20、高度 6 → 5pt，空进度时也可见；
+- 市价单等无价格订单不再显示 `--`，`detailLine` 为空时整行隐藏；
+- 次要按钮底色 0.09 → 0.14，避免在纯黑卡面上「看不见」；
+- 按钮高度 34 → 32pt，纵向留白收紧到 12pt。
