@@ -15,16 +15,12 @@ struct PositionsView: View {
 
         BasicLayout(L10n.Positions.title, titleDisplayMode: .inline, style: .scroll(spacing: 18)) {
             content(snapshot: snapshot)
+                // Keep the last result visible but dimmed while it revalidates.
+                .opacity(app.portfolio.isRefreshing && !snapshot.isEmpty ? 0.6 : 1)
+                .animation(.easeOut(duration: 0.2), value: app.portfolio.isRefreshing)
         }
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
-            if app.portfolio.isRefreshing && hasLoaded {
-                ToolbarItem(placement: .topBarTrailing) {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-            }
-
             if !app.portfolio.positions.isEmpty {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {

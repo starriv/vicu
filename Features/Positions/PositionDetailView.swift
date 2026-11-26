@@ -23,30 +23,23 @@ struct PositionDetailView: View {
     var body: some View {
         BasicLayout(L10n.PositionDetail.title, titleDisplayMode: .inline, style: .scroll(spacing: 20)) {
             content
+                // Keep the last result visible but dimmed while it revalidates.
+                .opacity(isLoading && position != nil ? 0.6 : 1)
+                .animation(.easeOut(duration: 0.2), value: isLoading)
         }
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
-            if isLoading {
-                ToolbarItem(placement: .topBarTrailing) {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-            }
-
             if !displaySymbol.isEmpty {
-                if let position {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        if let position {
                             positionSharePayload = sharePayload(for: position)
-                        } label: {
-                            Image(systemName: "square.and.arrow.up")
                         }
-                        .accessibilityLabel(L10n.PositionDetail.share)
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
                     }
-
-                    if #available(iOS 26.0, *) {
-                        ToolbarSpacer(.fixed, placement: .topBarTrailing)
-                    }
+                    .disabled(position == nil)
+                    .accessibilityLabel(L10n.PositionDetail.share)
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
@@ -67,7 +60,7 @@ struct PositionDetailView: View {
         }
         .sheet(item: $positionSharePayload) { payload in
             AssetPositionShareSheet(payload: payload)
-                .presentationDetents([.height(680)])
+                .presentationDetents([.height(700)])
                 .presentationDragIndicator(.visible)
         }
         .sheet(item: $closeConfirmation) { snapshot in
