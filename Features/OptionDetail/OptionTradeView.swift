@@ -308,14 +308,38 @@ final class OptionTradeStore {
         account?.optionsApprovedLevel ?? 0
     }
 
-    var optionsBuyingPower: Decimal? {
+    /// Cash-backed options buying power for opening orders (never borrows on margin).
+    var cashOptionsBuyingPower: Decimal? {
+        guard let account else {
+            return nil
+        }
+
+        let optionsBP = NumberParser.decimal(from: account.optionsBuyingPower)
+        let nonMarginable = NumberParser.decimal(from: account.nonMarginableBuyingPower)
+        let accountCash = NumberParser.decimal(from: account.cash)
+        let totalBP = NumberParser.decimal(from: account.buyingPower)
+
+        let cashBounds = [optionsBP, nonMarginable, accountCash].compactMap { $0 }
+        if let minBound = cashBounds.min() {
+            if let totalBP {
+                return max(min(minBound, totalBP), 0)
+            }
+            return max(minBound, 0)
+        }
+
+        return totalBP.map { max($0, 0) }
+    }
+
+    /// Closing buying power for `buyToClose` (never blocks risk-reducing short cover due to negative stock margin cash).
+    var closingOptionsBuyingPower: Decimal? {
         if let optionsBP = NumberParser.decimal(from: account?.optionsBuyingPower) {
             return max(optionsBP, 0)
         }
-        if let bp = NumberParser.decimal(from: account?.buyingPower) {
-            return max(bp, 0)
-        }
-        return nil
+        return cashOptionsBuyingPower
+    }
+
+    var optionsBuyingPower: Decimal? {
+        intent == .buyToClose ? closingOptionsBuyingPower : cashOptionsBuyingPower
     }
 
     var positionQuantity: Decimal {
@@ -551,8 +575,14 @@ final class OptionTradeStore {
 
     func fillContracts(percent: Decimal) {
         message = nil
+        if limitPrice == nil {
+            fillDefaultLimitPriceIfNeeded()
+        }
         let maxContracts = maxContractsAvailable
-        guard maxContracts > 0 else { return }
+        guard maxContracts > 0 else {
+            activeQuickFillPercent = nil
+            return
+        }
 
         let clampedPercent = min(max(percent, 0), 1)
         let target: Int
@@ -562,14 +592,15 @@ final class OptionTradeStore {
             target = max(1, Self.flooredWholeInt(Decimal(maxContracts) * clampedPercent))
         }
 
-        let nextText = String(min(target, maxContracts))
+        let resolvedTarget = min(target, maxContracts)
+        let nextText = String(resolvedTarget)
         var nextDraft = draft
         nextDraft.notionalText = ""
         nextDraft.quantityText = nextText
         if draft != nextDraft {
             draft = nextDraft
         }
-        activeQuickFillPercent = percent
+        activeQuickFillPercent = resolvedTarget == maxContracts ? Decimal(1) : percent
     }
 
     func selectPrice(_ source: OptionTradePriceFillSource) {

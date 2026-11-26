@@ -1525,6 +1525,12 @@ enum L10n {
         static func confirmEnvironment(locale: Locale) -> String {
             L10n.string("trade.confirm.environment", locale: locale)
         }
+        static func confirmMarginBuyTag(locale: Locale) -> String {
+            L10n.string("trade.confirm.margin_buy_tag", locale: locale)
+        }
+        static func confirmMarginBuyWarning(locale: Locale) -> String {
+            L10n.string("trade.confirm.margin_buy_warning", locale: locale)
+        }
         static func confirmShortSellTag(locale: Locale) -> String {
             L10n.string("trade.confirm.short_sell_tag", locale: locale)
         }
@@ -1551,6 +1557,9 @@ enum L10n {
         }
         static func notionalRequiresDay(locale: Locale) -> String {
             L10n.string("trade.error.notional_requires_day", locale: locale)
+        }
+        static func notionalBelowMinimum(locale: Locale) -> String {
+            L10n.string("trade.error.notional_below_minimum", locale: locale)
         }
         static func buyExceedsBuyingPower(locale: Locale) -> String {
             L10n.string("trade.error.buy_exceeds_buying_power", locale: locale)
@@ -1635,6 +1644,30 @@ enum L10n {
         }
         static func simpleBuyingPower(locale: Locale) -> String {
             L10n.string("trade.simple.buying_power", locale: locale)
+        }
+        static func simpleCashBuyingPower(locale: Locale) -> String {
+            L10n.string("trade.simple.cash_buying_power", locale: locale)
+        }
+        static func simpleMarginBuyingPower(locale: Locale) -> String {
+            L10n.string("trade.simple.margin_buying_power", locale: locale)
+        }
+        static func simpleShortBuyingPower(locale: Locale) -> String {
+            L10n.string("trade.simple.short_buying_power", locale: locale)
+        }
+        static func marginToggleBuy(locale: Locale) -> String {
+            L10n.string("trade.margin.toggle_buy", locale: locale)
+        }
+        static func marginToggleSell(locale: Locale) -> String {
+            L10n.string("trade.margin.toggle_sell", locale: locale)
+        }
+        static func marginChipBuy(locale: Locale) -> String {
+            L10n.string("trade.margin.chip_buy", locale: locale)
+        }
+        static func marginChipSell(locale: Locale) -> String {
+            L10n.string("trade.margin.chip_sell", locale: locale)
+        }
+        static func simpleNotionalMinShort(locale: Locale) -> String {
+            L10n.string("trade.simple.notional_min_short", locale: locale)
         }
         static func simpleAvailablePosition(locale: Locale) -> String {
             L10n.string("trade.simple.available_position", locale: locale)

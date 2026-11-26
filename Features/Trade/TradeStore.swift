@@ -62,6 +62,7 @@ enum TradeExecutionPriceSource: Equatable {
 enum TradeValidationIssueKind: Equatable {
     case generic
     case missingInput
+    case notionalBelowMinimum
     case buyExceedsBuyingPower
     case sellExceedsPosition
     case shortExceedsBuyingPower
@@ -117,10 +118,21 @@ private enum TradeContextLoadEvent {
 @MainActor
 @Observable
 final class TradeStore {
+    static let minimumNotionalOrderAmount = Decimal(1)
+    static let marketBuySharesCollar = Decimal(103) / Decimal(100)
+
     var draft: OrderDraft {
         didSet { refreshDerivedState() }
     }
     var sizingMode: TradeSizingMode
+    /// Optional user-controlled margin/shorting switch. Always defaults to `false` (cash & spot only).
+    private(set) var isMarginEnabled = false {
+        didSet {
+            if isMarginEnabled != oldValue {
+                refreshDerivedState()
+            }
+        }
+    }
     var context: TradeContext? {
         didSet { refreshDerivedState() }
     }
@@ -268,7 +280,30 @@ final class TradeStore {
         currentAccount?.currency ?? "USD"
     }
 
-    var buyingPower: Decimal? {
+    /// Cash buying power available without borrowing on margin.
+    /// Uses the conservative floor across `nonMarginableBuyingPower`, `cash`, and total `buyingPower`.
+    var cashBuyingPower: Decimal? {
+        guard let account = currentAccount else {
+            return nil
+        }
+
+        let nonMarginable = NumberParser.decimal(from: account.nonMarginableBuyingPower)
+        let accountCash = NumberParser.decimal(from: account.cash)
+        let totalBP = NumberParser.decimal(from: account.buyingPower)
+
+        let cashBounds = [nonMarginable, accountCash].compactMap { $0 }
+        if let minCashBound = cashBounds.min() {
+            if let totalBP {
+                return max(min(minCashBound, totalBP), 0)
+            }
+            return max(minCashBound, 0)
+        }
+
+        return totalBP.map { max($0, 0) }
+    }
+
+    /// Maximum buying power allowed by the brokerage account (may include margin for marginable assets).
+    var accountBuyingPower: Decimal? {
         if currentAsset?.marginable == false,
            let nonMarginable = NumberParser.decimal(from: currentAccount?.nonMarginableBuyingPower) {
             return max(nonMarginable, 0)
@@ -279,12 +314,82 @@ final class TradeStore {
         return max(raw, 0)
     }
 
+    /// Whether the account has margin leverage beyond cash.
+    var accountSupportsMargin: Bool {
+        if let multiplier = NumberParser.decimal(from: currentAccount?.multiplier), multiplier > 1 {
+            return true
+        }
+        if let accountBP = accountBuyingPower, let cashBP = cashBuyingPower, accountBP > cashBP {
+            return true
+        }
+        return false
+    }
+
+    /// Whether the optional margin/shorting toggle is relevant and usable for the current side and asset.
+    var canToggleMarginMode: Bool {
+        switch draft.side {
+        case .buy:
+            guard accountSupportsMargin, currentAsset?.marginable != false else {
+                return false
+            }
+            guard let accountBP = accountBuyingPower else {
+                return false
+            }
+            return accountBP > (cashBuyingPower ?? 0)
+        case .sell:
+            return availableSellQuantity <= 0 && canOpenShortPosition && (accountBuyingPower ?? 0) > 0
+        }
+    }
+
+    /// Whether short-selling via margin mode is currently active on the Sell side.
+    var isShortSellModeActive: Bool {
+        draft.side == .sell && isMarginEnabled && availableSellQuantity <= 0 && canOpenShortPosition
+    }
+
+    /// Active buying power based on whether the user opted into margin mode.
+    var effectiveBuyingPower: Decimal? {
+        isMarginEnabled ? (accountBuyingPower ?? cashBuyingPower) : cashBuyingPower
+    }
+
+    /// Default buying power used for display and quick-fill (cash-only unless user enables margin mode).
+    var buyingPower: Decimal? {
+        effectiveBuyingPower
+    }
+
+    func setMarginEnabled(_ enabled: Bool) {
+        let nextValue = enabled && canToggleMarginMode
+        guard isMarginEnabled != nextValue else {
+            return
+        }
+
+        message = nil
+        activeQuickFillPercent = nil
+        isMarginEnabled = nextValue
+
+        if isShortSellModeActive, sizingMode == .notional {
+            sizingMode = .shares
+            var nextDraft = draft
+            nextDraft.notionalText = ""
+            if draft != nextDraft {
+                draft = nextDraft
+            }
+        }
+    }
+
     var cash: Decimal? {
         NumberParser.decimal(from: currentAccount?.cash)
     }
 
     var positionQuantity: Decimal {
         NumberParser.decimal(from: currentPosition?.quantity) ?? 0
+    }
+
+    /// A buy that only reduces an existing short; it may use account buying power
+    /// without being a margin purchase.
+    var isClosingShortPosition: Bool {
+        draft.side == .buy
+            && positionQuantity < 0
+            && estimatedQuantity.map { $0 <= abs(positionQuantity) } == true
     }
 
     var availableSellQuantity: Decimal {
@@ -351,14 +456,31 @@ final class TradeStore {
         currentAccount?.shortingEnabled == true && currentAsset?.shortable == true
     }
 
+    /// Execution price used for Buy share quick-fill.
+    /// - Limit orders require an explicit positive limit price (never silently fall back to market ask).
+    /// - Market orders apply a 3% protective collar so tapping Max does not slip into margin or get rejected.
+    var buyQuickFillSharePrice: Decimal? {
+        if draft.orderType.requiresLimitPrice {
+            guard let limitPrice = NumberParser.decimal(from: draft.limitPriceText), limitPrice > 0 else {
+                return nil
+            }
+            return limitPrice
+        }
+
+        guard let price = estimatedExecutionPrice, price > 0 else {
+            return nil
+        }
+        return price * Self.marketBuySharesCollar
+    }
+
     var sellQuickFillQuantityBase: Decimal? {
         if availableSellQuantity > 0 {
             return availableSellQuantity
         }
 
-        guard positionQuantity <= 0,
-              canOpenShortPosition,
-              let buyingPower,
+        guard isShortSellModeActive,
+              let buyingPower = accountBuyingPower,
+              buyingPower > 0,
               let price = shortOrderReferencePrice,
               price > 0 else {
             return nil
@@ -368,12 +490,11 @@ final class TradeStore {
     }
 
     var sellQuickFillNotionalBase: Decimal? {
-        if availableSellQuantity > 0 {
-            let value = availableSellMarketValue
-            return value > 0 ? value : nil
+        guard availableSellQuantity > 0 else {
+            return nil
         }
-
-        return nil
+        let value = availableSellMarketValue
+        return value > 0 ? value : nil
     }
 
     var quickFillAvailable: Bool {
@@ -382,17 +503,26 @@ final class TradeStore {
             guard canUseNotionalSizing else { return false }
             switch draft.side {
             case .buy:
-                guard let buyingPower else { return false }
-                return Self.rounded(buyingPower, scale: 2, mode: .down) > 0
+                guard let buyBP = effectiveBuyingPower else { return false }
+                return Self.rounded(buyBP, scale: 2, mode: .down) >= Self.minimumNotionalOrderAmount
             case .sell:
-                guard let base = sellQuickFillNotionalBase else { return false }
-                return Self.rounded(base, scale: 2, mode: .down) > 0
+                guard availableSellQuantity > 0 else { return false }
+                if let base = sellQuickFillNotionalBase,
+                   Self.rounded(base, scale: 2, mode: .down) >= Self.minimumNotionalOrderAmount {
+                    return true
+                }
+                return Self.rounded(availableSellQuantity, scale: maxShareInputScale, mode: .down) > 0
             }
         case .shares:
             switch draft.side {
             case .buy:
-                guard let buyingPower, let price = estimatedExecutionPrice, price > 0 else { return false }
-                return Self.rounded(buyingPower / price, scale: maxShareInputScale, mode: .down) > 0
+                guard let buyBP = effectiveBuyingPower,
+                      buyBP > 0,
+                      let price = buyQuickFillSharePrice,
+                      price > 0 else {
+                    return false
+                }
+                return Self.rounded(buyBP / price, scale: maxShareInputScale, mode: .down) > 0
             case .sell:
                 guard let base = sellQuickFillQuantityBase else { return false }
                 let scale = availableSellQuantity > 0 ? maxShareInputScale : 0
@@ -579,9 +709,17 @@ final class TradeStore {
 
         let requestedQuantity = estimatedQuantity
         let usesFractionalQuantity = (requestedQuantity ?? Self.positiveSizeDecimal(from: draft.quantityText) ?? 0).isFractional
-        let usesNotional = Self.positiveSizeDecimal(from: draft.notionalText) != nil
+        let requestedNotional = Self.positiveSizeDecimal(from: draft.notionalText)
+        let usesNotional = requestedNotional != nil
         if (usesFractionalQuantity || usesNotional), context.asset.fractionable != true {
             issues.append(.generic(L10n.Trade.assetNotFractionable(locale: locale)))
+        }
+
+        if let requestedNotional, requestedNotional < Self.minimumNotionalOrderAmount {
+            issues.append(TradeValidationIssue(
+                kind: .notionalBelowMinimum,
+                message: L10n.Trade.notionalBelowMinimum(locale: locale)
+            ))
         }
 
         if usesFractionalQuantity, draft.timeInForce != .day {
@@ -593,20 +731,26 @@ final class TradeStore {
         }
 
         if draft.side == .buy {
-            if let estimatedNotional, let buyingPower, estimatedNotional > buyingPower {
+            let maxAllowedBuyingPower = (isMarginEnabled || isClosingShortPosition)
+                ? (accountBuyingPower ?? cashBuyingPower)
+                : cashBuyingPower
+            if let estimatedNotional, let maxAllowedBuyingPower, estimatedNotional > maxAllowedBuyingPower {
                 issues.append(TradeValidationIssue(
                     kind: .buyExceedsBuyingPower,
                     message: L10n.Trade.buyExceedsBuyingPower(locale: locale)
                 ))
             }
         } else if let requestedQuantity, requestedQuantity > availableSellQuantity {
-            if positionQuantity > availableSellQuantity {
+            // Never allow selling more than an existing long position in a single order (Alpaca rejects long->short flips),
+            // and never allow short selling unless the user explicitly enabled margin mode.
+            if positionQuantity > 0 || !isMarginEnabled {
                 issues.append(TradeValidationIssue(
                     kind: .sellExceedsPosition,
                     message: L10n.Trade.sellExceedsPosition(locale: locale)
                 ))
             } else {
                 let shortQuantity = requestedQuantity - max(positionQuantity, 0)
+                let maxShortBuyingPower = accountBuyingPower ?? cashBuyingPower
 
                 if context.account.shortingEnabled != true || context.asset.shortable != true {
                     issues.append(TradeValidationIssue(
@@ -619,8 +763,8 @@ final class TradeStore {
                         message: L10n.Trade.fractionalShortUnsupported(locale: locale)
                     ))
                 } else if let shortOrderValue = estimatedShortOrderValue(shortQuantity: shortQuantity),
-                          let buyingPower,
-                          shortOrderValue > buyingPower {
+                          let maxShortBuyingPower,
+                          shortOrderValue > maxShortBuyingPower {
                     issues.append(TradeValidationIssue(
                         kind: .shortExceedsBuyingPower,
                         message: L10n.Trade.shortExceedsBuyingPower(locale: locale)
@@ -750,12 +894,20 @@ final class TradeStore {
                 return
             }
 
+            let previousCashBP = cashBuyingPower
+            let previousSellQty = availableSellQuantity
             let previousFeed = feed
             feed = context.feed
             optimisticAccount = context.account
             optimisticAsset = context.asset
             optimisticPosition = context.position
             self.context = context
+            if !canToggleMarginMode, isMarginEnabled {
+                isMarginEnabled = false
+            }
+            if previousCashBP != cashBuyingPower || previousSellQty != availableSellQuantity {
+                activeQuickFillPercent = nil
+            }
             if previousFeed != feed {
                 startQuoteStream(app: app)
             }
@@ -887,6 +1039,7 @@ final class TradeStore {
         }
 
         message = nil
+        activeQuickFillPercent = nil
         let previousNotional = estimatedNotional
         let previousQuantity = estimatedQuantity
         let hadInput = !activeInputText.isEmpty
@@ -899,7 +1052,16 @@ final class TradeStore {
             if preserveValue {
                 if hadInput, let previousQuantity, previousQuantity > 0 {
                     let scale = (draft.side == .sell && availableSellQuantity <= 0) ? 0 : maxShareInputScale
-                    let roundedQty = Self.rounded(previousQuantity, scale: scale, mode: .down)
+                    var roundedQty = Self.rounded(previousQuantity, scale: scale, mode: .down)
+                    if draft.side == .sell, availableSellQuantity > 0, roundedQty > availableSellQuantity {
+                        roundedQty = Self.rounded(availableSellQuantity, scale: scale, mode: .down)
+                    } else if draft.side == .buy,
+                              let buyBP = effectiveBuyingPower,
+                              let price = estimatedExecutionPrice,
+                              price > 0,
+                              roundedQty * price > buyBP {
+                        roundedQty = Self.rounded(buyBP / price, scale: scale, mode: .down)
+                    }
                     nextDraft.quantityText = roundedQty > 0 ? Self.apiNumber(roundedQty, scale: scale, mode: .down) : ""
                 } else {
                     nextDraft.quantityText = ""
@@ -913,7 +1075,15 @@ final class TradeStore {
             nextDraft.quantityText = ""
             if preserveValue {
                 if hadInput, let previousNotional, previousNotional > 0 {
-                    let roundedNotional = Self.rounded(previousNotional, scale: 2, mode: .down)
+                    var roundedNotional = Self.rounded(previousNotional, scale: 2, mode: .down)
+                    if draft.side == .buy, let buyBP = effectiveBuyingPower, roundedNotional > buyBP {
+                        roundedNotional = Self.rounded(buyBP, scale: 2, mode: .down)
+                    } else if draft.side == .sell, availableSellQuantity > 0, availableSellMarketValue > 0 {
+                        let maxNotional = Self.rounded(availableSellMarketValue, scale: 2, mode: .down)
+                        if roundedNotional > maxNotional {
+                            roundedNotional = maxNotional
+                        }
+                    }
                     nextDraft.notionalText = roundedNotional > 0 ? Self.apiNumber(roundedNotional, scale: 2, mode: .down) : ""
                 } else {
                     nextDraft.notionalText = ""
@@ -971,12 +1141,37 @@ final class TradeStore {
     func prepareLimitOrder() {
         message = nil
         activeQuickFillPercent = nil
+        let previousNotional = Self.positiveSizeDecimal(from: draft.notionalText)
+        let previousEstimatedQty = estimatedQuantity
+
         var nextDraft = draft
         nextDraft.orderType = .limit
+        if NumberText.trimTrailingZeros(nextDraft.limitPriceText).isEmpty,
+           let defaultPrice = defaultLimitReferencePrice {
+            nextDraft.limitPriceText = Self.apiPriceNumber(defaultPrice)
+        }
+
+        let resolvedLimitPrice = NumberParser.decimal(from: nextDraft.limitPriceText).flatMap { $0 > 0 ? $0 : nil }
         if sizingMode == .notional {
-            if let estimatedQuantity, estimatedQuantity > 0 {
-                let scale = (draft.side == .sell && availableSellQuantity <= 0) ? 0 : maxShareInputScale
-                let roundedQty = Self.rounded(estimatedQuantity, scale: scale, mode: .down)
+            let scale = (draft.side == .sell && availableSellQuantity <= 0) ? 0 : maxShareInputScale
+            let rawQty: Decimal?
+            if let previousNotional, let resolvedLimitPrice, resolvedLimitPrice > 0 {
+                rawQty = previousNotional / resolvedLimitPrice
+            } else {
+                rawQty = previousEstimatedQty
+            }
+
+            if let rawQty, rawQty > 0 {
+                var roundedQty = Self.rounded(rawQty, scale: scale, mode: .down)
+                if draft.side == .buy,
+                   let buyBP = effectiveBuyingPower,
+                   let resolvedLimitPrice,
+                   resolvedLimitPrice > 0,
+                   roundedQty * resolvedLimitPrice > buyBP {
+                    roundedQty = Self.rounded(buyBP / resolvedLimitPrice, scale: scale, mode: .down)
+                } else if draft.side == .sell, availableSellQuantity > 0, roundedQty > availableSellQuantity {
+                    roundedQty = Self.rounded(availableSellQuantity, scale: scale, mode: .down)
+                }
                 nextDraft.quantityText = roundedQty > 0 ? Self.apiNumber(roundedQty, scale: scale, mode: .down) : ""
             } else {
                 nextDraft.quantityText = ""
@@ -1151,73 +1346,101 @@ final class TradeStore {
     }
 
     func fillQuickAmount(percent: Decimal) {
+        guard quickFillAvailable else {
+            activeQuickFillPercent = nil
+            return
+        }
         message = nil
+        let didFill: Bool
         switch sizingMode {
         case .shares:
-            fillQuantity(percent: percent)
+            didFill = fillQuantity(percent: percent)
         case .notional:
-            fillNotional(percent: percent)
+            didFill = fillNotional(percent: percent)
         }
-        activeQuickFillPercent = percent
+        activeQuickFillPercent = didFill ? percent : nil
     }
 
-    func fillQuantity(percent: Decimal) {
+    @discardableResult
+    func fillQuantity(percent: Decimal) -> Bool {
         let clampedPercent = min(max(percent, 0), 1)
         let rawQuantity: Decimal
         let scale: Int
 
         switch draft.side {
         case .buy:
-            guard let buyingPower, let price = estimatedExecutionPrice, price > 0 else { return }
+            guard let buyBP = effectiveBuyingPower,
+                  buyBP > 0,
+                  let price = buyQuickFillSharePrice,
+                  price > 0 else {
+                return false
+            }
             scale = maxShareInputScale
-            rawQuantity = (buyingPower * clampedPercent) / price
+            rawQuantity = (buyBP * clampedPercent) / price
         case .sell:
-            guard let base = sellQuickFillQuantityBase else { return }
-            let isLongSell = availableSellQuantity > 0
-            scale = isLongSell ? maxShareInputScale : 0
-            rawQuantity = (isLongSell && clampedPercent >= 1) ? availableSellQuantity : (base * clampedPercent)
+            if availableSellQuantity > 0 {
+                scale = maxShareInputScale
+                rawQuantity = clampedPercent >= 1 ? availableSellQuantity : (availableSellQuantity * clampedPercent)
+            } else if isShortSellModeActive,
+                      let base = sellQuickFillQuantityBase,
+                      base > 0 {
+                scale = 0
+                rawQuantity = base * clampedPercent
+            } else {
+                return false
+            }
         }
 
         var floored = Self.rounded(rawQuantity, scale: scale, mode: .down)
         if draft.side == .buy,
-           let buyingPower,
-           let price = estimatedExecutionPrice,
+           let buyBP = effectiveBuyingPower,
+           let price = buyQuickFillSharePrice,
            price > 0,
-           floored * price > buyingPower {
+           floored * price > buyBP {
             let step = Self.decimalStep(scale: scale)
             floored = max(floored - step, 0)
         } else if draft.side == .sell, availableSellQuantity > 0, floored > availableSellQuantity {
             floored = Self.rounded(availableSellQuantity, scale: scale, mode: .down)
         }
 
+        guard floored > 0 else {
+            return false
+        }
+
         sizingMode = .shares
         var nextDraft = draft
         nextDraft.notionalText = ""
-        nextDraft.quantityText = floored > 0 ? Self.apiNumber(floored, scale: scale, mode: .down) : ""
+        nextDraft.quantityText = Self.apiNumber(floored, scale: scale, mode: .down)
         if draft != nextDraft {
             draft = nextDraft
         }
+        return true
     }
 
-    func fillNotional(percent: Decimal) {
+    @discardableResult
+    func fillNotional(percent: Decimal) -> Bool {
         guard canUseNotionalSizing else {
-            fillQuantity(percent: percent)
-            return
+            return fillQuantity(percent: percent)
         }
 
         let clampedPercent = min(max(percent, 0), 1)
+        if draft.side == .sell, clampedPercent >= 1 {
+            // Sell Max always liquidates the exact available share holding to avoid tick drift, dust, or oversell.
+            return fillQuantity(percent: 1)
+        }
+
         let base: Decimal?
         switch draft.side {
         case .buy:
-            base = buyingPower
+            base = effectiveBuyingPower
         case .sell:
             base = sellQuickFillNotionalBase
         }
 
-        guard let base, base > 0 else { return }
+        guard let base, base > 0 else { return false }
         var floored = Self.rounded(base * clampedPercent, scale: 2, mode: .down)
-        if draft.side == .buy, let buyingPower, floored > buyingPower {
-            floored = Self.rounded(buyingPower, scale: 2, mode: .down)
+        if draft.side == .buy, let buyBP = effectiveBuyingPower, floored > buyBP {
+            floored = Self.rounded(buyBP, scale: 2, mode: .down)
         } else if draft.side == .sell,
                   availableSellQuantity > 0,
                   let price = estimatedExecutionPrice,
@@ -1228,13 +1451,18 @@ final class TradeStore {
             }
         }
 
+        guard floored >= Self.minimumNotionalOrderAmount else {
+            return false
+        }
+
         sizingMode = .notional
         var nextDraft = draft
         nextDraft.quantityText = ""
-        nextDraft.notionalText = floored > 0 ? Self.apiNumber(floored, scale: 2, mode: .down) : ""
+        nextDraft.notionalText = Self.apiNumber(floored, scale: 2, mode: .down)
         if draft != nextDraft {
             draft = nextDraft
         }
+        return true
     }
 
     func submit(_ orderDraft: OrderDraft, clientOrderID: String?, confirmedEnvironment: TradeEnvironment, app: AppModel) async -> TradeSubmitResult {

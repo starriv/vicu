@@ -12002,6 +12002,40 @@
         }
       }
     },
+    "trade.confirm.margin_buy_tag": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Margin"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "融资"
+          }
+        }
+      }
+    },
+    "trade.confirm.margin_buy_warning": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This order exceeds your available cash buying power and will use margin borrowing."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该订单超出可用现金购买力，提交后将使用融资额度。"
+          }
+        }
+      }
+    },
     "trade.confirm.order_type": {
       "extractionState": "stale",
       "localizations": {
@@ -12291,6 +12325,23 @@
         }
       }
     },
+    "trade.error.notional_below_minimum": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dollar orders require at least $1.00."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按金额下单最低需 $1.00。"
+          }
+        }
+      }
+    },
     "trade.error.notional_requires_day": {
       "extractionState": "stale",
       "localizations": {
@@ -12576,6 +12627,74 @@
           "stringUnit": {
             "state": "translated",
             "value": "较现价 %@"
+          }
+        }
+      }
+    },
+    "trade.margin.chip_buy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Margin"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "融资"
+          }
+        }
+      }
+    },
+    "trade.margin.chip_sell": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Short"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "做空"
+          }
+        }
+      }
+    },
+    "trade.margin.toggle_buy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Margin mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "融资买入"
+          }
+        }
+      }
+    },
+    "trade.margin.toggle_sell": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Short sell mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "融券做空"
           }
         }
       }
@@ -13209,6 +13328,23 @@
         }
       }
     },
+    "trade.simple.cash_buying_power": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cash buying power"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "现金购买力"
+          }
+        }
+      }
+    },
     "trade.simple.close_trade": {
       "extractionState": "stale",
       "localizations": {
@@ -13413,6 +13549,23 @@
         }
       }
     },
+    "trade.simple.margin_buying_power": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Margin buying power"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "融资购买力"
+          }
+        }
+      }
+    },
     "trade.simple.market_order": {
       "extractionState": "stale",
       "localizations": {
@@ -13443,6 +13596,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "最大"
+          }
+        }
+      }
+    },
+    "trade.simple.notional_min_short": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Min $1.00"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最低 $1.00"
           }
         }
       }
@@ -13579,6 +13749,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "股数"
+          }
+        }
+      }
+    },
+    "trade.simple.short_buying_power": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Short buying power"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "融券购买力"
           }
         }
       }

@@ -584,6 +584,17 @@ private struct TradeSimpleOrderCard: View {
             fundingRow
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
+
+            if store.canToggleMarginMode {
+                Rectangle()
+                    .fill(Color(.separator).opacity(0.18))
+                    .frame(height: 0.5)
+                    .padding(.horizontal, 16)
+
+                marginToggleRow
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+            }
         }
         .background(
             AppTheme.ColorToken.groupedSurface,
@@ -680,15 +691,44 @@ private struct TradeSimpleOrderCard: View {
         }
     }
 
+    private var marginToggleRow: some View {
+        HStack(spacing: 12) {
+            Text(
+                store.draft.side == .buy
+                    ? L10n.Trade.marginToggleBuy(locale: locale)
+                    : L10n.Trade.marginToggleSell(locale: locale)
+            )
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(store.isMarginEnabled ? AppTheme.ColorToken.warning : .secondary)
+            .lineLimit(1)
+
+            Spacer(minLength: 8)
+
+            Toggle(
+                "",
+                isOn: Binding(
+                    get: { store.isMarginEnabled },
+                    set: { enabled in
+                        TradeKeypadHaptics.selection()
+                        store.setMarginEnabled(enabled)
+                    }
+                )
+            )
+            .labelsHidden()
+            .tint(AppTheme.ColorToken.warning)
+        }
+    }
+
     private var fundingTitle: String {
         switch store.draft.side {
         case .buy:
-            return L10n.Trade.simpleBuyingPower(locale: locale)
+            return store.isMarginEnabled
+                ? L10n.Trade.simpleMarginBuyingPower(locale: locale)
+                : L10n.Trade.simpleCashBuyingPower(locale: locale)
         case .sell:
-            if store.availableSellQuantity > 0 {
-                return L10n.Trade.simpleAvailablePosition(locale: locale)
-            }
-            return L10n.Trade.simpleBuyingPower(locale: locale)
+            return store.isShortSellModeActive
+                ? L10n.Trade.simpleShortBuyingPower(locale: locale)
+                : L10n.Trade.simpleAvailablePosition(locale: locale)
         }
     }
 
@@ -702,14 +742,14 @@ private struct TradeSimpleOrderCard: View {
     private var fundingPrimaryValue: String {
         switch store.draft.side {
         case .buy:
-            return AppFormatter.money(store.buyingPower, currencyCode: store.currencyCode)
+            return AppFormatter.money(store.effectiveBuyingPower, currencyCode: store.currencyCode)
         case .sell:
-            if store.availableSellQuantity > 0 {
-                let qty = TradeFormat.quantity(store.availableSellQuantity)
-                let symbol = store.normalizedSymbol
-                return symbol.isEmpty ? qty : "\(qty) \(symbol)"
+            if store.isShortSellModeActive {
+                return AppFormatter.money(store.accountBuyingPower, currencyCode: store.currencyCode)
             }
-            return AppFormatter.money(store.buyingPower, currencyCode: store.currencyCode)
+            let qty = TradeFormat.quantity(store.availableSellQuantity)
+            let symbol = store.normalizedSymbol
+            return symbol.isEmpty ? qty : "\(qty) \(symbol)"
         }
     }
 
@@ -981,25 +1021,27 @@ private struct TradeLimitAssetHeader: View {
     private var availableLabel: String {
         switch store.draft.side {
         case .buy:
-            return L10n.Trade.simpleBuyingPower(locale: locale)
+            return store.isMarginEnabled
+                ? L10n.Trade.simpleMarginBuyingPower(locale: locale)
+                : L10n.Trade.simpleCashBuyingPower(locale: locale)
         case .sell:
-            return store.availableSellQuantity > 0
-                ? L10n.Trade.simpleAvailablePosition(locale: locale)
-                : L10n.Trade.simpleBuyingPower(locale: locale)
+            return store.isShortSellModeActive
+                ? L10n.Trade.simpleShortBuyingPower(locale: locale)
+                : L10n.Trade.simpleAvailablePosition(locale: locale)
         }
     }
 
     private var availablePrimaryValue: String {
         switch store.draft.side {
         case .buy:
-            return AppFormatter.money(store.buyingPower, currencyCode: store.currencyCode)
+            return AppFormatter.money(store.effectiveBuyingPower, currencyCode: store.currencyCode)
         case .sell:
-            if store.availableSellQuantity > 0 {
-                let qty = TradeFormat.quantity(store.availableSellQuantity)
-                let symbol = store.normalizedSymbol
-                return symbol.isEmpty ? qty : "\(qty) \(symbol)"
+            if store.isShortSellModeActive {
+                return AppFormatter.money(store.accountBuyingPower, currencyCode: store.currencyCode)
             }
-            return AppFormatter.money(store.buyingPower, currencyCode: store.currencyCode)
+            let qty = TradeFormat.quantity(store.availableSellQuantity)
+            let symbol = store.normalizedSymbol
+            return symbol.isEmpty ? qty : "\(qty) \(symbol)"
         }
     }
 }
@@ -1375,7 +1417,42 @@ private struct TradeLimitOptionsBar: View {
                     .strokeBorder(Color(.separator).opacity(0.16), lineWidth: 0.75)
             }
 
-            Spacer(minLength: 8)
+            Spacer(minLength: 6)
+
+            if store.canToggleMarginMode {
+                Button {
+                    TradeKeypadHaptics.selection()
+                    store.setMarginEnabled(!store.isMarginEnabled)
+                } label: {
+                    Text(
+                        store.draft.side == .buy
+                            ? L10n.Trade.marginChipBuy(locale: locale)
+                            : L10n.Trade.marginChipSell(locale: locale)
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(store.isMarginEnabled ? AppTheme.ColorToken.warning : .secondary)
+                    .lineLimit(1)
+                    .padding(.horizontal, 12)
+                    .frame(height: 42)
+                    .background(
+                        store.isMarginEnabled
+                            ? AppTheme.ColorToken.warning.opacity(0.14)
+                            : AppTheme.ColorToken.groupedSurface,
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(
+                                store.isMarginEnabled
+                                    ? AppTheme.ColorToken.warning.opacity(0.42)
+                                    : Color(.separator).opacity(0.16),
+                                lineWidth: store.isMarginEnabled ? 1.1 : 0.75
+                            )
+                    }
+                    .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(TradeFlatPressButtonStyle())
+            }
 
             Button {
                 TradeKeypadHaptics.selection()
@@ -1608,6 +1685,8 @@ enum TradeValidationActionTitle {
         switch issue.kind {
         case .missingInput:
             return L10n.Trade.simpleEnterAmount(locale: locale)
+        case .notionalBelowMinimum:
+            return L10n.Trade.simpleNotionalMinShort(locale: locale)
         case .buyExceedsBuyingPower, .shortExceedsBuyingPower:
             return L10n.Trade.simpleInsufficientBuyingPower(locale: locale)
         case .sellExceedsPosition:

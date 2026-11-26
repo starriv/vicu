@@ -11,6 +11,8 @@ struct TradeOrderConfirmationSnapshot: Identifiable {
     let currencyCode: String
     let environment: TradeEnvironment
     let positionQuantity: Decimal
+    let cashBuyingPower: Decimal?
+    let isClosingShortPosition: Bool
     let warnings: [String]
 
     @MainActor
@@ -24,7 +26,20 @@ struct TradeOrderConfirmationSnapshot: Identifiable {
         currencyCode = store.currencyCode
         self.environment = environment
         positionQuantity = store.availableSellQuantity
+        cashBuyingPower = store.cashBuyingPower
+        isClosingShortPosition = store.isClosingShortPosition
         warnings = store.validation.warnings
+    }
+
+    var usesMarginBuyingPower: Bool {
+        guard order.side == .buy,
+              !isClosingShortPosition,
+              let estimatedNotional,
+              let cashBuyingPower else {
+            return false
+        }
+
+        return estimatedNotional > cashBuyingPower
     }
 
     var isShortSell: Bool {
@@ -123,6 +138,10 @@ struct TradeOrderConfirmationSheet: View {
 
     private var warningMessages: [String] {
         var messages = snapshot.warnings
+
+        if snapshot.usesMarginBuyingPower {
+            messages.append(L10n.Trade.confirmMarginBuyWarning(locale: locale))
+        }
 
         if snapshot.isShortSell {
             messages.append(L10n.Trade.confirmShortSellWarning(locale: locale))
@@ -224,6 +243,15 @@ private struct TradeOrderConfirmationHeroHeader: View {
         VStack(alignment: .center, spacing: 0) {
             HStack(spacing: 6) {
                 AppSheetBadgePill(title: sideOrderBadgeText, tint: sideTint)
+
+                if snapshot.usesMarginBuyingPower {
+                    AppSheetBadgePill(
+                        title: L10n.Trade.confirmMarginBuyTag(locale: locale),
+                        tint: AppTheme.ColorToken.warning,
+                        horizontalPadding: 10,
+                        backgroundOpacity: 0.14
+                    )
+                }
 
                 if snapshot.isShortSell {
                     AppSheetBadgePill(

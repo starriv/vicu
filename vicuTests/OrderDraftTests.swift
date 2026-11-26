@@ -327,10 +327,14 @@ final class TradeStoreEstimationTests: XCTestCase {
 
     private func makeAccount(
         buyingPower: String = "1000.00",
-        nonMarginableBuyingPower: String? = "500.00",
+        cash: String? = nil,
+        nonMarginableBuyingPower: String? = nil,
+        optionsBuyingPower: String? = nil,
         shortingEnabled: Bool = true
     ) -> AlpacaAccount {
-        AlpacaAccount(
+        let resolvedCash = cash ?? buyingPower
+        let resolvedNonMarginable = nonMarginableBuyingPower ?? resolvedCash
+        return AlpacaAccount(
             id: "acct-1",
             accountNumber: "123456",
             createdAt: nil,
@@ -340,10 +344,10 @@ final class TradeStoreEstimationTests: XCTestCase {
             regtBuyingPower: nil,
             daytradingBuyingPower: nil,
             effectiveBuyingPower: nil,
-            nonMarginableBuyingPower: nonMarginableBuyingPower,
-            optionsBuyingPower: nil,
+            nonMarginableBuyingPower: resolvedNonMarginable,
+            optionsBuyingPower: optionsBuyingPower,
             bodDtbp: nil,
-            cash: buyingPower,
+            cash: resolvedCash,
             accruedFees: nil,
             portfolioValue: buyingPower,
             patternDayTrader: false,
@@ -513,8 +517,9 @@ final class TradeStoreEstimationTests: XCTestCase {
         store.fillQuantity(percent: 1)
         XCTAssertEqual(store.estimatedExecutionPrice, Decimal(string: "120.01"))
         let quantity = try XCTUnwrap(Decimal(string: store.draft.quantityText))
+        let collaredCost = quantity * Decimal(string: "120.01")! * TradeStore.marketBuySharesCollar
         XCTAssertGreaterThan(quantity, 8)
-        XCTAssertLessThanOrEqual(quantity * Decimal(string: "120.01")!, 1000)
+        XCTAssertLessThanOrEqual(collaredCost, 1000)
         XCTAssertTrue(store.validation.canSubmit)
     }
 
@@ -534,20 +539,28 @@ final class TradeStoreEstimationTests: XCTestCase {
     }
 
     func testQuickFillMaxInSharesFloorsDownAndNeverExceedsBuyingPower() {
-        // 100 / 1.50 = 66.6666666... -> .plain would round UP to 66.666667 (100.0000005 > 100!)
+        // Limit order: exact 100 / 1.50 = 66.6666666... -> .plain would round UP to 66.666667 (100.0000005 > 100!)
         let seed = TradeSeedContext(
             account: makeAccount(buyingPower: "100.00"),
             asset: makeAsset(fractionable: true),
             latestQuote: makeQuote(bid: 1.49, ask: 1.50),
             latestTrade: makeTrade(price: 1.50)
         )
-        let store = TradeStore(symbol: "AAPL", side: .buy, orderType: .market, sizingMode: .shares, seed: seed)
+        let limitStore = TradeStore(symbol: "AAPL", side: .buy, orderType: .limit, sizingMode: .shares, seed: seed)
+        limitStore.setLimitPriceText("1.50")
 
-        store.fillQuickAmount(percent: Decimal(1))
+        limitStore.fillQuickAmount(percent: Decimal(1))
 
-        XCTAssertEqual(store.draft.quantityText, "66.666666")
-        XCTAssertTrue(store.validation.canSubmit, "Max quick-fill must never trigger buyExceedsBuyingPower: \(store.validation.errors)")
-        XCTAssertLessThanOrEqual(store.estimatedNotional ?? 0, Decimal(100))
+        XCTAssertEqual(limitStore.draft.quantityText, "66.666666")
+        XCTAssertTrue(limitStore.validation.canSubmit, "Limit Max quick-fill must never trigger buyExceedsBuyingPower: \(limitStore.validation.errors)")
+        XCTAssertLessThanOrEqual(limitStore.estimatedNotional ?? 0, Decimal(100))
+
+        // Market buy in shares applies 3% protective collar: floor(100 / (1.50 * 1.03)) = 64.724919
+        let marketStore = TradeStore(symbol: "AAPL", side: .buy, orderType: .market, sizingMode: .shares, seed: seed)
+        marketStore.fillQuickAmount(percent: Decimal(1))
+        XCTAssertEqual(marketStore.draft.quantityText, "64.724919")
+        XCTAssertLessThanOrEqual((marketStore.estimatedNotional ?? 0) * TradeStore.marketBuySharesCollar, Decimal(100))
+        XCTAssertTrue(marketStore.validation.canSubmit)
     }
 
     func testNonFractionableAssetQuickFillFloorsToWholeShares() {
@@ -557,13 +570,14 @@ final class TradeStoreEstimationTests: XCTestCase {
             latestQuote: makeQuote(bid: 14.95, ask: 15.00),
             latestTrade: makeTrade(price: 15.00)
         )
-        let store = TradeStore(symbol: "AAPL", side: .buy, orderType: .market, sizingMode: .shares, seed: seed)
+        let limitStore = TradeStore(symbol: "AAPL", side: .buy, orderType: .limit, sizingMode: .shares, seed: seed)
+        limitStore.setLimitPriceText("15.00")
 
-        store.fillQuickAmount(percent: Decimal(1))
+        limitStore.fillQuickAmount(percent: Decimal(1))
 
-        XCTAssertEqual(store.draft.quantityText, "6")
-        XCTAssertEqual(store.estimatedNotional, Decimal(90))
-        XCTAssertTrue(store.validation.canSubmit, "Whole-share floor should pass validation: \(store.validation.errors)")
+        XCTAssertEqual(limitStore.draft.quantityText, "6")
+        XCTAssertEqual(limitStore.estimatedNotional, Decimal(90))
+        XCTAssertTrue(limitStore.validation.canSubmit, "Whole-share floor should pass validation: \(limitStore.validation.errors)")
     }
 
     func testSellUsesAvailableQuantityWhenSharesReservedByOpenOrders() {
@@ -594,10 +608,10 @@ final class TradeStoreEstimationTests: XCTestCase {
         XCTAssertEqual(store.validation.firstIssue?.kind, .sellExceedsPosition)
     }
 
-    func testShortSellQuickFillRespectsThreePercentBufferAndWholeShares() {
-        // Buying power $1000, ask $100 -> buffered short price $103 -> floor(1000/103) = 9 shares
+    func testSpotSellQuickFillDoesNotOpenShortPositionWhenHoldingZeroShares() {
+        // By default (isMarginEnabled == false), spot sell must block both quick-fill and manual short entry.
         let seed = TradeSeedContext(
-            account: makeAccount(buyingPower: "1000.00", shortingEnabled: true),
+            account: makeAccount(buyingPower: "20000.00", cash: "10000.00", nonMarginableBuyingPower: "10000.00", shortingEnabled: true),
             asset: makeAsset(fractionable: true, shortable: true),
             position: nil,
             latestQuote: makeQuote(bid: 99.90, ask: 100.00),
@@ -605,10 +619,249 @@ final class TradeStoreEstimationTests: XCTestCase {
         )
         let store = TradeStore(symbol: "AAPL", side: .sell, orderType: .market, sizingMode: .shares, seed: seed)
 
+        XCTAssertFalse(store.isMarginEnabled)
+        XCTAssertTrue(store.canToggleMarginMode)
+        XCTAssertFalse(store.quickFillAvailable)
+        XCTAssertNil(store.sellQuickFillQuantityBase)
         store.fillQuickAmount(percent: Decimal(1))
+        XCTAssertEqual(store.draft.quantityText, "")
+        XCTAssertNil(store.activeQuickFillPercent)
 
-        XCTAssertEqual(store.draft.quantityText, "9")
-        XCTAssertTrue(store.validation.canSubmit, "Short sell Max should respect 3% buffer and integer shares: \(store.validation.errors)")
+        // Manual short entry is hard-blocked while margin mode is OFF.
+        store.setSimpleInputText("5")
+        XCTAssertFalse(store.validation.canSubmit)
+        XCTAssertEqual(store.validation.firstIssue?.kind, .sellExceedsPosition)
+
+        // Opting into margin/short mode unlocks buffered whole-share shorting.
+        store.setMarginEnabled(true)
+        XCTAssertTrue(store.isShortSellModeActive)
+        XCTAssertTrue(store.quickFillAvailable)
+        store.fillQuickAmount(percent: Decimal(1))
+        // 20000 / (100 * 1.03) = 194.17 -> 194 whole shares
+        XCTAssertEqual(store.draft.quantityText, "194")
+        XCTAssertTrue(store.validation.canSubmit)
+    }
+
+    func testBuyQuickFillUsesCashBuyingPowerWithoutMarginAndToggleUnlocksMargin() {
+        // Margin account: $20,000 total buying power (2x), $10,000 cash, $8,000 non-marginable (after $2,000 open hold).
+        let seed = TradeSeedContext(
+            account: makeAccount(buyingPower: "20000.00", cash: "10000.00", nonMarginableBuyingPower: "8000.00"),
+            asset: makeAsset(fractionable: true, marginable: true),
+            latestQuote: makeQuote(bid: 99.95, ask: 100.00),
+            latestTrade: makeTrade(price: 100.00)
+        )
+        let store = TradeStore(symbol: "AAPL", side: .buy, orderType: .market, sizingMode: .notional, seed: seed)
+
+        XCTAssertFalse(store.isMarginEnabled)
+        XCTAssertTrue(store.canToggleMarginMode)
+        XCTAssertEqual(store.cashBuyingPower, Decimal(8000))
+        XCTAssertEqual(store.buyingPower, Decimal(8000))
+        XCTAssertEqual(store.accountBuyingPower, Decimal(20000))
+
+        store.fillQuickAmount(percent: Decimal(1))
+        XCTAssertEqual(store.draft.notionalText, "8000")
+        XCTAssertTrue(store.validation.canSubmit)
+
+        // Manual input exceeding cash ($12,000) is hard-blocked when margin mode is OFF.
+        store.setSimpleInputText("12000")
+        XCTAssertFalse(store.validation.canSubmit)
+        XCTAssertEqual(store.validation.firstIssue?.kind, .buyExceedsBuyingPower)
+
+        // Opting into margin mode unlocks buying up to $20,000 and still flags margin warning on confirmation snapshot.
+        store.setMarginEnabled(true)
+        XCTAssertEqual(store.buyingPower, Decimal(20000))
+        XCTAssertTrue(store.validation.canSubmit)
+        let snapshot = TradeOrderConfirmationSnapshot(store: store, environment: .paper)
+        XCTAssertTrue(snapshot.usesMarginBuyingPower)
+
+        store.fillQuickAmount(percent: Decimal(1))
+        XCTAssertEqual(store.draft.notionalText, "20000")
+        XCTAssertTrue(store.validation.canSubmit)
+    }
+
+    func testShortCoverBuyIsAllowedEvenWhenCashBuyingPowerIsInsufficient() {
+        let shortPosition = makePosition(
+            quantity: "-10",
+            quantityAvailable: "-10",
+            marketValue: "-1000.00",
+            currentPrice: "100.00"
+        )
+        let seed = TradeSeedContext(
+            account: makeAccount(buyingPower: "5000.00", cash: "200.00", nonMarginableBuyingPower: "200.00"),
+            asset: makeAsset(fractionable: true, marginable: true),
+            position: shortPosition,
+            latestQuote: makeQuote(bid: 99.95, ask: 100.00),
+            latestTrade: makeTrade(price: 100.00)
+        )
+        let store = TradeStore(symbol: "AAPL", side: .buy, orderType: .market, sizingMode: .shares, seed: seed)
+
+        store.setSimpleInputText("10")
+        XCTAssertFalse(store.isMarginEnabled)
+        XCTAssertTrue(store.validation.canSubmit, "Covering an existing short position must never be blocked by cash-only guard")
+    }
+
+    func testNotionalBelowOneDollarIsRejectedAndZeroQuickFillDoesNotHighlightPercent() {
+        let seed = TradeSeedContext(
+            account: makeAccount(buyingPower: "2.00", cash: "2.00", nonMarginableBuyingPower: "2.00"),
+            asset: makeAsset(fractionable: true, marginable: true),
+            latestQuote: makeQuote(bid: 99.95, ask: 100.00),
+            latestTrade: makeTrade(price: 100.00)
+        )
+        let store = TradeStore(symbol: "AAPL", side: .buy, orderType: .market, sizingMode: .notional, seed: seed)
+
+        // Manual $0.50 notional is rejected by Alpaca's $1 minimum rule.
+        store.setSimpleInputText("0.50")
+        XCTAssertFalse(store.validation.canSubmit)
+        XCTAssertEqual(store.validation.firstIssue?.kind, .notionalBelowMinimum)
+
+        // Tapping 25% of $2.00 = $0.50 (< $1.00) must not fill invalid amount or highlight 25%.
+        store.setSimpleInputText("1.50")
+        store.fillQuickAmount(percent: Decimal(string: "0.25")!)
+        XCTAssertNil(store.activeQuickFillPercent)
+        XCTAssertEqual(store.draft.notionalText, "1.50")
+    }
+
+    func testSwitchingMarketMaxNotionalToLimitClampsAgainstResolvedLimitPrice() {
+        let seed = TradeSeedContext(
+            account: makeAccount(buyingPower: "1000.00", cash: "1000.00", nonMarginableBuyingPower: "1000.00"),
+            asset: makeAsset(fractionable: true),
+            latestQuote: makeQuote(bid: 100.00, ask: 102.00),
+            latestTrade: makeTrade(price: 101.00)
+        )
+        let store = TradeStore(symbol: "AAPL", side: .buy, orderType: .market, sizingMode: .notional, seed: seed)
+        store.fillQuickAmount(percent: Decimal(1))
+        XCTAssertEqual(store.draft.notionalText, "1000")
+
+        store.prepareLimitOrder()
+        XCTAssertEqual(store.draft.orderType, .limit)
+        XCTAssertEqual(store.sizingMode, .shares)
+        XCTAssertLessThanOrEqual(store.estimatedNotional ?? 0, Decimal(1000))
+        XCTAssertTrue(store.validation.canSubmit)
+
+        // Clearing limit price disables buy quick-fill instead of falling back to market ask.
+        store.setLimitPriceText("")
+        XCTAssertFalse(store.quickFillAvailable)
+    }
+
+    func testOptionBuyToCloseUsesClosingBuyingPowerWhenStockMarginCashIsNegative() {
+        let store = OptionTradeStore(
+            contractSymbol: "NVDA261218C00140000",
+            initialIntent: .buyToClose,
+            initialSnapshotModel: nil
+        )
+        let account = AlpacaAccount(
+            id: "acct-opt",
+            accountNumber: "123456",
+            createdAt: nil,
+            status: "ACTIVE",
+            currency: "USD",
+            buyingPower: "15000.00",
+            regtBuyingPower: nil,
+            daytradingBuyingPower: nil,
+            effectiveBuyingPower: nil,
+            nonMarginableBuyingPower: "0.00",
+            optionsBuyingPower: "2000.00",
+            bodDtbp: nil,
+            cash: "-500.00",
+            accruedFees: nil,
+            portfolioValue: "10000.00",
+            patternDayTrader: false,
+            tradingBlocked: false,
+            transfersBlocked: false,
+            accountBlocked: false,
+            tradeSuspendedByUser: false,
+            multiplier: "2",
+            shortingEnabled: true,
+            equity: "10000.00",
+            lastEquity: "10000.00",
+            longMarketValue: nil,
+            shortMarketValue: nil,
+            positionMarketValue: nil,
+            initialMargin: nil,
+            maintenanceMargin: nil,
+            lastMaintenanceMargin: nil,
+            sma: nil,
+            daytradeCount: 0,
+            balanceAsOf: nil,
+            cryptoStatus: nil,
+            optionsApprovedLevel: 2,
+            optionsTradingLevel: 2,
+            cryptoTier: nil,
+            intradayAdjustments: nil,
+            pendingRegTAFFees: nil
+        )
+        let shortOpt = AlpacaPosition(
+            assetID: "opt-1",
+            symbol: "NVDA261218C00140000",
+            exchange: "OPRA",
+            assetClass: "us_option",
+            assetMarginable: false,
+            quantity: "-2",
+            quantityAvailable: "-2",
+            averageEntryPrice: "4.00",
+            side: "short",
+            marketValue: "-800.00",
+            costBasis: "-800.00",
+            unrealizedPL: "0.00",
+            unrealizedPLPC: "0.00",
+            unrealizedIntradayPL: "0.00",
+            unrealizedIntradayPLPC: "0.00",
+            currentPrice: "4.00",
+            lastDayPrice: "4.00",
+            changeToday: "0.00"
+        )
+
+        store.configureForTesting(account: account, position: shortOpt)
+        store.setLimitPriceText("4.00")
+        XCTAssertEqual(store.optionsBuyingPower, Decimal(2000))
+        XCTAssertEqual(store.maxContractsAvailable, 2)
+
+        store.fillContracts(percent: Decimal(1))
+        XCTAssertEqual(store.draft.quantityText, "2")
+        XCTAssertTrue(store.validation.canSubmit)
+
+        // Switching to buyToOpen strictly enforces cash-only ($0 because cash is negative).
+        store.intent = .buyToOpen
+        XCTAssertEqual(store.optionsBuyingPower, Decimal(0))
+        XCTAssertEqual(store.maxContractsAvailable, 0)
+    }
+
+    func testNegativeCashAccountDisablesBuyQuickFillInsteadOfBorrowingMargin() {
+        let seed = TradeSeedContext(
+            account: makeAccount(buyingPower: "45000.00", cash: "-2500.00", nonMarginableBuyingPower: "0.00"),
+            asset: makeAsset(fractionable: true, marginable: true),
+            latestQuote: makeQuote(bid: 99.95, ask: 100.00),
+            latestTrade: makeTrade(price: 100.00)
+        )
+        let store = TradeStore(symbol: "AAPL", side: .buy, orderType: .market, sizingMode: .notional, seed: seed)
+
+        XCTAssertEqual(store.cashBuyingPower, Decimal(0))
+        XCTAssertFalse(store.quickFillAvailable)
+        store.fillQuickAmount(percent: Decimal(1))
+        XCTAssertEqual(store.draft.notionalText, "")
+    }
+
+    func testSellMaxInNotionalModeLiquidatesExactAvailableShares() {
+        let position = makePosition(
+            quantity: "64.5",
+            quantityAvailable: "64.5",
+            marketValue: "6450.00",
+            currentPrice: "100.00"
+        )
+        let seed = TradeSeedContext(
+            account: makeAccount(buyingPower: "20000.00", cash: "10000.00", nonMarginableBuyingPower: "10000.00"),
+            asset: makeAsset(fractionable: true),
+            position: position,
+            latestQuote: makeQuote(bid: 100.00, ask: 100.05),
+            latestTrade: makeTrade(price: 100.00)
+        )
+        let store = TradeStore(symbol: "AAPL", side: .sell, orderType: .market, sizingMode: .notional, seed: seed)
+
+        store.fillQuickAmount(percent: Decimal(1))
+        XCTAssertEqual(store.sizingMode, .shares)
+        XCTAssertEqual(store.draft.quantityText, "64.5")
+        XCTAssertEqual(store.draft.notionalText, "")
+        XCTAssertTrue(store.validation.canSubmit)
     }
 
     func testBidirectionalNotionalAndSharesEstimationAndToggle() {
