@@ -137,7 +137,15 @@ enum MarketSessionSchedule {
         in days: [AlpacaCalendarDay],
         overnightDays: [AlpacaCalendarDay] = []
     ) -> MarketSessionInterval? {
-        intervals(from: days, overnightDays: overnightDays)
+        activeInterval(at: date, in: intervals(from: days, overnightDays: overnightDays))
+    }
+
+    /// Overload for callers that already built the interval list, so it isn't recomputed per query.
+    static func activeInterval(
+        at date: Date,
+        in intervals: [MarketSessionInterval]
+    ) -> MarketSessionInterval? {
+        intervals
             .filter { $0.contains(date) }
             .min { lhs, rhs in
                 if lhs.session.activePriority == rhs.session.activePriority {
@@ -174,8 +182,15 @@ enum MarketSessionSchedule {
         overnightDays: [AlpacaCalendarDay] = [],
         at date: Date
     ) -> MarketSessionProgress {
-        let cycleIntervals = intervals(from: days, overnightDays: overnightDays)
-            .filter { $0.marketDate == activeInterval.marketDate }
+        progress(for: activeInterval, in: intervals(from: days, overnightDays: overnightDays), at: date)
+    }
+
+    static func progress(
+        for activeInterval: MarketSessionInterval,
+        in intervals: [MarketSessionInterval],
+        at date: Date
+    ) -> MarketSessionProgress {
+        let cycleIntervals = intervals.filter { $0.marketDate == activeInterval.marketDate }
         return MarketSessionProgress(intervals: cycleIntervals, referenceDate: date)
     }
 

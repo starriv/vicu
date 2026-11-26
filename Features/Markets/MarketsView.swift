@@ -103,6 +103,16 @@ struct MarketsView: View {
             }
         }
         .task(id: marketContextID) {
+            // Local-only read; safe to do before the transition delay so recents are never stale.
+            searchStore.syncRecentSymbols(app: app)
+
+            // Let the tab-switch Liquid Glass transition settle before kicking off
+            // search prompt/cache mutations and network revalidation.
+            try? await Task.sleep(for: .milliseconds(180))
+            guard !Task.isCancelled else {
+                return
+            }
+
             async let marketsLoad: Void = loadInitialOrRevalidate()
             async let searchLoad: Void = searchStore.handleContextAppearance(contextID: marketContextID, app: app)
             _ = await (marketsLoad, searchLoad)
@@ -112,9 +122,6 @@ struct MarketsView: View {
         }
         .task(id: app.cachedMarketOverviewAt) {
             await refreshMarketDataAtNextBoundary()
-        }
-        .onAppear {
-            searchStore.syncRecentSymbols(app: app)
         }
         .onDisappear {
             searchStore.onDisappear()
@@ -352,27 +359,21 @@ struct MarketListModePicker: View {
     @Binding var selection: MarketListMode
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            if #available(iOS 26.0, *) {
-                glassContent
-            } else {
-                fallbackContent
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: 10) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    pickerButtons(usesGlass: true)
+                        .padding(.vertical, 2)
+                }
+                .scrollClipDisabled()
             }
+        } else {
+            ScrollView(.horizontal, showsIndicators: false) {
+                pickerButtons(usesGlass: false)
+                    .padding(.vertical, 2)
+            }
+            .scrollClipDisabled()
         }
-        .scrollClipDisabled()
-    }
-
-    @available(iOS 26.0, *)
-    private var glassContent: some View {
-        GlassEffectContainer(spacing: 10) {
-            pickerButtons(usesGlass: true)
-        }
-        .padding(.vertical, 2)
-    }
-
-    private var fallbackContent: some View {
-        pickerButtons(usesGlass: false)
-            .padding(.vertical, 2)
     }
 
     private func pickerButtons(usesGlass: Bool) -> some View {
@@ -524,25 +525,15 @@ struct MarketStatusCard: View {
             from: overview.calendar,
             overnightDays: overview.overnightCalendar
         )
-        let targetInterval = MarketSessionSchedule.activeInterval(
-            at: referenceDate,
-            in: overview.calendar,
-            overnightDays: overview.overnightCalendar
-        )
+        let targetInterval = MarketSessionSchedule.activeInterval(at: referenceDate, in: intervals)
             ?? intervals.first { $0.end > referenceDate }
-
 
         guard let targetInterval else {
             return nil
         }
 
         return MarketSessionTimeline(
-            progress: MarketSessionSchedule.progress(
-                for: targetInterval,
-                in: overview.calendar,
-                overnightDays: overview.overnightCalendar,
-                at: referenceDate
-            )
+            progress: MarketSessionSchedule.progress(for: targetInterval, in: intervals, at: referenceDate)
         )
     }
 }
@@ -674,21 +665,6 @@ enum MarketSession {
             AppTheme.ColorToken.icon
         }
     }
-
-    var activePriority: Int {
-        switch self {
-        case .regular:
-            0
-        case .preMarket:
-            1
-        case .afterHours:
-            2
-        case .overnight:
-            3
-        case .closed, .unknown:
-            4
-        }
-    }
 }
 
 struct MarketSessionSnapshot {
@@ -697,13 +673,16 @@ struct MarketSessionSnapshot {
 
     static func current(for overview: MarketOverview, now referenceDate: Date = Date()) -> MarketSessionSnapshot {
         let nextClockOpen = AlpacaDateParser.date(overview.clock.nextOpen).flatMap { $0 > referenceDate ? $0 : nil }
-        let intervals = MarketTradingInterval.intervals(
+        let intervals = MarketSessionSchedule.intervals(
             from: overview.calendar,
             overnightDays: overview.overnightCalendar
         )
 
-        if let activeInterval = intervals.activeInterval(at: referenceDate) {
-            return MarketSessionSnapshot(session: activeInterval.session, nextBoundary: activeInterval.end)
+        if let activeInterval = MarketSessionSchedule.activeInterval(at: referenceDate, in: intervals) {
+            return MarketSessionSnapshot(
+                session: MarketSession.session(for: activeInterval.session),
+                nextBoundary: activeInterval.end
+            )
         }
 
         if intervals.isEmpty {
@@ -740,44 +719,6 @@ struct MarketSessionSnapshot {
         }
     }
 }
-
-private struct MarketTradingInterval {
-    let session: MarketSession
-    let start: Date
-    let end: Date
-
-    func contains(_ date: Date) -> Bool {
-        start <= date && date < end
-    }
-
-    static func intervals(
-        from days: [AlpacaCalendarDay],
-        overnightDays: [AlpacaCalendarDay]
-    ) -> [MarketTradingInterval] {
-        MarketSessionSchedule.intervals(from: days, overnightDays: overnightDays)
-            .map { interval in
-                MarketTradingInterval(
-                    session: MarketSession.session(for: interval.session),
-                    start: interval.start,
-                    end: interval.end
-                )
-            }
-    }
-}
-
-private extension Array where Element == MarketTradingInterval {
-    func activeInterval(at date: Date) -> MarketTradingInterval? {
-        filter { $0.contains(date) }
-            .min { lhs, rhs in
-                if lhs.session.activePriority == rhs.session.activePriority {
-                    return lhs.start < rhs.start
-                }
-
-                return lhs.session.activePriority < rhs.session.activePriority
-            }
-    }
-}
-
 
 private struct MarketSymbolSection: View {
     let mode: MarketListMode
