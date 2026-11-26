@@ -162,12 +162,12 @@ struct PositionsSharePayload: Identifiable {
     }
 
     private static let palette: [Color] = [
-        AppTheme.ColorToken.brand,
-        Color(red: 0.118, green: 0.533, blue: 0.898),
-        AppTheme.ColorToken.positive,
-        Color(red: 0.933, green: 0.463, blue: 0.129),
-        Color(red: 0.514, green: 0.341, blue: 0.820),
-        Color(red: 0.071, green: 0.647, blue: 0.725)
+        Color(red: 0.290, green: 0.435, blue: 0.647),
+        Color(red: 0.239, green: 0.569, blue: 0.549),
+        Color(red: 0.831, green: 0.635, blue: 0.298),
+        Color(red: 0.486, green: 0.435, blue: 0.624),
+        Color(red: 0.557, green: 0.588, blue: 0.643),
+        Color(red: 0.784, green: 0.478, blue: 0.420)
     ]
 }
 
@@ -393,8 +393,8 @@ private struct PositionsShareCard: View {
     private let allocationLimit = 4
     private let rowLimit = 5
 
-    private var style: PositionsShareCardStyle {
-        PositionsShareCardStyle(colorScheme: colorScheme)
+    private var style: ShareCardStyle {
+        ShareCardStyle(colorScheme: colorScheme)
     }
 
     private var rows: [AlpacaPosition] {
@@ -409,128 +409,191 @@ private struct PositionsShareCard: View {
         PositionDisplay.tint(for: payload.totalUnrealizedPL)
     }
 
+    private var isUnrealizedPositive: Bool {
+        (payload.totalUnrealizedPL ?? payload.totalUnrealizedPLPercent ?? 0) >= 0
+    }
+
     private var totalUnrealizedPercentText: String? {
         payload.totalUnrealizedPLPercent.map { AppFormatter.signedPercent($0) }
     }
 
+    private var allocationSlices: [PositionsShareAllocationSlice] {
+        payload.allocationSlices(limit: allocationLimit, locale: locale)
+    }
+
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: style.backgroundColors,
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+            ShareCardBackground(
+                accentTint: totalUnrealizedTint,
+                style: style
             )
 
             VStack(alignment: .leading, spacing: 0) {
                 header
 
-                HStack(alignment: .center, spacing: 20) {
-                    PositionsSharePieChart(
-                        slices: payload.allocationSlices(limit: allocationLimit, locale: locale),
-                        positionCount: payload.positions.count,
-                        style: style,
-                        locale: locale
-                    )
-                    .frame(width: 190, height: 190)
+                performanceHero
+                    .padding(.top, 20)
 
-                    PositionsShareLegend(
-                        slices: payload.allocationSlices(limit: allocationLimit, locale: locale),
-                        locale: locale,
-                        style: style
-                    )
-                }
-                .padding(.top, 24)
+                allocationCard
+                    .padding(.top, 18)
 
-                PositionsShareMetric(
-                    title: L10n.PositionsShare.unrealizedPL(locale: locale),
-                    value: AppFormatter.signedCompactMoney(payload.totalUnrealizedPL, currencyCode: payload.currencyCode),
-                    secondaryValue: totalUnrealizedPercentText,
-                    tint: totalUnrealizedTint,
+                holdingsHeader
+                    .padding(.top, 22)
+
+                holdingsTableCard
+                    .padding(.top, 10)
+
+                Spacer(minLength: 14)
+
+                ShareCardFooter(
+                    timestampText: Date.now.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(locale)),
                     style: style
                 )
-                .padding(.top, 22)
-
-                Text(L10n.PositionsShare.holdings(locale: locale))
-                    .font(.system(size: 18, weight: .black, design: .rounded))
-                    .foregroundStyle(style.primaryText)
-                    .padding(.top, 24)
-
-                PositionsShareTableHeader(style: style, locale: locale)
-                    .padding(.top, 12)
-
-                VStack(spacing: 0) {
-                    ForEach(rows) { position in
-                        PositionsShareTableRow(
-                            position: position,
-                            currencyCode: payload.currencyCode,
-                            style: style
-                        )
-
-                        if position.id != rows.last?.id {
-                            Rectangle()
-                                .fill(style.divider)
-                                .frame(height: 1)
-                        }
-                    }
-                }
-                .padding(.top, 2)
-
-                if hiddenCount > 0 {
-                    Text(L10n.PositionsShare.morePositions(count: hiddenCount, locale: locale))
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(style.tertiaryText)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                        .padding(.top, 10)
-                }
-
-                Spacer(minLength: 0)
-
-                footer
             }
-            .padding(34)
+            .padding(36)
         }
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(L10n.PositionsShare.portfolioSnapshot(locale: locale))
-                    .font(.system(size: 34, weight: .black, design: .rounded))
-                    .foregroundStyle(style.primaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+        HStack(alignment: .center, spacing: 12) {
+            Text(L10n.PositionsShare.portfolioSnapshot(locale: locale))
+                .font(.system(size: 32, weight: .black, design: .rounded))
+                .foregroundStyle(style.primaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
 
-                Spacer(minLength: 12)
-            }
+            Spacer(minLength: 8)
 
             Text(L10n.PositionsShare.sharePreviewTitle(count: payload.positions.count, locale: locale))
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
-                .foregroundStyle(style.secondaryText)
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(style.badgeText)
+                .padding(.horizontal, 12)
+                .frame(height: 28)
+                .background(style.badgeBackground, in: Capsule())
                 .lineLimit(1)
-                .minimumScaleFactor(0.78)
         }
     }
 
-    private var footer: some View {
-        HStack {
-            Text("@Vicu")
-                .font(.system(size: 18, weight: .black, design: .rounded))
-                .foregroundStyle(AppTheme.ColorToken.brand)
+    private var performanceHero: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(L10n.PositionsShare.unrealizedPL(locale: locale))
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(style.metricTitleText)
+                .lineLimit(1)
+
+            HStack(alignment: .center, spacing: 12) {
+                Text(AppFormatter.signedCompactMoney(payload.totalUnrealizedPL, currencyCode: payload.currencyCode))
+                    .font(.system(size: 46, weight: .black, design: .rounded))
+                    .monospacedDigit()
+                    .tracking(-1.0)
+                    .foregroundStyle(totalUnrealizedTint)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.55)
+
+                if let totalUnrealizedPercentText {
+                    HStack(spacing: 5) {
+                        Image(systemName: isUnrealizedPositive ? "arrow.up.right" : "arrow.down.right")
+                            .font(.system(size: 12, weight: .bold))
+
+                        Text(totalUnrealizedPercentText)
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                    }
+                    .foregroundStyle(style.secondaryText)
+                    .lineLimit(1)
+                    .padding(.horizontal, 12)
+                    .frame(height: 32)
+                    .background(style.pillBackground, in: Capsule())
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(style.metricBorder, lineWidth: 1)
+                    }
+                }
+
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private var allocationCard: some View {
+        HStack(alignment: .center, spacing: 20) {
+            PositionsSharePieChart(
+                slices: allocationSlices,
+                positionCount: payload.positions.count,
+                style: style,
+                locale: locale
+            )
+            .frame(width: 148, height: 148)
+
+            PositionsShareLegend(
+                slices: allocationSlices,
+                locale: locale,
+                style: style
+            )
+        }
+        .padding(.vertical, 16)
+        .padding(.horizontal, 18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(style.metricBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(style.metricBorder, lineWidth: 1)
+        }
+    }
+
+    private var holdingsHeader: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(L10n.PositionsShare.holdings(locale: locale))
+                .font(.system(size: 17, weight: .black, design: .rounded))
+                .foregroundStyle(style.primaryText)
 
             Spacer()
 
-            Text(Date.now.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(locale)))
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundStyle(style.tertiaryText)
+            if hiddenCount > 0 {
+                Text(L10n.PositionsShare.morePositions(count: hiddenCount, locale: locale))
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(style.tertiaryText)
+            }
         }
-        .padding(.top, 18)
+    }
+
+    private var holdingsTableCard: some View {
+        VStack(spacing: 0) {
+            PositionsShareTableHeader(style: style, locale: locale)
+
+            Rectangle()
+                .fill(style.divider)
+                .frame(height: 1)
+
+            ForEach(rows) { position in
+                PositionsShareTableRow(
+                    position: position,
+                    currencyCode: payload.currencyCode,
+                    style: style
+                )
+
+                if position.id != rows.last?.id {
+                    Rectangle()
+                        .fill(style.divider)
+                        .frame(height: 1)
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 6)
+        .background(style.metricBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(style.metricBorder, lineWidth: 1)
+        }
     }
 }
 
 private struct PositionsSharePieChart: View {
     let slices: [PositionsShareAllocationSlice]
     let positionCount: Int
-    let style: PositionsShareCardStyle
+    let style: ShareCardStyle
     let locale: Locale
 
     var body: some View {
@@ -538,17 +601,17 @@ private struct PositionsSharePieChart: View {
             Chart(slices) { slice in
                 SectorMark(
                     angle: .value(L10n.PositionsShare.allocation(locale: locale), slice.value),
-                    innerRadius: .ratio(0.62),
-                    angularInset: 1.2
+                    innerRadius: .ratio(0.65),
+                    angularInset: 1.5
                 )
-                .cornerRadius(5)
+                .cornerRadius(4)
                 .foregroundStyle(slice.color)
             }
             .chartLegend(.hidden)
 
-            VStack(spacing: 2) {
+            VStack(spacing: 1) {
                 Text("\(positionCount)")
-                    .font(.system(size: 30, weight: .black, design: .rounded))
+                    .font(.system(size: 26, weight: .black, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(style.primaryText)
 
@@ -558,7 +621,7 @@ private struct PositionsSharePieChart: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
-            .frame(width: 82)
+            .frame(width: 72)
         }
     }
 }
@@ -566,12 +629,12 @@ private struct PositionsSharePieChart: View {
 private struct PositionsShareLegend: View {
     let slices: [PositionsShareAllocationSlice]
     let locale: Locale
-    let style: PositionsShareCardStyle
+    let style: ShareCardStyle
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 9) {
             Text(L10n.PositionsShare.allocation(locale: locale))
-                .font(.system(size: 13, weight: .black, design: .rounded))
+                .font(.system(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(style.metricTitleText)
                 .lineLimit(1)
 
@@ -579,10 +642,10 @@ private struct PositionsShareLegend: View {
                 HStack(spacing: 8) {
                     Circle()
                         .fill(slice.color)
-                        .frame(width: 9, height: 9)
+                        .frame(width: 8, height: 8)
 
                     Text(slice.title)
-                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
                         .foregroundStyle(style.primaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.70)
@@ -590,94 +653,47 @@ private struct PositionsShareLegend: View {
                     Spacer(minLength: 8)
 
                     Text(slice.percentText)
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                         .foregroundStyle(style.secondaryText)
                         .lineLimit(1)
                 }
             }
         }
-        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(style.metricBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(style.metricBorder)
-        }
-    }
-}
-
-private struct PositionsShareMetric: View {
-    let title: String
-    let value: String
-    let secondaryValue: String?
-    let tint: Color
-    let style: PositionsShareCardStyle
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(style.metricTitleText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.74)
-
-            Text(displayValue)
-                .font(.system(size: 25, weight: .black, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(tint)
-                .lineLimit(1)
-                .minimumScaleFactor(0.60)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 14)
-        .padding(.horizontal, 16)
-        .background(style.metricBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(style.metricBorder)
-        }
-    }
-
-    private var displayValue: String {
-        guard let secondaryValue else {
-            return value
-        }
-
-        return "\(value) \(secondaryValue)"
     }
 }
 
 private struct PositionsShareTableHeader: View {
-    let style: PositionsShareCardStyle
+    let style: ShareCardStyle
     let locale: Locale
 
     var body: some View {
         HStack(spacing: 8) {
             Text(L10n.PositionsShare.assetCode(locale: locale))
-                .frame(width: 88, alignment: .leading)
+                .frame(width: 84, alignment: .leading)
 
             Text(L10n.PositionsShare.entryPrice(locale: locale))
-                .frame(width: 112, alignment: .trailing)
+                .frame(width: 106, alignment: .trailing)
 
             Text(L10n.PositionsShare.latestPrice(locale: locale))
-                .frame(width: 112, alignment: .trailing)
+                .frame(width: 106, alignment: .trailing)
 
             Text(L10n.PositionsShare.unrealizedPL(locale: locale))
                 .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .font(.system(size: 12, weight: .black, design: .rounded))
+        .font(.system(size: 11, weight: .bold, design: .rounded))
         .foregroundStyle(style.metricTitleText)
         .lineLimit(1)
         .minimumScaleFactor(0.68)
-        .padding(.bottom, 6)
+        .padding(.bottom, 8)
     }
 }
 
 private struct PositionsShareTableRow: View {
     let position: AlpacaPosition
     let currencyCode: String
-    let style: PositionsShareCardStyle
+    let style: ShareCardStyle
 
     private var symbol: String {
         PositionDisplay.normalizedSymbol(position.symbol)
@@ -694,29 +710,29 @@ private struct PositionsShareTableRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(symbol)
-                .font(.system(size: 17, weight: .black, design: .rounded))
+                .font(.system(size: 16, weight: .black, design: .rounded))
                 .monospaced()
                 .foregroundStyle(style.primaryText)
-                .frame(width: 88, alignment: .leading)
+                .frame(width: 84, alignment: .leading)
                 .lineLimit(1)
                 .minimumScaleFactor(0.64)
 
             Text(AppFormatter.money(position.averageEntryPrice, currencyCode: currencyCode))
-                .frame(width: 112, alignment: .trailing)
+                .frame(width: 106, alignment: .trailing)
 
             Text(AppFormatter.money(position.currentPrice, currencyCode: currencyCode))
-                .frame(width: 112, alignment: .trailing)
+                .frame(width: 106, alignment: .trailing)
 
             Text(AppFormatter.signedCompactMoney(unrealizedValue, currencyCode: currencyCode))
                 .foregroundStyle(unrealizedTint)
                 .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .font(.system(size: 16, weight: .bold, design: .rounded))
+        .font(.system(size: 15, weight: .bold, design: .rounded))
         .monospacedDigit()
         .foregroundStyle(style.secondaryText)
         .lineLimit(1)
         .minimumScaleFactor(0.60)
-        .padding(.vertical, 10)
+        .padding(.vertical, 9)
     }
 }
 
@@ -731,74 +747,6 @@ private struct PositionsShareAllocationSlice: Identifiable {
     let value: Double
     let percentText: String
     let color: Color
-}
-
-private struct PositionsShareCardStyle {
-    let backgroundColors: [Color]
-    let primaryText: Color
-    let secondaryText: Color
-    let tertiaryText: Color
-    let metricTitleText: Color
-    let metricBackground: Color
-    let metricBorder: Color
-    let divider: Color
-
-    init(colorScheme: ColorScheme) {
-        switch colorScheme {
-        case .light:
-            self.init(
-                backgroundColors: [
-                    Color(red: 0.988, green: 0.992, blue: 0.980),
-                    Color(red: 0.925, green: 0.965, blue: 0.968),
-                    Color(red: 0.984, green: 0.968, blue: 0.902)
-                ],
-                primaryText: Color(red: 0.055, green: 0.060, blue: 0.064),
-                secondaryText: Color(red: 0.260, green: 0.278, blue: 0.286),
-                tertiaryText: Color(red: 0.415, green: 0.426, blue: 0.440),
-                metricTitleText: Color(red: 0.405, green: 0.420, blue: 0.430),
-                metricBackground: Color.white.opacity(0.74),
-                metricBorder: Color.black.opacity(0.08),
-                divider: Color.black.opacity(0.08)
-            )
-        case .dark:
-            self.init(
-                backgroundColors: [
-                    Color.black,
-                    Color(red: 0.055, green: 0.062, blue: 0.068),
-                    Color.black
-                ],
-                primaryText: .white,
-                secondaryText: .white.opacity(0.82),
-                tertiaryText: .white.opacity(0.46),
-                metricTitleText: .white.opacity(0.54),
-                metricBackground: .white.opacity(0.10),
-                metricBorder: .white.opacity(0),
-                divider: .white.opacity(0.10)
-            )
-        @unknown default:
-            self.init(colorScheme: .dark)
-        }
-    }
-
-    private init(
-        backgroundColors: [Color],
-        primaryText: Color,
-        secondaryText: Color,
-        tertiaryText: Color,
-        metricTitleText: Color,
-        metricBackground: Color,
-        metricBorder: Color,
-        divider: Color
-    ) {
-        self.backgroundColors = backgroundColors
-        self.primaryText = primaryText
-        self.secondaryText = secondaryText
-        self.tertiaryText = tertiaryText
-        self.metricTitleText = metricTitleText
-        self.metricBackground = metricBackground
-        self.metricBorder = metricBorder
-        self.divider = divider
-    }
 }
 
 private struct PositionsShareCircleButtonModifier: ViewModifier {

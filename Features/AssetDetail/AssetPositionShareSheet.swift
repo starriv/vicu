@@ -214,6 +214,10 @@ private struct AssetPositionShareCard: View {
         AssetPositionSharePerformance.intraday(position: payload.position)
     }
 
+    private var unrealizedPerformance: AssetPositionSharePerformance {
+        AssetPositionSharePerformance.unrealized(position: payload.position)
+    }
+
     private var isPositive: Bool {
         intradayPerformance.isPositive
     }
@@ -222,188 +226,175 @@ private struct AssetPositionShareCard: View {
         isPositive ? AppTheme.ColorToken.positive : AppTheme.ColorToken.negative
     }
 
-    private var style: AssetPositionShareCardStyle {
-        AssetPositionShareCardStyle(colorScheme: colorScheme)
+    private var unrealizedTint: Color {
+        guard let amount = unrealizedPerformance.amount else {
+            return style.primaryText
+        }
+
+        return amount >= 0 ? AppTheme.ColorToken.positive : AppTheme.ColorToken.negative
+    }
+
+    private var style: ShareCardStyle {
+        ShareCardStyle(colorScheme: colorScheme)
     }
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: style.backgroundColors,
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+            ShareCardBackground(
+                accentTint: tint,
+                style: style
             )
-
-            AssetPositionShareTrendBackground(
-                isPositive: isPositive,
-                tint: tint,
-                highlight: style.trendHighlight,
-                strokeOpacity: style.trendStrokeOpacity,
-                highlightOpacity: style.trendHighlightOpacity
-            )
-                .opacity(style.trendLayerOpacity)
-                .padding(34)
 
             VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(payload.symbol)
-                        .font(.system(size: 48, weight: .black, design: .rounded))
-                        .monospaced()
-                        .foregroundStyle(style.primaryText)
-                        .lineLimit(1)
+                header
 
-                    if payload.exchange != AppFormatter.placeholder {
-                        Text(payload.exchange)
-                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                Spacer(minLength: 20)
+
+                performanceBlock
+
+                Spacer(minLength: 22)
+
+                metricsCard
+
+                ShareCardFooter(
+                    timestampText: Date.now.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(locale)),
+                    style: style
+                )
+                .padding(.top, 24)
+            }
+            .padding(40)
+        }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 10) {
+                Text(payload.symbol)
+                    .font(.system(size: 46, weight: .black, design: .rounded))
+                    .monospaced()
+                    .foregroundStyle(style.primaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.62)
+
+                if payload.exchange != AppFormatter.placeholder {
+                    Text(payload.exchange)
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(style.badgeText)
+                        .padding(.horizontal, 10)
+                        .frame(height: 26)
+                        .background(style.badgeBackground, in: Capsule())
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 12)
+            }
+
+            Text(payload.displayName)
+                .font(.system(size: 20, weight: .semibold, design: .rounded))
+                .foregroundStyle(style.secondaryText)
+                .lineLimit(2)
+                .minimumScaleFactor(0.76)
+        }
+    }
+
+    private var performanceBlock: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(L10n.AssetPositionShare.intradayPL(locale: locale))
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundStyle(style.metricTitleText)
+                .lineLimit(1)
+
+            Text(AppFormatter.signedMoney(intradayPerformance.amount))
+                .font(.system(size: 82, weight: .black, design: .rounded))
+                .monospacedDigit()
+                .tracking(-1.5)
+                .foregroundStyle(tint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.45)
+                .padding(.top, 6)
+
+            HStack(spacing: 7) {
+                Image(systemName: isPositive ? "arrow.up.right" : "arrow.down.right")
+                    .font(.system(size: 15, weight: .bold))
+
+                Text(AppFormatter.signedPercent(intradayPerformance.percent, fractionLength: 2))
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+            }
+            .foregroundStyle(style.secondaryText)
+            .lineLimit(1)
+            .minimumScaleFactor(0.68)
+            .padding(.horizontal, 15)
+            .frame(height: 38)
+            .background(style.pillBackground, in: Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(style.metricBorder, lineWidth: 1)
+            }
+            .padding(.top, 12)
+        }
+    }
+
+    private var metricsCard: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(L10n.AssetPositionShare.unrealizedPL(locale: locale))
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(style.metricTitleText)
+                    .lineLimit(1)
+
+                Spacer(minLength: 8)
+
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(AppFormatter.signedMoney(unrealizedPerformance.amount))
+                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(unrealizedTint)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.64)
+
+                    if let unrealizedPercent = unrealizedPerformance.percent {
+                        Text(AppFormatter.signedPercent(unrealizedPercent, fractionLength: 2))
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .monospacedDigit()
                             .foregroundStyle(style.secondaryText)
                             .lineLimit(1)
                     }
-
-                    Spacer(minLength: 12)
                 }
-
-                Text(payload.displayName)
-                    .font(.system(size: 22, weight: .semibold, design: .rounded))
-                    .foregroundStyle(style.secondaryText)
-                    .lineLimit(2)
-                    .padding(.top, 8)
-
-                Spacer(minLength: 26)
-
-                Text(AppFormatter.signedPercent(intradayPerformance.percent, fractionLength: 2))
-                    .font(.system(size: 86, weight: .black, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(style.primaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.55)
-
-                HStack(spacing: 8) {
-                    Image(systemName: isPositive ? "arrow.up.right" : "arrow.down.right")
-                        .font(.system(size: 20, weight: .black))
-
-                    Text(AppFormatter.signedMoney(intradayPerformance.amount))
-                        .font(.system(size: 34, weight: .black, design: .rounded))
-                        .monospacedDigit()
-                }
-                .foregroundStyle(tint)
-                .lineLimit(1)
-                .minimumScaleFactor(0.62)
-                .padding(.top, 6)
-
-                Spacer(minLength: 0)
-
-                HStack(spacing: 12) {
-                    AssetPositionSharePriceMetric(
-                        title: L10n.AssetPositionShare.entryPrice(locale: locale),
-                        value: AppFormatter.money(payload.position.averageEntryPrice),
-                        style: style
-                    )
-
-                    AssetPositionSharePriceMetric(
-                        title: L10n.AssetPositionShare.latestPrice(locale: locale),
-                        value: AppFormatter.money(payload.position.currentPrice),
-                        style: style
-                    )
-                }
-
-                HStack {
-                    Text("@Vicu")
-                        .font(.system(size: 18, weight: .black, design: .rounded))
-                        .foregroundStyle(AppTheme.ColorToken.brand)
-
-                    Spacer()
-
-                    Text(Date.now.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(locale)))
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .foregroundStyle(style.tertiaryText)
-                }
-                .padding(.top, 28)
             }
-            .padding(42)
+            .padding(.vertical, 16)
+            .padding(.horizontal, 20)
+
+            Rectangle()
+                .fill(style.divider)
+                .frame(height: 1)
+                .padding(.horizontal, 20)
+
+            HStack(spacing: 0) {
+                AssetPositionSharePriceColumn(
+                    title: L10n.AssetPositionShare.entryPrice(locale: locale),
+                    value: AppFormatter.money(payload.position.averageEntryPrice),
+                    style: style
+                )
+
+                Rectangle()
+                    .fill(style.divider)
+                    .frame(width: 1)
+                    .padding(.vertical, 14)
+
+                AssetPositionSharePriceColumn(
+                    title: L10n.AssetPositionShare.latestPrice(locale: locale),
+                    value: AppFormatter.money(payload.position.currentPrice),
+                    style: style
+                )
+            }
+            .fixedSize(horizontal: false, vertical: true)
         }
-    }
-}
-
-private struct AssetPositionShareCardStyle {
-    let backgroundColors: [Color]
-    let primaryText: Color
-    let secondaryText: Color
-    let tertiaryText: Color
-    let metricTitleText: Color
-    let metricBackground: Color
-    let metricBorder: Color
-    let trendHighlight: Color
-    let trendStrokeOpacity: Double
-    let trendHighlightOpacity: Double
-    let trendLayerOpacity: Double
-
-    init(colorScheme: ColorScheme) {
-        switch colorScheme {
-        case .light:
-            self.init(
-                backgroundColors: [
-                    Color(red: 0.992, green: 0.992, blue: 0.980),
-                    Color(red: 0.942, green: 0.965, blue: 0.952),
-                    Color(red: 0.984, green: 0.972, blue: 0.918)
-                ],
-                primaryText: Color(red: 0.055, green: 0.060, blue: 0.064),
-                secondaryText: Color(red: 0.260, green: 0.278, blue: 0.286),
-                tertiaryText: Color(red: 0.415, green: 0.426, blue: 0.440),
-                metricTitleText: Color(red: 0.405, green: 0.420, blue: 0.430),
-                metricBackground: Color.white.opacity(0.72),
-                metricBorder: Color.black.opacity(0.08),
-                trendHighlight: Color.white,
-                trendStrokeOpacity: 0.30,
-                trendHighlightOpacity: 0.46,
-                trendLayerOpacity: 0.48
-            )
-        case .dark:
-            self.init(
-                backgroundColors: [
-                    Color.black,
-                    Color(red: 0.055, green: 0.055, blue: 0.065),
-                    Color.black
-                ],
-                primaryText: .white,
-                secondaryText: .white.opacity(0.82),
-                tertiaryText: .white.opacity(0.46),
-                metricTitleText: .white.opacity(0.54),
-                metricBackground: .white.opacity(0.10),
-                metricBorder: .white.opacity(0),
-                trendHighlight: .white,
-                trendStrokeOpacity: 0.38,
-                trendHighlightOpacity: 0.14,
-                trendLayerOpacity: 0.56
-            )
-        @unknown default:
-            self.init(colorScheme: .dark)
+        .background(style.metricBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(style.metricBorder, lineWidth: 1)
         }
-    }
-
-    private init(
-        backgroundColors: [Color],
-        primaryText: Color,
-        secondaryText: Color,
-        tertiaryText: Color,
-        metricTitleText: Color,
-        metricBackground: Color,
-        metricBorder: Color,
-        trendHighlight: Color,
-        trendStrokeOpacity: Double,
-        trendHighlightOpacity: Double,
-        trendLayerOpacity: Double
-    ) {
-        self.backgroundColors = backgroundColors
-        self.primaryText = primaryText
-        self.secondaryText = secondaryText
-        self.tertiaryText = tertiaryText
-        self.metricTitleText = metricTitleText
-        self.metricBackground = metricBackground
-        self.metricBorder = metricBorder
-        self.trendHighlight = trendHighlight
-        self.trendStrokeOpacity = trendStrokeOpacity
-        self.trendHighlightOpacity = trendHighlightOpacity
-        self.trendLayerOpacity = trendLayerOpacity
     }
 }
 
@@ -492,109 +483,28 @@ struct AssetPositionSharePerformance {
     }
 }
 
-private struct AssetPositionSharePriceMetric: View {
+private struct AssetPositionSharePriceColumn: View {
     let title: String
     let value: String
-    let style: AssetPositionShareCardStyle
+    let style: ShareCardStyle
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .font(.system(size: 13, weight: .bold, design: .rounded))
                 .foregroundStyle(style.metricTitleText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
 
             Text(value)
-                .font(.system(size: 27, weight: .black, design: .rounded))
+                .font(.system(size: 26, weight: .black, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(style.primaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.64)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 16)
-        .padding(.horizontal, 16)
-        .background(style.metricBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(style.metricBorder)
-        }
-    }
-}
-
-private struct AssetPositionShareTrendBackground: View {
-    let isPositive: Bool
-    let tint: Color
-    let highlight: Color
-    let strokeOpacity: Double
-    let highlightOpacity: Double
-
-    var body: some View {
-        Canvas { context, size in
-            let points = Self.trendPoints(isPositive: isPositive, in: size)
-            guard let first = points.first, let last = points.last, points.count > 1 else {
-                return
-            }
-
-            var trendPath = Path()
-            trendPath.move(to: first)
-            points.dropFirst().forEach { trendPath.addLine(to: $0) }
-
-            context.stroke(
-                trendPath,
-                with: .color(tint.opacity(strokeOpacity)),
-                style: StrokeStyle(lineWidth: 18, lineCap: .round, lineJoin: .round)
-            )
-
-            context.stroke(
-                trendPath,
-                with: .color(highlight.opacity(highlightOpacity)),
-                style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round)
-            )
-
-            let previous = points[points.count - 2]
-            let angle = atan2(last.y - previous.y, last.x - previous.x)
-            let headLength: CGFloat = 52
-            let spread = CGFloat.pi / 7
-
-            var arrowHead = Path()
-            arrowHead.move(to: last)
-            arrowHead.addLine(
-                to: CGPoint(
-                    x: last.x - cos(angle - spread) * headLength,
-                    y: last.y - sin(angle - spread) * headLength
-                )
-            )
-            arrowHead.move(to: last)
-            arrowHead.addLine(
-                to: CGPoint(
-                    x: last.x - cos(angle + spread) * headLength,
-                    y: last.y - sin(angle + spread) * headLength
-                )
-            )
-
-            context.stroke(
-                arrowHead,
-                with: .color(tint.opacity(strokeOpacity + 0.14)),
-                style: StrokeStyle(lineWidth: 18, lineCap: .round, lineJoin: .round)
-            )
-        }
-        .blur(radius: 0.2)
-    }
-
-    private static func trendPoints(isPositive: Bool, in size: CGSize) -> [CGPoint] {
-        let wave: [CGFloat] = [0.10, -0.06, 0.14, -0.10, 0.05, -0.03, 0.09, -0.04]
-        let startY: CGFloat = isPositive ? 0.74 : 0.26
-        let endY: CGFloat = isPositive ? 0.22 : 0.78
-
-        return wave.enumerated().map { index, offset in
-            let progress = CGFloat(index) / CGFloat(max(wave.count - 1, 1))
-            let y = startY + (endY - startY) * progress + offset
-            return CGPoint(
-                x: size.width * (0.08 + 0.84 * progress),
-                y: size.height * y
-            )
-        }
+        .padding(.vertical, 18)
+        .padding(.horizontal, 20)
     }
 }

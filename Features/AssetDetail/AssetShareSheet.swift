@@ -48,6 +48,8 @@ struct AssetSharePayload: Identifiable {
         for store: AssetDetailStore,
         model: AssetChartRenderModel
     ) -> AssetSharePriceChange {
+        // 1D must match the page's "Today" line (measured from the previous close),
+        // not the chart's first intraday bar.
         if store.selectedRange == .oneDay {
             return AssetSharePriceChange(
                 change: store.todayPriceChange,
@@ -60,7 +62,7 @@ struct AssetSharePayload: Identifiable {
             return AssetSharePriceChange(
                 change: periodChange.change,
                 percentChange: periodChange.percentChange,
-                isPositive: periodChange.isPositive
+                isPositive: model.isPeriodPositive
             )
         }
 
@@ -79,9 +81,8 @@ struct AssetShareChartModel {
     let priceChangeBaseline: Double?
 
     init(renderModel: AssetChartRenderModel) {
-        let financialPoints = renderModel.points.map(\.financialPoint)
         let sampled = FinancialChartDownsampler.lttb(
-            financialPoints[...],
+            renderModel.financialPoints[...],
             targetCount: Self.maximumPointCount
         )
         series = FinancialChartSeries(
@@ -300,22 +301,21 @@ private struct AssetShareCard: View {
         payload.isPositive ? AppTheme.ColorToken.positive : AppTheme.ColorToken.negative
     }
 
-    private var style: AssetShareCardStyle {
-        AssetShareCardStyle(colorScheme: colorScheme)
+    private var style: ShareCardStyle {
+        ShareCardStyle(colorScheme: colorScheme)
     }
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: style.backgroundColors,
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+            ShareCardBackground(
+                accentTint: tint,
+                style: style
             )
 
             VStack(alignment: .leading, spacing: 0) {
                 header
 
-                Spacer(minLength: 28)
+                Spacer(minLength: 26)
 
                 priceBlock
 
@@ -324,15 +324,18 @@ private struct AssetShareCard: View {
                     tint: tint,
                     style: style
                 )
-                .frame(height: 205)
-                .padding(.top, 28)
+                .frame(height: 200)
+                .padding(.top, 26)
 
-                metrics
-                    .padding(.top, 26)
+                metricsStrip
+                    .padding(.top, 24)
 
                 Spacer(minLength: 18)
 
-                footer
+                ShareCardFooter(
+                    timestampText: updatedText,
+                    style: style
+                )
             }
             .padding(40)
         }
@@ -341,7 +344,7 @@ private struct AssetShareCard: View {
     private var header: some View {
         HStack(alignment: .top, spacing: 18) {
             VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                HStack(alignment: .center, spacing: 10) {
                     Text(payload.symbol)
                         .font(.system(size: 46, weight: .black, design: .rounded))
                         .monospaced()
@@ -351,52 +354,54 @@ private struct AssetShareCard: View {
 
                     if payload.exchange != AppFormatter.placeholder {
                         Text(payload.exchange)
-                            .font(.system(size: 14, weight: .black, design: .rounded))
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
                             .foregroundStyle(style.badgeText)
-                            .padding(.horizontal, 9)
-                            .frame(height: 24)
+                            .padding(.horizontal, 10)
+                            .frame(height: 26)
                             .background(style.badgeBackground, in: Capsule())
                             .lineLimit(1)
                     }
                 }
 
                 Text(payload.displayName)
-                    .font(.system(size: 21, weight: .semibold, design: .rounded))
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
                     .foregroundStyle(style.secondaryText)
                     .lineLimit(2)
-                    .minimumScaleFactor(0.74)
+                    .minimumScaleFactor(0.76)
             }
 
             Spacer(minLength: 12)
 
-            VStack(alignment: .trailing, spacing: 8) {
+            VStack(alignment: .trailing, spacing: 6) {
                 Text(L10n.AssetShare.marketSnapshot(locale: locale))
-                    .font(.system(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(AppTheme.ColorToken.brand)
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(style.secondaryText)
                     .multilineTextAlignment(.trailing)
                     .lineLimit(2)
 
                 if payload.assetClass != AppFormatter.placeholder {
                     Text(payload.assetClass)
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(style.tertiaryText)
                         .lineLimit(1)
                 }
             }
             .frame(maxWidth: 126, alignment: .trailing)
+            .padding(.top, 6)
         }
     }
 
     private var priceBlock: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             Text(AppFormatter.money(payload.currentPrice))
-                .font(.system(size: 76, weight: .black, design: .rounded))
+                .font(.system(size: 74, weight: .black, design: .rounded))
                 .monospacedDigit()
+                .tracking(-1.5)
                 .foregroundStyle(style.primaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.48)
 
-            HStack(alignment: .center, spacing: 11) {
+            HStack(alignment: .center, spacing: 10) {
                 AssetShareChangeBadge(
                     change: payload.priceChange,
                     percentChange: payload.percentChange,
@@ -406,8 +411,8 @@ private struct AssetShareCard: View {
                 )
 
                 Text(verbatim: "\(payload.range.title) · \(payload.range.performanceLabel)")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(style.secondaryText)
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(style.tertiaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.74)
 
@@ -416,44 +421,51 @@ private struct AssetShareCard: View {
         }
     }
 
-    private var metrics: some View {
-        HStack(spacing: 10) {
-            AssetShareMetric(
+    private var metricsStrip: some View {
+        HStack(spacing: 0) {
+            AssetShareMetricColumn(
                 title: L10n.AssetShare.open(locale: locale),
                 value: AppFormatter.money(payload.open),
                 style: style
             )
-            AssetShareMetric(
+
+            metricDivider
+
+            AssetShareMetricColumn(
                 title: L10n.AssetShare.high(locale: locale),
                 value: AppFormatter.money(payload.high),
                 style: style
             )
-            AssetShareMetric(
+
+            metricDivider
+
+            AssetShareMetricColumn(
                 title: L10n.AssetShare.low(locale: locale),
                 value: AppFormatter.money(payload.low),
                 style: style
             )
-            AssetShareMetric(
+
+            metricDivider
+
+            AssetShareMetricColumn(
                 title: L10n.AssetShare.volume(locale: locale),
                 value: AssetShareNumber.compact(payload.volume),
                 style: style
             )
         }
+        .fixedSize(horizontal: false, vertical: true)
+        .background(style.metricBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(style.metricBorder, lineWidth: 1)
+        }
     }
 
-    private var footer: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text("@Vicu")
-                .font(.system(size: 18, weight: .black, design: .rounded))
-                .foregroundStyle(AppTheme.ColorToken.brand)
-
-            Spacer()
-
-            Text(updatedText)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundStyle(style.tertiaryText)
-                .lineLimit(1)
-        }
+    private var metricDivider: some View {
+        Rectangle()
+            .fill(style.divider)
+            .frame(width: 1)
+            .padding(.vertical, 12)
     }
 
     private var updatedText: String {
@@ -467,26 +479,26 @@ private struct AssetShareChangeBadge: View {
     let percentChange: Double?
     let isPositive: Bool
     let tint: Color
-    let style: AssetShareCardStyle
+    let style: ShareCardStyle
 
     var body: some View {
-        HStack(spacing: 7) {
+        HStack(spacing: 6) {
             Image(systemName: isPositive ? "arrow.up.right" : "arrow.down.right")
-                .font(.system(size: 13, weight: .black))
+                .font(.system(size: 13, weight: .bold))
 
             Text("\(AppFormatter.signedMoney(change)) \(AppFormatter.signedPercent(percentChange))")
-                .font(.system(size: 16, weight: .black, design: .rounded))
+                .font(.system(size: 16, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.66)
         }
         .foregroundStyle(tint)
-        .padding(.horizontal, 12)
-        .frame(height: 34)
-        .background(style.changeBadgeBackground, in: Capsule())
+        .padding(.horizontal, 13)
+        .frame(height: 36)
+        .background(style.pillBackground, in: Capsule())
         .overlay {
             Capsule()
-                .strokeBorder(tint.opacity(style.changeBadgeStrokeOpacity), lineWidth: 1)
+                .strokeBorder(style.metricBorder, lineWidth: 1)
         }
     }
 }
@@ -494,7 +506,7 @@ private struct AssetShareChangeBadge: View {
 private struct AssetShareSparklineChart: View {
     let model: AssetShareChartModel
     let tint: Color
-    let style: AssetShareCardStyle
+    let style: ShareCardStyle
 
     var body: some View {
         StaticSparklineChartView(
@@ -504,10 +516,10 @@ private struct AssetShareSparklineChart: View {
                 positiveColor: AppTheme.ColorToken.positive,
                 negativeColor: AppTheme.ColorToken.negative,
                 areaTopOpacity: style.chartFillOpacity,
-                areaBottomOpacity: 0.02,
-                lineWidth: 5,
+                areaBottomOpacity: 0.01,
+                lineWidth: 4.5,
                 lineHighlightColor: style.chartHighlight,
-                lineHighlightWidth: 1.6,
+                lineHighlightWidth: 1.4,
                 gridColor: style.chartGrid,
                 showsGrid: true,
                 showsVolume: false,
@@ -520,132 +532,29 @@ private struct AssetShareSparklineChart: View {
     }
 }
 
-private struct AssetShareMetric: View {
+private struct AssetShareMetricColumn: View {
     let title: String
     let value: String
-    let style: AssetShareCardStyle
+    let style: ShareCardStyle
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 5) {
             Text(title)
-                .font(.system(size: 11, weight: .black, design: .rounded))
+                .font(.system(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(style.metricTitleText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
 
             Text(value)
-                .font(.system(size: 18, weight: .black, design: .rounded))
+                .font(.system(size: 17, weight: .black, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(style.primaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.56)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 13)
+        .padding(.vertical, 14)
         .padding(.horizontal, 12)
-        .background(style.metricBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(style.metricBorder)
-        }
-    }
-}
-
-private struct AssetShareCardStyle {
-    let backgroundColors: [Color]
-    let primaryText: Color
-    let secondaryText: Color
-    let tertiaryText: Color
-    let badgeText: Color
-    let badgeBackground: Color
-    let metricTitleText: Color
-    let metricBackground: Color
-    let metricBorder: Color
-    let changeBadgeBackground: Color
-    let changeBadgeStrokeOpacity: Double
-    let chartGrid: Color
-    let chartHighlight: Color
-    let chartFillOpacity: Double
-
-    init(colorScheme: ColorScheme) {
-        switch colorScheme {
-        case .light:
-            self.init(
-                backgroundColors: [
-                    Color(red: 0.990, green: 0.992, blue: 0.994),
-                    Color(red: 0.940, green: 0.966, blue: 0.982),
-                    Color(red: 0.984, green: 0.982, blue: 0.956)
-                ],
-                primaryText: Color(red: 0.052, green: 0.058, blue: 0.064),
-                secondaryText: Color(red: 0.260, green: 0.285, blue: 0.300),
-                tertiaryText: Color(red: 0.455, green: 0.475, blue: 0.490),
-                badgeText: Color(red: 0.145, green: 0.160, blue: 0.170),
-                badgeBackground: Color.black.opacity(0.07),
-                metricTitleText: Color(red: 0.455, green: 0.475, blue: 0.490),
-                metricBackground: Color.white.opacity(0.70),
-                metricBorder: Color.black.opacity(0.08),
-                changeBadgeBackground: Color.white.opacity(0.62),
-                changeBadgeStrokeOpacity: 0.20,
-                chartGrid: Color.black.opacity(0.06),
-                chartHighlight: Color.white.opacity(0.82),
-                chartFillOpacity: 0.20
-            )
-        case .dark:
-            self.init(
-                backgroundColors: [
-                    Color.black,
-                    Color(red: 0.038, green: 0.044, blue: 0.050),
-                    Color(red: 0.012, green: 0.014, blue: 0.016)
-                ],
-                primaryText: .white,
-                secondaryText: .white.opacity(0.78),
-                tertiaryText: .white.opacity(0.44),
-                badgeText: .white.opacity(0.78),
-                badgeBackground: .white.opacity(0.10),
-                metricTitleText: .white.opacity(0.46),
-                metricBackground: .white.opacity(0.095),
-                metricBorder: .white.opacity(0.08),
-                changeBadgeBackground: .white.opacity(0.09),
-                changeBadgeStrokeOpacity: 0.34,
-                chartGrid: .white.opacity(0.06),
-                chartHighlight: .white.opacity(0.22),
-                chartFillOpacity: 0.22
-            )
-        @unknown default:
-            self.init(colorScheme: .dark)
-        }
-    }
-
-    private init(
-        backgroundColors: [Color],
-        primaryText: Color,
-        secondaryText: Color,
-        tertiaryText: Color,
-        badgeText: Color,
-        badgeBackground: Color,
-        metricTitleText: Color,
-        metricBackground: Color,
-        metricBorder: Color,
-        changeBadgeBackground: Color,
-        changeBadgeStrokeOpacity: Double,
-        chartGrid: Color,
-        chartHighlight: Color,
-        chartFillOpacity: Double
-    ) {
-        self.backgroundColors = backgroundColors
-        self.primaryText = primaryText
-        self.secondaryText = secondaryText
-        self.tertiaryText = tertiaryText
-        self.badgeText = badgeText
-        self.badgeBackground = badgeBackground
-        self.metricTitleText = metricTitleText
-        self.metricBackground = metricBackground
-        self.metricBorder = metricBorder
-        self.changeBadgeBackground = changeBadgeBackground
-        self.changeBadgeStrokeOpacity = changeBadgeStrokeOpacity
-        self.chartGrid = chartGrid
-        self.chartHighlight = chartHighlight
-        self.chartFillOpacity = chartFillOpacity
     }
 }
 
