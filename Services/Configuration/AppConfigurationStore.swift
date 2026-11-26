@@ -37,7 +37,7 @@ enum AppConfigurationKeys {
         static let tradeEnvironment = AppConfigurationKey<TradeEnvironment>(
             namespace: "app",
             name: TradeEnvironment.storageKey,
-            defaultValue: .paper
+            defaultValue: .live
         )
 
         static let appearanceMode = AppConfigurationKey<AppearanceMode>(

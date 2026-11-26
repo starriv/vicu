@@ -2,8 +2,8 @@ import Foundation
 import SwiftUI
 
 enum TradeEnvironment: String, CaseIterable, Codable, Identifiable, Sendable {
-    case paper
     case live
+    case paper
 
     static let storageKey = "tradeEnvironment"
 

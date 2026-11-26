@@ -129,14 +129,8 @@ private struct AccountHeroHeader: View {
                     .lineLimit(1)
                     .textSelection(.enabled)
 
-                HStack(spacing: 8) {
-                    AccountStatusPill(text: account.status)
-
-                    if isPaperTrading {
-                        AccountPaperTradingPill(isPresented: $isPaperTipPresented)
-                    }
-
-                    AccountCurrencyPill(text: AccountDetailFormatter.currency(account.currency))
+                if isPaperTrading {
+                    AccountPaperTradingPill(isPresented: $isPaperTipPresented)
                 }
             }
         }
@@ -206,44 +200,6 @@ private struct AccountPaperTradingTooltip: View {
         }
         .padding(14)
         .frame(width: 260, alignment: .leading)
-    }
-}
-
-private struct AccountStatusPill: View {
-    let text: String?
-
-    private var normalizedText: String {
-        text?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() ?? AppFormatter.placeholder
-    }
-
-    private var tint: Color {
-        normalizedText == "ACTIVE" ? AppTheme.ColorToken.positive : AppTheme.ColorToken.warning
-    }
-
-    var body: some View {
-        HStack(spacing: 5) {
-            AppSettingsStatusDot(color: tint, size: 6)
-
-            Text(normalizedText)
-                .font(AppTypography.caption.monospacedDigit().weight(.semibold))
-                .foregroundStyle(tint)
-        }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 4)
-        .background(tint.opacity(0.14), in: Capsule())
-    }
-}
-
-private struct AccountCurrencyPill: View {
-    let text: String
-
-    var body: some View {
-        Text(text)
-            .font(AppTypography.caption.monospacedDigit().weight(.medium))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 4)
-            .background(Color(.tertiarySystemFill), in: Capsule())
     }
 }
 

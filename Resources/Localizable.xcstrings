@@ -936,7 +936,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Paper"
+            "value": "Paper Account"
           }
         },
         "zh-Hans": {
@@ -1860,6 +1860,22 @@
         }
       }
     },
+    "alpaca.connect_paper_action": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect Paper Account"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连接模拟账户"
+          }
+        }
+      }
+    },
     "alpaca.connected_description": {
       "localizations": {
         "en": {
@@ -2031,7 +2047,39 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "使用 Alpaca API 凭证登录。"
+            "value": "使用您的 Alpaca API 凭证登录。"
+          }
+        }
+      }
+    },
+    "alpaca.onboarding_keychain_note": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stored locally in iOS Keychain"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "凭证仅加密保存在本机钥匙串"
+          }
+        }
+      }
+    },
+    "alpaca.onboarding_paper_description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in with your Alpaca Paper Account credentials."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用 Alpaca 模拟账户 API 凭证登录。"
           }
         }
       }
@@ -2169,13 +2217,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Paper and Live credentials are stored separately. Switching environments uses that environment's endpoint and key."
+            "value": "Live Account and Paper Account credentials are stored separately. Switching environments uses that environment's endpoint and key."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "模拟盘和实盘凭证会分别保存。切换环境会使用对应环境的端点和 Key。"
+            "value": "真实账户和模拟账户凭证会分别保存。切换环境会使用对应环境的端点和 Key。"
           }
         }
       }
@@ -2224,6 +2272,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "成功"
+          }
+        }
+      }
+    },
+    "alpaca.switch_to_live": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch to Live Account"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换至真实账户"
+          }
+        }
+      }
+    },
+    "alpaca.switch_to_paper": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch to Paper Account"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换至模拟账户"
           }
         }
       }
@@ -2304,6 +2384,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Alpaca"
+          }
+        }
+      }
+    },
+    "alpaca.toggle_secret_visibility": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toggle Secret Key Visibility"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换显示 Secret Key"
           }
         }
       }
@@ -3536,13 +3632,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Live"
+            "value": "Live Account"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "实盘"
+            "value": "真实账户"
           }
         }
       }
@@ -3552,13 +3648,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Paper"
+            "value": "Paper Account"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "模拟盘"
+            "value": "模拟账户"
           }
         }
       }
@@ -6142,10 +6238,16 @@
     "more.risk.live_trading_locked": {
       "extractionState": "stale",
       "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live Account trading locked"
+          }
+        },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "实盘交易已锁定"
+            "value": "真实账户交易已锁定"
           }
         }
       }
@@ -10722,13 +10824,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Live trading is locked in Risk controls."
+            "value": "Live Account trading is locked in Risk controls."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "实盘交易已在风控设置中锁定。"
+            "value": "真实账户交易已在风控设置中锁定。"
           }
         }
       }
@@ -10803,13 +10905,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Live trading selected"
+            "value": "Live Account selected"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已选择实盘交易"
+            "value": "已选择真实账户"
           }
         }
       }
@@ -10851,13 +10953,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Paper trading selected"
+            "value": "Paper Account selected"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已选择模拟盘交易"
+            "value": "已选择模拟账户"
           }
         }
       }
@@ -10915,13 +11017,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Unlock Live Trading"
+            "value": "Unlock Live Account Trading"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "解锁实盘交易"
+            "value": "解锁真实账户交易"
           }
         }
       }

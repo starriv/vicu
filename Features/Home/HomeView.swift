@@ -41,6 +41,7 @@ struct HomeView: View {
 
             RecentOrdersSummaryView(showsInitialSkeleton: loadingState.orders)
         }
+        .modifier(HomePaperNavigationSubtitleModifier(isPaper: app.environment == .paper))
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -202,12 +203,29 @@ private struct HomeInitialLoadingState: Equatable {
     }
 }
 
+private struct HomePaperNavigationSubtitleModifier: ViewModifier {
+    let isPaper: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *), isPaper {
+            content.navigationSubtitle(L10n.AccountDetail.paperBadge)
+        } else {
+            content
+        }
+    }
+}
+
 private struct HomeAccountButton: View {
     var body: some View {
         NavigationLink {
             AccountView()
         } label: {
-            AppAccountAvatar(size: 36, iconSize: 34)
+            if #available(iOS 26.0, *) {
+                AppAccountAvatar(size: 44, iconSize: 44)
+            } else {
+                AppAccountAvatar(size: 36, iconSize: 34)
+            }
         }
         .buttonStyle(.plain)
         .accessibilityLabel(L10n.AccountDetail.title)

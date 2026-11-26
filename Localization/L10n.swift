@@ -966,8 +966,14 @@ enum L10n {
         static var bootstrapLoading: LocalizedStringKey { "alpaca.bootstrap_loading" }
         static var onboardingTitle: LocalizedStringKey { "alpaca.onboarding_title" }
         static var onboardingDescription: LocalizedStringKey { "alpaca.onboarding_description" }
+        static var onboardingPaperDescription: LocalizedStringKey { "alpaca.onboarding_paper_description" }
+        static var onboardingKeychainNote: LocalizedStringKey { "alpaca.onboarding_keychain_note" }
         static var onboardingSavedFooter: LocalizedStringKey { "alpaca.onboarding_saved_footer" }
         static var connectAction: LocalizedStringKey { "alpaca.connect_action" }
+        static var connectPaperAction: LocalizedStringKey { "alpaca.connect_paper_action" }
+        static var switchToPaper: LocalizedStringKey { "alpaca.switch_to_paper" }
+        static var switchToLive: LocalizedStringKey { "alpaca.switch_to_live" }
+        static var toggleSecretVisibility: LocalizedStringKey { "alpaca.toggle_secret_visibility" }
         static var connection: LocalizedStringKey { "alpaca.connection" }
         static var environment: LocalizedStringKey { "alpaca.environment" }
         static var connectedDescription: LocalizedStringKey { "alpaca.connected_description" }

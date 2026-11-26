@@ -95,6 +95,7 @@ extension PageCacheTests {
         let services = AppServices(alpaca: AlpacaClient(apiClient: api), credentialStore: KeychainCredentialStore(),
                                    configurationStore: MemoryAppConfigurationStore(), pageCache: cache)
         let app = AppModel(services: services)
+        app.environment = .paper
         app.credentials = AlpacaCredentials(keyID: "fixture", secretKey: "fixture", environment: .paper)
         app.hasCredentials = true
         return app

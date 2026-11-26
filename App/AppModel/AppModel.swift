@@ -10,7 +10,7 @@ final class AppModel: AssetDetailServicing {
     var selectedTab: AppTab = .home
     var pendingOrdersListRequest: OrdersListRequest?
     var pendingOrderDetailRequest: OrderDetailNavigationRequest?
-    var environment: TradeEnvironment = .paper {
+    var environment: TradeEnvironment = .live {
         didSet {
             services.configurationStore.setValue(environment, for: AppConfigurationKeys.App.tradeEnvironment)
         }

@@ -4,19 +4,6 @@ struct MoreView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.locale) private var locale
 
-    private var connectionTint: Color {
-        switch app.credentialsStatus {
-        case .connected, .verified:
-            AppTheme.ColorToken.positive
-        case .failed:
-            AppTheme.ColorToken.negative
-        case .testing:
-            .blue
-        case .missing, .untested:
-            AppTheme.ColorToken.warning
-        }
-    }
-
     private var notificationsEnabledSummary: String {
         let prefs = app.notificationPreferences
         let hasActiveChannel = prefs.isEnabled && (
@@ -37,9 +24,7 @@ struct MoreView: View {
                 } label: {
                     MoreAccountProfileRow(
                         accountNumber: app.portfolio.account?.accountNumber,
-                        environment: app.environment,
-                        statusText: app.credentialsStatus.title(locale: locale),
-                        statusTint: connectionTint
+                        environment: app.environment
                     )
                 }
                 .accessibilityHint(L10n.More.accountHint)
@@ -51,20 +36,8 @@ struct MoreView: View {
                 } label: {
                     AppSettingsRow(
                         title: L10n.More.alpacaRowTitle,
-                        detail: app.environment.titleText(locale: locale),
-                        detailDotColor: connectionTint,
                         systemImage: AppIcon.More.alpaca,
                         badgeColor: .teal
-                    )
-                }
-
-                NavigationLink {
-                    AccountActivityView()
-                } label: {
-                    AppSettingsRow(
-                        title: L10n.AccountActivity.title,
-                        systemImage: AppIcon.More.activity,
-                        badgeColor: .blue
                     )
                 }
             } header: {
@@ -106,8 +79,6 @@ struct MoreView: View {
 private struct MoreAccountProfileRow: View {
     let accountNumber: String?
     let environment: TradeEnvironment
-    let statusText: String
-    let statusTint: Color
 
     private var cleanAccountNumber: String? {
         guard let accountNumber else { return nil }
@@ -120,31 +91,22 @@ private struct MoreAccountProfileRow: View {
             AppAccountAvatar(size: 54, iconSize: 52)
                 .modifier(MoreAvatarGlassRingModifier())
 
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    if let cleanAccountNumber {
-                        Text(cleanAccountNumber)
-                            .font(.headline.weight(.semibold).monospacedDigit())
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                    } else {
-                        Text(L10n.More.accountDefaultTitle)
-                            .font(.headline.weight(.semibold))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                    }
-
-                    MoreEnvironmentPill(environment: environment)
-                }
-
-                HStack(spacing: 6) {
-                    AppSettingsStatusDot(color: statusTint, size: 7)
-
-                    Text(statusText)
-                        .font(AppTypography.detail)
-                        .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 6) {
+                if let cleanAccountNumber {
+                    Text(cleanAccountNumber)
+                        .font(.headline.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(.primary)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                } else {
+                    Text(L10n.More.accountDefaultTitle)
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                 }
+
+                MoreEnvironmentPill(environment: environment)
             }
 
             Spacer(minLength: 0)
@@ -169,6 +131,8 @@ private struct MoreEnvironmentPill: View {
         Text(environment.title)
             .font(AppTypography.caption.weight(.semibold))
             .foregroundStyle(foregroundColor)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(backgroundColor, in: Capsule())

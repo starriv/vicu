@@ -12,30 +12,21 @@ struct AlpacaView: View {
 
 struct AlpacaCredentialOnboardingView: View {
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                AlpacaCredentialConfigurationView(mode: .onboarding)
-
-                Link(L10n.Settings.privacyPolicy, destination: URL(string: "https://gist.github.com/starriv/a9184e0b2752f7a3c73204d5229fde1b")!)
-                    .font(AppTypography.detail)
-                    .accessibilityIdentifier("onboarding.privacyPolicy")
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .scrollDismissesKeyboard(.interactively)
-        .scrollContentBackground(.hidden)
-        .background(AppTheme.ColorToken.pageBackground.ignoresSafeArea())
-        .contentMargins(.horizontal, AppTheme.Spacing.pageHorizontal, for: .scrollContent)
-        .contentMargins(.top, 56, for: .scrollContent)
-        .contentMargins(.bottom, AppTheme.Spacing.pageBottom, for: .scrollContent)
-        .tint(AppTheme.ColorToken.brand)
+        AlpacaCredentialConfigurationView(mode: .onboarding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(AppTheme.ColorToken.pageBackground.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
+            .tint(AppTheme.ColorToken.brand)
     }
 }
 
 private struct OnboardingHeader: View {
+    let environment: TradeEnvironment
+
     var body: some View {
         VStack(alignment: .center, spacing: 18) {
-            AppAccountAvatar(size: 72, iconSize: 58)
+            AppAccountAvatar(size: 74, iconSize: 60)
+                .modifier(OnboardingAvatarRingModifier())
 
             VStack(alignment: .center, spacing: 8) {
                 Text(L10n.Alpaca.onboardingTitle)
@@ -44,7 +35,23 @@ private struct OnboardingHeader: View {
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text(L10n.Alpaca.onboardingDescription)
+                if environment == .paper {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(AppTheme.ColorToken.brandDark)
+                            .frame(width: 6, height: 6)
+
+                        Text(L10n.Environment.paper)
+                            .font(AppTypography.caption.weight(.semibold))
+                            .foregroundStyle(.primary)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(AppTheme.ColorToken.brand.opacity(0.2), in: Capsule())
+                    .transition(.opacity.combined(with: .scale(scale: 0.92)))
+                }
+
+                Text(environment == .paper ? L10n.Alpaca.onboardingPaperDescription : L10n.Alpaca.onboardingDescription)
                     .font(AppTypography.detail)
                     .foregroundStyle(.secondary)
                     .lineSpacing(AppTypography.secondaryLineSpacing)
@@ -53,8 +60,24 @@ private struct OnboardingHeader: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
+        .padding(.vertical, 6)
         .accessibilityElement(children: .combine)
+    }
+}
+
+private struct OnboardingAvatarRingModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .padding(3)
+                .glassEffect(.regular, in: .circle)
+        } else {
+            content
+                .overlay {
+                    Circle()
+                        .strokeBorder(Color(.separator).opacity(0.22), lineWidth: 1)
+                }
+        }
     }
 }
 
@@ -69,6 +92,7 @@ private struct AlpacaCredentialConfigurationView: View {
     @Environment(\.locale) private var locale
     @State private var keyID = ""
     @State private var secretKey = ""
+    @State private var isSecretVisible = false
     @State private var isCurrentCredentialInputVerified = false
     @State private var isConnecting = false
     @FocusState private var focusedField: CredentialField?
@@ -104,7 +128,7 @@ private struct AlpacaCredentialConfigurationView: View {
         @Bindable var app = app
 
         if mode == .onboarding {
-            loginContent(environment: $app.environment)
+            loginContent()
         } else {
             settingsContent(environment: $app.environment)
         }
@@ -141,61 +165,135 @@ private struct AlpacaCredentialConfigurationView: View {
         }
     }
 
-    private func loginContent(environment: Binding<TradeEnvironment>) -> some View {
-        VStack(alignment: .leading, spacing: 26) {
-            OnboardingHeader()
-                .padding(.top, 10)
+    private func loginContent() -> some View {
+        GeometryReader { proxy in
+            ScrollView {
+                VStack(spacing: 0) {
+                    VStack(alignment: .leading, spacing: 26) {
+                        OnboardingHeader(environment: app.environment)
+                            .padding(.top, 40)
 
-            VStack(alignment: .leading, spacing: 18) {
-                environmentPicker(selection: environment, showsLabel: false)
-                    .onChange(of: app.environment) { _, newValue in
-                        handleEnvironmentChange(newValue)
+                        VStack(alignment: .leading, spacing: 14) {
+                            loginTextField(
+                                title: L10n.Alpaca.apiKeyID,
+                                systemImage: AppIcon.Settings.apiKey,
+                                text: $keyID,
+                                field: .keyID
+                            )
+
+                            Divider()
+                                .padding(.leading, 40)
+
+                            loginSecretField()
+                        }
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 16)
+                        .background(
+                            AppTheme.ColorToken.groupedSurface,
+                            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .strokeBorder(Color(.separator).opacity(0.12), lineWidth: 1)
+                        }
+
+                        VStack(spacing: 12) {
+                            Button {
+                                connectCredentials()
+                            } label: {
+                                HStack(spacing: 10) {
+                                    if isConnectInProgress {
+                                        RotatingConnectionIndicator()
+                                    }
+
+                                    Text(connectButtonTitle)
+                                        .font(.headline)
+                                }
+                                .foregroundStyle(connectButtonForeground)
+                                .padding(.horizontal, 22)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
+                                .background(connectButtonBackground, in: Capsule())
+                                .contentShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(!canConnectCredentials)
+                            .animation(.snappy, value: isConnectInProgress)
+                            .animation(.snappy, value: hasCredentialInput)
+                            .accessibilityHint(L10n.Alpaca.saveToKeychainHint)
+
+                            HStack(spacing: 5) {
+                                Image(systemName: "lock.shield")
+                                    .font(.caption2)
+                                Text(L10n.Alpaca.onboardingKeychainNote)
+                                    .font(AppTypography.caption)
+                            }
+                            .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity)
+                        }
                     }
 
-                Divider()
+                    Spacer(minLength: 36)
 
-                loginTextField(
-                    title: L10n.Alpaca.apiKeyID,
-                    systemImage: "person.crop.circle",
-                    text: $keyID,
-                    field: .keyID
-                )
+                    VStack(spacing: 12) {
+                        Button {
+                            let target: TradeEnvironment = app.environment == .live ? .paper : .live
+                            withAnimation(.snappy(duration: 0.24)) {
+                                handleEnvironmentChange(target)
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.left.arrow.right")
+                                    .font(.caption2.weight(.semibold))
+                                Text(app.environment == .live ? L10n.Alpaca.switchToPaper : L10n.Alpaca.switchToLive)
+                                    .font(AppTypography.detail.weight(.medium))
+                            }
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Color(.tertiarySystemFill).opacity(0.75), in: Capsule())
+                            .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isConnectInProgress)
+                        .accessibilityIdentifier("onboarding.switchEnvironment")
 
-                Divider()
-
-                loginSecretField()
-            }
-            .padding(20)
-            .background(AppTheme.ColorToken.groupedSurface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-
-            Button {
-                connectCredentials()
-            } label: {
-                HStack(spacing: 10) {
-                    if isConnectInProgress {
-                        RotatingConnectionIndicator()
+                        Link(
+                            L10n.Settings.privacyPolicy,
+                            destination: URL(string: "https://gist.github.com/starriv/a9184e0b2752f7a3c73204d5229fde1b")!
+                        )
+                        .font(AppTypography.caption)
+                        .foregroundStyle(.tertiary)
+                        .accessibilityIdentifier("onboarding.privacyPolicy")
                     }
-
-                    Text(isConnectInProgress ? L10n.Alpaca.testingConnection : L10n.Alpaca.connectAction)
-                        .font(AppTypography.rowTitle)
+                    .frame(maxWidth: .infinity)
+                    .padding(.bottom, 16)
                 }
-                .foregroundStyle(AppTheme.ColorToken.brandForeground)
-                .padding(.horizontal, 22)
-                .frame(maxWidth: .infinity)
-                .frame(height: 44)
-                .background(connectButtonBackground, in: Capsule())
-                .contentShape(Capsule())
+                .frame(maxWidth: 430)
+                .frame(maxWidth: .infinity, minHeight: max(0, proxy.size.height - 16))
+                .padding(.horizontal, AppTheme.Spacing.pageHorizontal)
+                .animation(.snappy(duration: 0.24), value: app.environment)
             }
-            .buttonStyle(.plain)
-            .disabled(!canConnectCredentials)
-            .frame(maxWidth: .infinity, alignment: .center)
-            .animation(.snappy, value: isConnectInProgress)
-            .animation(.snappy, value: hasCredentialInput)
-            .accessibilityHint(L10n.Alpaca.saveToKeychainHint)
-
+            .scrollDismissesKeyboard(.interactively)
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollContentBackground(.hidden)
         }
-        .frame(maxWidth: 430, alignment: .leading)
-        .frame(maxWidth: .infinity)
+    }
+
+    private var connectButtonTitle: LocalizedStringKey {
+        if isConnectInProgress {
+            return L10n.Alpaca.testingConnection
+        }
+
+        return app.environment == .paper ? L10n.Alpaca.connectPaperAction : L10n.Alpaca.connectAction
+    }
+
+    private var connectButtonForeground: Color {
+        if canConnectCredentials || isConnectInProgress {
+            return AppTheme.ColorToken.brandForeground
+        }
+
+        return Color(.tertiaryLabel)
     }
 
     private var connectButtonBackground: Color {
@@ -203,7 +301,7 @@ private struct AlpacaCredentialConfigurationView: View {
             return AppTheme.ColorToken.brand
         }
 
-        return AppTheme.ColorToken.groupedSurface
+        return Color(.tertiarySystemFill)
     }
 
     private func environmentPicker(selection: Binding<TradeEnvironment>, showsLabel: Bool) -> some View {
@@ -232,7 +330,7 @@ private struct AlpacaCredentialConfigurationView: View {
     ) -> some View {
         HStack(spacing: 12) {
             Image(systemName: systemImage)
-                .font(.title3.weight(.semibold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(AppTheme.ColorToken.icon)
                 .frame(width: 28)
 
@@ -250,31 +348,52 @@ private struct AlpacaCredentialConfigurationView: View {
                     invalidateCurrentCredentialInput()
                 }
         }
-        .frame(minHeight: 36)
+        .frame(minHeight: 38)
     }
 
     private func loginSecretField() -> some View {
         HStack(spacing: 12) {
-            Image(systemName: AppIcon.Alpaca.credential)
-                .font(.title3.weight(.semibold))
+            Image(systemName: "lock.fill")
+                .font(.body.weight(.semibold))
                 .foregroundStyle(AppTheme.ColorToken.icon)
                 .frame(width: 28)
 
-            SecureField(L10n.Alpaca.apiSecretKey, text: $secretKey)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .textContentType(.password)
-                .focused($focusedField, equals: .secretKey)
-                .submitLabel(.go)
-                .onSubmit {
-                    connectCredentials()
+            Group {
+                if isSecretVisible {
+                    TextField(L10n.Alpaca.apiSecretKey, text: $secretKey)
+                } else {
+                    SecureField(L10n.Alpaca.apiSecretKey, text: $secretKey)
                 }
+            }
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .textContentType(.password)
+            .focused($focusedField, equals: .secretKey)
+            .submitLabel(.go)
+            .onSubmit {
+                connectCredentials()
+            }
+            .disabled(app.credentialsStatus.isTesting || isConnecting)
+            .onChange(of: secretKey) { _, _ in
+                invalidateCurrentCredentialInput()
+            }
+
+            if !secretKey.isEmpty {
+                Button {
+                    isSecretVisible.toggle()
+                } label: {
+                    Image(systemName: isSecretVisible ? "eye.slash" : "eye")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
                 .disabled(app.credentialsStatus.isTesting || isConnecting)
-                .onChange(of: secretKey) { _, _ in
-                    invalidateCurrentCredentialInput()
-                }
+                .accessibilityLabel(L10n.Alpaca.toggleSecretVisibility)
+            }
         }
-        .frame(minHeight: 36)
+        .frame(minHeight: 38)
     }
 
     private func saveCredentials() {
@@ -310,6 +429,7 @@ private struct AlpacaCredentialConfigurationView: View {
             case .success(let environment):
                 keyID = ""
                 secretKey = ""
+                isSecretVisible = false
                 isCurrentCredentialInputVerified = false
                 toastCenter.show(connectedToastMessage(environment: environment))
             case .failure(let message):
@@ -364,8 +484,10 @@ private struct AlpacaCredentialConfigurationView: View {
     }
 
     private func handleEnvironmentChange(_ newValue: TradeEnvironment) {
+        focusedField = nil
         keyID = ""
         secretKey = ""
+        isSecretVisible = false
         isCurrentCredentialInputVerified = false
         isConnecting = false
         Task {
