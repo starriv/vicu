@@ -105,19 +105,6 @@ struct MarketActiveSymbol: Codable, Identifiable, Sendable {
     }
 }
 
-struct MarketSearchResult: Identifiable, Sendable {
-    let asset: AlpacaAsset
-    let quote: MarketActiveSymbol?
-
-    var id: String { asset.symbol }
-    var symbol: String { asset.symbol }
-    var companyName: String { asset.name ?? AppFormatter.placeholder }
-    var exchange: String { asset.exchange ?? AppFormatter.placeholder }
-    var price: Double? { quote?.price }
-    var percentChange: Double? { quote?.percentChange }
-    var isPositive: Bool { quote?.isPositive ?? true }
-}
-
 enum MarketMostActiveSort: String, CaseIterable, Identifiable, Sendable {
     case volume
     case trades

@@ -26,44 +26,31 @@ struct MarketSymbolRowsSkeleton: View {
     }
 }
 
-struct MarketSearchPopularSkeleton: View {
-    let rowCount: Int
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(alignment: .center, spacing: 7) {
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(Color(.secondarySystemFill))
-                        .frame(width: 17, height: 17)
-
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(Color(.secondarySystemFill))
-                        .frame(width: 116, height: 18)
-                }
-
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(Color(.tertiarySystemFill))
-                    .frame(width: 148, height: 12)
-            }
-
-            MarketSearchRowsSkeleton(rowCount: rowCount)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .redacted(reason: .placeholder)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-}
-
 struct MarketSearchResultsSkeleton: View {
     let rowCount: Int
 
     var body: some View {
-        MarketSearchRowsSkeleton(rowCount: rowCount)
-            .redacted(reason: .placeholder)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
+        VStack(spacing: 0) {
+            ForEach(0..<rowCount, id: \.self) { index in
+                MarketSearchRowSkeleton(symbolWidth: symbolWidth(for: index))
+
+                if index < rowCount - 1 {
+                    Divider()
+                        .padding(.leading, 56)
+                }
+            }
+        }
+        .background(
+            AppTheme.ColorToken.groupedSurface,
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        )
+        .redacted(reason: .placeholder)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func symbolWidth(for index: Int) -> CGFloat {
+        [48, 58, 52, 44, 64, 54][index % 6]
     }
 }
 
@@ -79,59 +66,40 @@ private struct MarketSymbolSectionSkeleton: View {
     }
 }
 
-private struct MarketSearchRowsSkeleton: View {
-    let rowCount: Int
-
-    var body: some View {
-        VStack(spacing: 0) {
-            ForEach(0..<rowCount, id: \.self) { index in
-                MarketSearchRowSkeleton(symbolWidth: symbolWidth(for: index))
-
-                if index < rowCount - 1 {
-                    Divider()
-                }
-            }
-        }
-    }
-
-    private func symbolWidth(for index: Int) -> CGFloat {
-        [52, 64, 58, 46, 72, 56][index % 6]
-    }
-}
-
 private struct MarketSearchRowSkeleton: View {
     let symbolWidth: CGFloat
 
     var body: some View {
-        HStack(spacing: 14) {
-            VStack(alignment: .leading, spacing: 8) {
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(Color(.secondarySystemFill))
-                    .frame(width: symbolWidth, height: 16)
+        HStack(spacing: 11) {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(Color(.secondarySystemFill))
+                .frame(width: 32, height: 32)
 
+            VStack(alignment: .leading, spacing: 6) {
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(Color(.secondarySystemFill))
+                    .frame(width: symbolWidth, height: 13)
+
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
                     .fill(Color(.tertiarySystemFill))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 11)
+                    .frame(maxWidth: 160)
+                    .frame(height: 10)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            VStack(alignment: .trailing, spacing: 8) {
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(Color(.secondarySystemFill))
-                    .frame(width: 74, height: 16)
-
+            VStack(alignment: .trailing, spacing: 6) {
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(Color(.tertiarySystemFill))
-                    .frame(width: 48, height: 11)
-            }
+                    .fill(Color(.secondarySystemFill))
+                    .frame(width: 58, height: 13)
 
-            Circle()
-                .fill(Color(.tertiarySystemFill))
-                .frame(width: 42, height: 42)
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .fill(Color(.tertiarySystemFill))
+                    .frame(width: 40, height: 10)
+            }
         }
-        .frame(minHeight: 64)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .frame(minHeight: 54)
+        .padding(.vertical, 4)
     }
 }
 

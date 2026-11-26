@@ -75,6 +75,16 @@ enum AppConfigurationKeys {
         )
     }
 
+    enum Search {
+        static func recentSymbols(credentials: AlpacaCredentials) -> AppConfigurationKey<[String]> {
+            AppConfigurationKey(
+                namespace: "search",
+                name: "recent_symbols.\(credentials.environment.rawValue).\(credentials.keyID)",
+                defaultValue: []
+            )
+        }
+    }
+
     enum Realtime {
         static func activityLastEventID(credentials: AlpacaCredentials) -> AppConfigurationKey<String> {
             AppConfigurationKey(

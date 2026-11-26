@@ -1185,6 +1185,7 @@ enum L10n {
         static var mostActive: LocalizedStringKey { "markets.most_active" }
         static var favorites: LocalizedStringKey { "markets.favorites" }
         static var popular: LocalizedStringKey { "markets.popular" }
+        static var leaders: LocalizedStringKey { "markets.leaders" }
         static var noFavorites: LocalizedStringKey { "markets.no_favorites" }
         static var noFavoritesDescription: LocalizedStringKey { "markets.no_favorites_description" }
         static var noScreenerData: LocalizedStringKey { "markets.no_screener_data" }
@@ -1193,6 +1194,22 @@ enum L10n {
         static var retry: LocalizedStringKey { "markets.retry" }
         static var apiNotConnected: LocalizedStringKey { "markets.api_not_connected" }
         static var apiNotConnectedDescription: LocalizedStringKey { "markets.api_not_connected_description" }
+    }
+
+    enum Search {
+        static var recentTitle: LocalizedStringKey { "search.recent_title" }
+        static var badgeHeld: LocalizedStringKey { "search.badge.held" }
+        static var showMoreTrending: LocalizedStringKey { "search.show_more_trending" }
+        static var scopeAll: LocalizedStringKey { "search.scope.all" }
+        static var scopeSaved: LocalizedStringKey { "search.scope.saved" }
+        static var scopeFractional: LocalizedStringKey { "search.scope.fractional" }
+        static var syncingCatalog: LocalizedStringKey { "search.syncing_catalog" }
+        static var resetScope: LocalizedStringKey { "search.reset_scope" }
+        static var directOpenSubtitle: LocalizedStringKey { "search.direct_open.subtitle" }
+
+        static func directOpenTitle(symbol: String, locale: Locale = .current) -> String {
+            L10n.format("search.direct_open.title_format", locale: locale, symbol)
+        }
     }
 
     enum Watchlists {

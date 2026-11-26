@@ -218,6 +218,27 @@ enum AppFormatter {
         return normalized.isEmpty ? placeholder : normalized
     }
 
+    static func compactNumber(
+        _ value: Double?,
+        fractionLength: Int = 1,
+        placeholder: String = AppFormatter.placeholder
+    ) -> String {
+        guard let value, value.isFinite else {
+            return placeholder
+        }
+
+        let magnitude = abs(value)
+        let sign = value < 0 ? "-" : ""
+        if let unit = compactMoneyUnits.first(where: { magnitude >= $0.divisor }) {
+            let scaled = (magnitude / unit.divisor).formatted(
+                .number.precision(.fractionLength(0...fractionLength)).locale(moneyLocale)
+            )
+            return "\(sign)\(scaled)\(unit.suffix)"
+        }
+
+        return value.formatted(.number.precision(.fractionLength(0)).locale(moneyLocale))
+    }
+
     static func latency(milliseconds: Int?, placeholder: String = AppFormatter.placeholder) -> String {
         guard let milliseconds else {
             return placeholder

@@ -32,8 +32,13 @@
 		0A0F90000000000000000105 /* Features/Home/HomeAllocationCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F90000000000000000205 /* Features/Home/HomeAllocationCard.swift */; };
 		0A0F90000000000000000106 /* Features/Home/HomeAICopilotSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F90000000000000000206 /* Features/Home/HomeAICopilotSheet.swift */; };
 		0C0F90000000000000000101 /* vicuTests/PortfolioIntelligenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0F90000000000000000201 /* PortfolioIntelligenceTests.swift */; };
+		0C0FA1000000000000000101 /* vicuTests/MarketSearchEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0FA1000000000000000201 /* MarketSearchEngineTests.swift */; };
 		0A0000000000000000000114 /* Features/Markets/MarketsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000214 /* Features/Markets/MarketsView.swift */; };
 		0A0F60000000000000000103 /* Features/Markets/MarketIndexProxyPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F60000000000000000203 /* Features/Markets/MarketIndexProxyPanel.swift */; };
+		0A0FA0000000000000000101 /* Features/Search/MarketSearchEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0FA0000000000000000201 /* Features/Search/MarketSearchEngine.swift */; };
+		0A0FA0000000000000000102 /* Features/Search/MarketSearchStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0FA0000000000000000202 /* Features/Search/MarketSearchStore.swift */; };
+		0A0FA0000000000000000103 /* Features/Search/MarketSearchComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0FA0000000000000000203 /* Features/Search/MarketSearchComponents.swift */; };
+		0A0FA0000000000000000104 /* Features/Search/MarketSearchResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0FA0000000000000000204 /* Features/Search/MarketSearchResultsView.swift */; };
 		0A0000000000000000000115 /* Features/Trade/TradeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000215 /* Features/Trade/TradeView.swift */; };
 		0A0000000000000000000116 /* Features/Orders/OrdersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000216 /* Features/Orders/OrdersView.swift */; };
 		0A0000000000000000000118 /* Features/Alpaca/AlpacaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000218 /* Features/Alpaca/AlpacaView.swift */; };
@@ -251,8 +256,13 @@
 		0A0F90000000000000000205 /* Features/Home/HomeAllocationCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Home/HomeAllocationCard.swift; sourceTree = "<group>"; };
 		0A0F90000000000000000206 /* Features/Home/HomeAICopilotSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Home/HomeAICopilotSheet.swift; sourceTree = "<group>"; };
 		0C0F90000000000000000201 /* PortfolioIntelligenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = vicuTests/PortfolioIntelligenceTests.swift; sourceTree = "<group>"; };
+		0C0FA1000000000000000201 /* MarketSearchEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = vicuTests/MarketSearchEngineTests.swift; sourceTree = "<group>"; };
 		0A0000000000000000000214 /* Features/Markets/MarketsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Markets/MarketsView.swift; sourceTree = "<group>"; };
 		0A0F60000000000000000203 /* Features/Markets/MarketIndexProxyPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Markets/MarketIndexProxyPanel.swift; sourceTree = "<group>"; };
+		0A0FA0000000000000000201 /* Features/Search/MarketSearchEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Search/MarketSearchEngine.swift; sourceTree = "<group>"; };
+		0A0FA0000000000000000202 /* Features/Search/MarketSearchStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Search/MarketSearchStore.swift; sourceTree = "<group>"; };
+		0A0FA0000000000000000203 /* Features/Search/MarketSearchComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Search/MarketSearchComponents.swift; sourceTree = "<group>"; };
+		0A0FA0000000000000000204 /* Features/Search/MarketSearchResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Search/MarketSearchResultsView.swift; sourceTree = "<group>"; };
 		0A0000000000000000000215 /* Features/Trade/TradeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Trade/TradeView.swift; sourceTree = "<group>"; };
 		0A0000000000000000000216 /* Features/Orders/OrdersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Orders/OrdersView.swift; sourceTree = "<group>"; };
 		0A0000000000000000000218 /* Features/Alpaca/AlpacaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Alpaca/AlpacaView.swift; sourceTree = "<group>"; };
@@ -498,6 +508,7 @@
 				0A0F90000000000000000205 /* Features/Home/HomeAllocationCard.swift */,
 				0A0F90000000000000000206 /* Features/Home/HomeAICopilotSheet.swift */,
 				0C0F90000000000000000201 /* PortfolioIntelligenceTests.swift */,
+				0C0FA1000000000000000201 /* MarketSearchEngineTests.swift */,
 				0A0000000000000000000260 /* Features/Home/AccountView.swift */,
 				0A0000000000000000000268 /* Features/Home/AccountActivityView.swift */,
 				0A0000000000000000000262 /* Features/Home/HomeAccountPolling.swift */,
@@ -526,6 +537,10 @@
 				0A7777777777777777777803 /* Features/Watchlists/WatchlistsView.swift */,
 				0A0000000000000000000214 /* Features/Markets/MarketsView.swift */,
 				0A0F60000000000000000203 /* Features/Markets/MarketIndexProxyPanel.swift */,
+				0A0FA0000000000000000201 /* Features/Search/MarketSearchEngine.swift */,
+				0A0FA0000000000000000202 /* Features/Search/MarketSearchStore.swift */,
+				0A0FA0000000000000000203 /* Features/Search/MarketSearchComponents.swift */,
+				0A0FA0000000000000000204 /* Features/Search/MarketSearchResultsView.swift */,
 				0A0000000000000000000293 /* Features/Markets/Skeletons/MarketsSkeletons.swift */,
 				0A00000000000000000002D1 /* Features/Trade/Skeletons/TradeSkeletons.swift */,
 				0A00000000000000000002D3 /* Features/AssetDetail/Skeletons/AssetSkeletons.swift */,
@@ -905,6 +920,10 @@
 				0A0000000000000000000192 /* DesignSystem/Components/MarketSessionTimelineView.swift in Sources */,
 				0A0000000000000000000114 /* Features/Markets/MarketsView.swift in Sources */,
 				0A0F60000000000000000103 /* Features/Markets/MarketIndexProxyPanel.swift in Sources */,
+				0A0FA0000000000000000101 /* Features/Search/MarketSearchEngine.swift in Sources */,
+				0A0FA0000000000000000102 /* Features/Search/MarketSearchStore.swift in Sources */,
+				0A0FA0000000000000000103 /* Features/Search/MarketSearchComponents.swift in Sources */,
+				0A0FA0000000000000000104 /* Features/Search/MarketSearchResultsView.swift in Sources */,
 				0A0000000000000000000193 /* Features/Markets/Skeletons/MarketsSkeletons.swift in Sources */,
 				0A00000000000000000001D1 /* Features/Trade/Skeletons/TradeSkeletons.swift in Sources */,
 				0A00000000000000000001D3 /* Features/AssetDetail/Skeletons/AssetSkeletons.swift in Sources */,
@@ -1014,6 +1033,7 @@
 				0C0F60000000000000000103 /* vicuTests/OrderDraftTests.swift in Sources */,
 				0C0F80000000000000000101 /* vicuTests/FinancialChartEngineTests.swift in Sources */,
 				0C0F90000000000000000101 /* vicuTests/PortfolioIntelligenceTests.swift in Sources */,
+				0C0FA1000000000000000101 /* vicuTests/MarketSearchEngineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

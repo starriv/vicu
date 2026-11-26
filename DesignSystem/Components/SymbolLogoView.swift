@@ -4,6 +4,7 @@ import SwiftUI
 struct SymbolLogoView: View {
     let symbol: String
     let size: CGFloat
+    var usesGlass: Bool = true
 
     @Environment(AppModel.self) private var app
     @Environment(\.colorScheme) private var colorScheme
@@ -38,12 +39,16 @@ struct SymbolLogoView: View {
 
     @ViewBuilder
     private var generatedBadge: some View {
-        if #available(iOS 26.0, *) {
-            generatedBadgeContent
-                .glassEffect(.regular.tint(glassTint), in: .rect(cornerRadius: size * 0.28))
+        if usesGlass {
+            if #available(iOS 26.0, *) {
+                generatedBadgeContent
+                    .glassEffect(.regular.tint(glassTint), in: .rect(cornerRadius: size * 0.28))
+            } else {
+                generatedBadgeContent
+                    .background(.regularMaterial, in: logoShape)
+            }
         } else {
             generatedBadgeContent
-                .background(.regularMaterial, in: logoShape)
         }
     }
 

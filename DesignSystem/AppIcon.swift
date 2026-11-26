@@ -102,6 +102,7 @@ enum AppIcon {
     }
 
     enum Market {
+        static let overviewEmpty = "chart.line.uptrend.xyaxis"
         static let equity = "building.columns"
         static let crypto = "bitcoinsign.circle"
         static let regular = "sun.max.fill"
@@ -112,7 +113,7 @@ enum AppIcon {
         static let favorites = "star.fill"
         static let watchlists = "star.square.on.square"
         static let popular = "flame.fill"
-        static let search = "magnifyingglass"
+        static let leaders = "crown.fill"
         static let more = "ellipsis"
     }
 }

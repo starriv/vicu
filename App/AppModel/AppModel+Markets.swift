@@ -1,25 +1,5 @@
 import Foundation
 
-enum MarketSearchLoadEvent {
-    case cached(String, [MarketSearchResult], isFresh: Bool)
-    case partial(String, [MarketSearchResult])
-    case enriched(String, [MarketSearchResult])
-
-    var query: String {
-        switch self {
-        case .cached(let query, _, _), .partial(let query, _), .enriched(let query, _):
-            query
-        }
-    }
-
-    var results: [MarketSearchResult] {
-        switch self {
-        case .cached(_, let results, _), .partial(_, let results), .enriched(_, let results):
-            results
-        }
-    }
-}
-
 extension AppModel {
     func hydrateCachedMarketsFromDisk() async {
         guard let activeCredentials = credentials else {
@@ -73,8 +53,445 @@ extension AppModel {
                 _ = try? await self.fetchMarketOverview(forceRefresh: false)
             }()
             async let favoritesWarmup: Void = self.refreshFavoriteMarketSymbols(forceReload: false)
-            _ = await (overviewWarmup, favoritesWarmup)
+            async let searchIndexWarmup: Void = self.prewarmSearchIndexIfNeeded()
+            _ = await (overviewWarmup, favoritesWarmup, searchIndexWarmup)
         }
+    }
+
+    func prewarmSearchIndexIfNeeded() async {
+        guard let activeCredentials = credentials else {
+            return
+        }
+
+        if assetCache.searchIndex == nil {
+            await hydrateSearchIndexFromDisk(credentials: activeCredentials)
+        }
+
+        guard isCurrentCredentialContext(activeCredentials) else {
+            return
+        }
+
+        let needsNetworkRefresh = assetCache.searchIndex == nil
+            || assetCache.isSearchIndexStale
+            || assetCache.searchIndexDate.map { Date().timeIntervalSince($0) >= assetCache.marketAssetsTTL } ?? true
+
+        if needsNetworkRefresh {
+            _ = try? await ensureSearchIndex(credentials: activeCredentials, allowStaleReturn: false)
+        }
+    }
+
+    func hydrateSearchIndexFromDisk(credentials activeCredentials: AlpacaCredentials? = nil) async {
+        guard let activeCredentials = activeCredentials ?? credentials else {
+            return
+        }
+
+        if assetCache.searchIndex != nil {
+            return
+        }
+
+        let cacheKey = AppPageCacheKeys.marketAssets(credentials: activeCredentials)
+        let pageCache = services.pageCache
+        let lookup: PageCacheLookup<[SearchableAssetRecord]>? = await withCheckedContinuation { continuation in
+            marketCacheQueue.async {
+                let value = pageCache.value([SearchableAssetRecord].self, for: cacheKey, allowStale: true)
+                continuation.resume(returning: value)
+            }
+        }
+        guard isCurrentCredentialContext(activeCredentials), let lookup, !lookup.value.isEmpty else {
+            return
+        }
+
+        let index = await Task.detached(priority: .userInitiated) {
+            MarketSearchIndex(records: lookup.value)
+        }.value
+        guard isCurrentCredentialContext(activeCredentials), assetCache.searchIndex == nil else {
+            return
+        }
+
+        assetCache.searchIndex = index
+        assetCache.searchIndexDate = lookup.cachedAt
+        assetCache.isSearchIndexStale = !lookup.isFresh
+    }
+
+    func searchIndexSnapshot() -> MarketSearchIndex? {
+        assetCache.searchIndex
+    }
+
+    func searchIndexTimestamp() -> Date? {
+        assetCache.searchIndexDate
+    }
+
+    func lookupSearchAsset(symbol: String) -> SearchableAssetRecord? {
+        let normalized = normalizedMarketSymbol(symbol)
+        guard !normalized.isEmpty else { return nil }
+
+        if let record = assetCache.searchIndex?.record(forSymbol: normalized) {
+            return record
+        }
+        if let favoriteAsset = favoriteMarketAssetBySymbol[normalized] {
+            return SearchableAssetRecord(asset: favoriteAsset)
+        }
+        return nil
+    }
+
+    func localFallbackSearchRecords() -> [SearchableAssetRecord] {
+        var seen = Set<String>()
+        var records: [SearchableAssetRecord] = []
+
+        func appendRecord(_ record: SearchableAssetRecord) {
+            let key = normalizedMarketSymbol(record.symbol)
+            guard !key.isEmpty, seen.insert(key).inserted else { return }
+            records.append(record)
+        }
+
+        // Option contracts aren't searchable equities; their detail page can't load them.
+        for position in portfolio.positions where position.assetCategory != .option {
+            let symbol = normalizedMarketSymbol(position.symbol)
+            let name = favoriteMarketAssetBySymbol[symbol]?.name
+                ?? cachedMarketOverview?.mostActive.first(where: { normalizedMarketSymbol($0.symbol) == symbol })?.companyName
+            appendRecord(
+                SearchableAssetRecord(
+                    id: position.assetID ?? symbol,
+                    symbol: symbol,
+                    name: name,
+                    exchange: position.exchange,
+                    assetClass: position.assetClass,
+                    tradable: true
+                )
+            )
+        }
+
+        for symbol in favoriteMarketSymbols {
+            let normalized = normalizedMarketSymbol(symbol)
+            if let asset = favoriteMarketAssetBySymbol[normalized] {
+                appendRecord(SearchableAssetRecord(asset: asset))
+            } else {
+                appendRecord(SearchableAssetRecord(id: normalized, symbol: normalized))
+            }
+        }
+
+        for leader in cachedMarketOverview?.mostActive ?? [] {
+            appendRecord(
+                SearchableAssetRecord(
+                    id: leader.symbol,
+                    symbol: normalizedMarketSymbol(leader.symbol),
+                    name: leader.companyName
+                )
+            )
+        }
+
+        for cachedPopular in searchCache.popularSymbolsCache.values {
+            for item in cachedPopular {
+                appendRecord(
+                    SearchableAssetRecord(
+                        id: item.symbol,
+                        symbol: normalizedMarketSymbol(item.symbol),
+                        name: item.companyName
+                    )
+                )
+            }
+        }
+
+        return records
+    }
+
+    func cachedSearchQuotesSnapshot() -> [String: MarketActiveSymbol] {
+        var quotes: [String: MarketActiveSymbol] = [:]
+        let now = Date()
+
+        for list in searchCache.popularSymbolsCache.values {
+            for item in list where item.price != nil {
+                quotes[normalizedMarketSymbol(item.symbol)] = item
+            }
+        }
+
+        if let overview = cachedMarketOverview {
+            for indexQuote in overview.indexQuotes where indexQuote.price != nil {
+                let key = normalizedMarketSymbol(indexQuote.symbol)
+                quotes[key] = MarketActiveSymbol(
+                    symbol: key,
+                    companyName: lookupSearchAsset(symbol: key)?.displayName ?? indexQuote.title,
+                    price: indexQuote.price,
+                    change: indexQuote.change,
+                    percentChange: indexQuote.percentChange,
+                    volume: nil,
+                    tradeCount: nil
+                )
+            }
+
+            for active in overview.mostActive where active.price != nil {
+                quotes[normalizedMarketSymbol(active.symbol)] = active
+            }
+        }
+
+        for position in portfolio.positions {
+            guard let price = NumberParser.double(from: position.currentPrice), price > 0 else { continue }
+            let key = normalizedMarketSymbol(position.symbol)
+            let pct = NumberParser.double(from: position.changeToday)
+            let lastday = NumberParser.double(from: position.lastDayPrice)
+            quotes[key] = MarketActiveSymbol(
+                symbol: key,
+                companyName: lookupSearchAsset(symbol: key)?.displayName,
+                price: price,
+                change: lastday.map { price - $0 },
+                percentChange: pct,
+                volume: nil,
+                tradeCount: nil
+            )
+        }
+
+        for (key, quote) in favoriteMarketQuotesBySymbol where quote.price != nil {
+            quotes[key] = quote
+        }
+
+        for (key, entry) in searchCache.quoteCache where now.timeIntervalSince(entry.cachedAt) < searchCache.quoteCacheTTL {
+            quotes[key] = entry.value
+        }
+
+        return quotes
+    }
+
+    func cachedSearchQuote(forSymbol symbol: String) -> MarketActiveSymbol? {
+        let key = normalizedMarketSymbol(symbol)
+        guard !key.isEmpty else { return nil }
+
+        if let entry = searchCache.quoteCache[key],
+           Date().timeIntervalSince(entry.cachedAt) < searchCache.quoteCacheTTL {
+            return entry.value
+        }
+
+        if let favoriteQuote = favoriteMarketQuotesBySymbol[key], favoriteQuote.price != nil {
+            return favoriteQuote
+        }
+
+        if let position = portfolio.positions.first(where: { normalizedMarketSymbol($0.symbol) == key }),
+           let price = NumberParser.double(from: position.currentPrice), price > 0 {
+            let pct = NumberParser.double(from: position.changeToday)
+            let lastday = NumberParser.double(from: position.lastDayPrice)
+            let change = lastday.map { price - $0 }
+            return MarketActiveSymbol(
+                symbol: key,
+                companyName: lookupSearchAsset(symbol: key)?.displayName,
+                price: price,
+                change: change,
+                percentChange: pct,
+                volume: nil,
+                tradeCount: nil
+            )
+        }
+
+        if let active = cachedMarketOverview?.mostActive.first(where: { normalizedMarketSymbol($0.symbol) == key }),
+           active.price != nil {
+            return active
+        }
+
+        if let indexQuote = cachedMarketOverview?.indexQuotes.first(where: { normalizedMarketSymbol($0.symbol) == key }),
+           indexQuote.price != nil {
+            return MarketActiveSymbol(
+                symbol: key,
+                companyName: lookupSearchAsset(symbol: key)?.displayName ?? indexQuote.title,
+                price: indexQuote.price,
+                change: indexQuote.change,
+                percentChange: indexQuote.percentChange,
+                volume: nil,
+                tradeCount: nil
+            )
+        }
+
+        for list in searchCache.popularSymbolsCache.values {
+            if let popular = list.first(where: { normalizedMarketSymbol($0.symbol) == key }),
+               popular.price != nil {
+                return popular
+            }
+        }
+
+        return nil
+    }
+
+    func fetchSearchQuotes(forSymbols symbols: [String]) async -> [String: MarketActiveSymbol] {
+        guard let activeCredentials = credentials else {
+            return [:]
+        }
+
+        let normalized = Self.normalizedMarketSymbols(symbols)
+        guard !normalized.isEmpty else {
+            return [:]
+        }
+
+        let now = Date()
+        var resolved: [String: MarketActiveSymbol] = [:]
+        var missing: [String] = []
+
+        for symbol in normalized {
+            if let entry = searchCache.quoteCache[symbol],
+               now.timeIntervalSince(entry.cachedAt) < searchCache.quoteCacheTTL {
+                resolved[symbol] = entry.value
+            } else {
+                missing.append(symbol)
+            }
+        }
+
+        guard !missing.isEmpty else {
+            return resolved
+        }
+
+        let fetched = (try? await services.markets.fetchMarketSymbols(symbols: missing, credentials: activeCredentials)) ?? []
+        guard isCurrentCredentialContext(activeCredentials) else {
+            return resolved
+        }
+
+        let fetchedAt = Date()
+        for quote in fetched {
+            let key = normalizedMarketSymbol(quote.symbol)
+            guard !key.isEmpty else { continue }
+            if quote.price != nil {
+                searchCache.quoteCache[key] = TimedCacheEntry(value: quote, cachedAt: fetchedAt)
+                resolved[key] = quote
+            }
+        }
+        return resolved
+    }
+
+    func fetchDirectSearchAsset(symbol: String) async -> SearchableAssetRecord? {
+        guard let activeCredentials = credentials else {
+            return nil
+        }
+
+        let normalized = normalizedMarketSymbol(symbol)
+        guard MarketSearchIndex.looksLikeTicker(normalized) else {
+            return nil
+        }
+
+        if let existing = lookupSearchAsset(symbol: normalized) {
+            return existing
+        }
+
+        guard let asset = try? await services.markets.fetchAsset(
+            symbolOrAssetID: normalized,
+            credentials: activeCredentials
+        ) else {
+            return nil
+        }
+
+        guard asset.status?.lowercased() == "active" else {
+            return nil
+        }
+        return SearchableAssetRecord(asset: asset)
+    }
+
+    func ensureSearchIndex(
+        credentials activeCredentials: AlpacaCredentials? = nil,
+        allowStaleReturn: Bool = true
+    ) async throws -> MarketSearchIndex {
+        guard let activeCredentials = activeCredentials ?? credentials else {
+            throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
+        }
+
+        if assetCache.searchIndex == nil {
+            await hydrateSearchIndexFromDisk(credentials: activeCredentials)
+        }
+
+        if let existing = assetCache.searchIndex, !existing.isEmpty {
+            let isFresh = !assetCache.isSearchIndexStale
+                && (assetCache.searchIndexDate.map { Date().timeIntervalSince($0) < assetCache.marketAssetsTTL } ?? false)
+            if isFresh {
+                return existing
+            }
+            if allowStaleReturn {
+                if assetCache.inFlightSearchIndexTask == nil {
+                    Task { @MainActor [weak self] in
+                        _ = try? await self?.refreshSearchIndexFromNetwork(credentials: activeCredentials)
+                    }
+                }
+                return existing
+            }
+        }
+
+        return try await refreshSearchIndexFromNetwork(credentials: activeCredentials)
+    }
+
+    private func refreshSearchIndexFromNetwork(credentials activeCredentials: AlpacaCredentials) async throws -> MarketSearchIndex {
+        if let existingTask = assetCache.inFlightSearchIndexTask {
+            return try await existingTask.value
+        }
+
+        let marketsService = services.markets
+        let pageCache = services.pageCache
+        let cacheKey = AppPageCacheKeys.marketAssets(credentials: activeCredentials)
+        let cacheQueue = marketCacheQueue
+
+        let task = Task<MarketSearchIndex, Error> { @MainActor [weak self] in
+            let fetchedAssets = try await marketsService.fetchMarketAssets(credentials: activeCredentials)
+            try Task.checkCancellation()
+
+            let (index, records) = await Task.detached(priority: .userInitiated) {
+                let built = MarketSearchIndex(assets: fetchedAssets)
+                return (built, built.records)
+            }.value
+            try Task.checkCancellation()
+
+            guard let self, self.isCurrentCredentialContext(activeCredentials) else {
+                throw CancellationError()
+            }
+
+            self.assetCache.searchIndex = index
+            self.assetCache.searchIndexDate = Date()
+            self.assetCache.isSearchIndexStale = false
+
+            cacheQueue.async {
+                pageCache.setValue(records, for: cacheKey, policy: .marketAssets)
+            }
+
+            return index
+        }
+
+        assetCache.inFlightSearchIndexTask = task
+        defer {
+            if assetCache.inFlightSearchIndexTask == task {
+                assetCache.inFlightSearchIndexTask = nil
+            }
+        }
+        return try await task.value
+    }
+
+    func recentSearchSymbols() -> [String] {
+        guard let credentials else { return [] }
+        return Self.normalizedMarketSymbols(
+            services.configurationStore.value(for: AppConfigurationKeys.Search.recentSymbols(credentials: credentials))
+        )
+    }
+
+    func recordRecentSearchSymbol(_ symbol: String) {
+        guard let credentials else { return }
+        let normalized = normalizedMarketSymbol(symbol)
+        guard !normalized.isEmpty else { return }
+
+        var symbols = recentSearchSymbols().filter { $0 != normalized }
+        symbols.insert(normalized, at: 0)
+        if symbols.count > 10 {
+            symbols = Array(symbols.prefix(10))
+        }
+        services.configurationStore.setValue(
+            symbols,
+            for: AppConfigurationKeys.Search.recentSymbols(credentials: credentials)
+        )
+    }
+
+    func removeRecentSearchSymbol(_ symbol: String) {
+        guard let credentials else { return }
+        let normalized = normalizedMarketSymbol(symbol)
+        let updated = recentSearchSymbols().filter { $0 != normalized }
+        services.configurationStore.setValue(
+            updated,
+            for: AppConfigurationKeys.Search.recentSymbols(credentials: credentials)
+        )
+    }
+
+    func clearRecentSearchSymbols() {
+        guard let credentials else { return }
+        services.configurationStore.removeValue(
+            for: AppConfigurationKeys.Search.recentSymbols(credentials: credentials)
+        )
     }
 
     func cachedPopularMarketSymbols(sort: MarketMostActiveSort, limit: Int = 12) -> [MarketActiveSymbol]? {
@@ -791,123 +1208,6 @@ extension AppModel {
         )
     }
 
-    func searchMarketSymbols(_ query: String, limit: Int = 20) async throws -> [MarketSearchResult] {
-        var latestResults: [MarketSearchResult] = []
-        try await searchMarketSymbolsProgressively(query, limit: limit) { event in
-            latestResults = event.results
-        }
-        return latestResults
-    }
-
-    func searchMarketSymbolsProgressively(
-        _ query: String,
-        limit: Int = 20,
-        forceRefresh: Bool = false,
-        emit: @MainActor (MarketSearchLoadEvent) -> Void
-    ) async throws {
-        guard let credentials else {
-            throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
-        }
-
-        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalizedQuery.isEmpty else {
-            return
-        }
-
-        let startedAt = Date()
-        Self.debugMarketSearchLatency("start", query: normalizedQuery, startedAt: startedAt)
-        let cacheKey = SearchResultCacheKey(query: normalizedQuery.uppercased(), limit: limit)
-        let cachedEntry = searchCache.resultCache[cacheKey]
-        let cachedResults = cachedEntry?.value
-        if let cachedEntry = searchCache.resultCache[cacheKey],
-           Date().timeIntervalSince(cachedEntry.cachedAt) < searchCache.resultCacheTTL {
-            Self.debugMarketSearchLatency(
-                "cache.fresh",
-                query: normalizedQuery,
-                startedAt: startedAt,
-                resultCount: cachedEntry.value.count
-            )
-            emit(.cached(normalizedQuery, cachedEntry.value, isFresh: true))
-            if !forceRefresh {
-                return
-            }
-        } else if let cachedEntry {
-            Self.debugMarketSearchLatency(
-                "cache.stale",
-                query: normalizedQuery,
-                startedAt: startedAt,
-                resultCount: cachedEntry.value.count
-            )
-            emit(.cached(normalizedQuery, cachedEntry.value, isFresh: false))
-        }
-
-        let assets = try await marketAssets(credentials: credentials)
-        try Task.checkCancellation()
-        Self.debugMarketSearchLatency(
-            "assets.ready",
-            query: normalizedQuery,
-            startedAt: startedAt,
-            resultCount: assets.count
-        )
-        let matchedAssets = await Task.detached(priority: .userInitiated) {
-            Self.rankMarketAssets(assets, query: normalizedQuery, limit: limit)
-        }.value
-        try Task.checkCancellation()
-        Self.debugMarketSearchLatency(
-            "rank.done",
-            query: normalizedQuery,
-            startedAt: startedAt,
-            resultCount: matchedAssets.count
-        )
-        let symbols = matchedAssets.map(\.symbol)
-
-        guard !symbols.isEmpty else {
-            searchCache.resultCache[cacheKey] = TimedCacheEntry(value: [], cachedAt: Date())
-            emit(.enriched(normalizedQuery, []))
-            return
-        }
-
-        let cachedQuotesBySymbol: [String: MarketActiveSymbol] = (cachedResults ?? []).reduce(into: [:]) { quotesBySymbol, result in
-            guard let quote = result.quote else {
-                return
-            }
-
-            quotesBySymbol[normalizedMarketSymbol(result.symbol)] = quote
-        }
-        let partialResults = matchedAssets.map { asset in
-            MarketSearchResult(asset: asset, quote: cachedQuotesBySymbol[normalizedMarketSymbol(asset.symbol)])
-        }
-        Self.debugMarketSearchLatency(
-            "partial.emit",
-            query: normalizedQuery,
-            startedAt: startedAt,
-            resultCount: partialResults.count
-        )
-        emit(.partial(normalizedQuery, partialResults))
-
-        let quotes = (try? await services.markets.fetchMarketSymbols(symbols: symbols, credentials: credentials)) ?? []
-        try Task.checkCancellation()
-        let quotesBySymbol: [String: MarketActiveSymbol] = quotes.reduce(into: [:]) { quotesBySymbol, quote in
-            quotesBySymbol[normalizedMarketSymbol(quote.symbol)] = quote
-        }
-
-        let results = matchedAssets.map { asset in
-            let normalizedSymbol = normalizedMarketSymbol(asset.symbol)
-            return MarketSearchResult(
-                asset: asset,
-                quote: quotesBySymbol[normalizedSymbol] ?? cachedQuotesBySymbol[normalizedSymbol]
-            )
-        }
-        searchCache.resultCache[cacheKey] = TimedCacheEntry(value: results, cachedAt: Date())
-        Self.debugMarketSearchLatency(
-            "enriched.done",
-            query: normalizedQuery,
-            startedAt: startedAt,
-            resultCount: results.count
-        )
-        emit(.enriched(normalizedQuery, results))
-    }
-
     func fetchSearchPopularMarketSymbols(limit: Int = 12, sort: MarketMostActiveSort = .volume) async throws -> [MarketActiveSymbol] {
         guard let credentials else {
             throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
@@ -916,7 +1216,8 @@ extension AppModel {
         if let searchPopularSymbolsCache = searchCache.popularSymbolsCache[sort],
            let searchPopularSymbolsCacheDate = searchCache.popularSymbolsCacheDate[sort],
            Date().timeIntervalSince(searchPopularSymbolsCacheDate) < searchCache.popularSymbolsCacheTTL {
-            return Array(searchPopularSymbolsCache.prefix(limit))
+            let enriched = enrichPopularSymbolsWithCompanyNames(searchPopularSymbolsCache)
+            return Array(enriched.prefix(limit))
         }
 
         let rankedSymbols = try await services.markets.fetchMostActiveMarketSymbols(top: limit, sort: sort, credentials: credentials)
@@ -930,21 +1231,33 @@ extension AppModel {
         }
 
         async let quotesRequest = services.markets.fetchMarketSymbols(symbols: symbols, credentials: credentials)
+        if assetCache.searchIndex == nil {
+            await hydrateSearchIndexFromDisk(credentials: credentials)
+        }
 
         let quotes = (try? await quotesRequest) ?? []
-        let quotesBySymbol = quotes.reduce(into: [:]) { result, quote in
-            result[normalizedMarketSymbol(quote.symbol)] = quote
+        let now = Date()
+        let quotesBySymbol = quotes.reduce(into: [String: MarketActiveSymbol]()) { result, quote in
+            let key = normalizedMarketSymbol(quote.symbol)
+            result[key] = quote
+            if quote.price != nil {
+                searchCache.quoteCache[key] = TimedCacheEntry(value: quote, cachedAt: now)
+            }
         }
-        let rankedBySymbol = rankedSymbols.reduce(into: [:]) { result, symbol in
+        let rankedBySymbol = rankedSymbols.reduce(into: [String: MarketActiveSymbol]()) { result, symbol in
             result[normalizedMarketSymbol(symbol.symbol)] = symbol
         }
 
         let popularSymbols = symbols.map { symbol in
             let rankedSymbol = rankedBySymbol[symbol]
             let quote = quotesBySymbol[symbol]
+            let resolvedName = rankedSymbol?.companyName
+                ?? assetCache.searchIndex?.companyName(forSymbol: symbol)
+                ?? favoriteMarketAssetBySymbol[symbol]?.name
+                ?? cachedMarketOverview?.mostActive.first(where: { normalizedMarketSymbol($0.symbol) == symbol })?.companyName
             return MarketActiveSymbol(
                 symbol: symbol,
-                companyName: rankedSymbol?.companyName,
+                companyName: resolvedName,
                 price: quote?.price ?? rankedSymbol?.price,
                 change: quote?.change ?? rankedSymbol?.change,
                 percentChange: quote?.percentChange ?? rankedSymbol?.percentChange,
@@ -960,49 +1273,35 @@ extension AppModel {
         return popularSymbols
     }
 
-    func fetchSearchPlaceholderSymbol(sort: MarketMostActiveSort = .trades) async -> String {
-        guard let credentials else {
-            return Self.searchPlaceholderFallbackSymbol
-        }
-
-        if let searchPopularSymbolsCache = searchCache.popularSymbolsCache[sort],
-           let searchPopularSymbolsCacheDate = searchCache.popularSymbolsCacheDate[sort],
-           Date().timeIntervalSince(searchPopularSymbolsCacheDate) < searchCache.popularSymbolsCacheTTL {
-            return Self.searchPlaceholderSymbol(from: searchPopularSymbolsCache)
-        }
-
-        do {
-            let mostActiveSymbols = try await services.markets.fetchMostActiveMarketSymbols(
-                top: 12,
-                sort: sort,
-                credentials: credentials
+    func enrichPopularSymbolsWithCompanyNames(_ symbols: [MarketActiveSymbol]) -> [MarketActiveSymbol] {
+        guard !symbols.isEmpty else { return symbols }
+        return symbols.map { item in
+            let existing = item.companyName?.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let existing, !existing.isEmpty {
+                return item
+            }
+            let key = normalizedMarketSymbol(item.symbol)
+            let resolvedName = assetCache.searchIndex?.companyName(forSymbol: key)
+                ?? favoriteMarketAssetBySymbol[key]?.name
+                ?? cachedMarketOverview?.mostActive.first(where: { normalizedMarketSymbol($0.symbol) == key })?.companyName
+            guard let resolvedName else {
+                return item
+            }
+            return MarketActiveSymbol(
+                symbol: item.symbol,
+                companyName: resolvedName,
+                price: item.price,
+                change: item.change,
+                percentChange: item.percentChange,
+                volume: item.volume,
+                tradeCount: item.tradeCount
             )
-            return Self.searchPlaceholderSymbol(from: mostActiveSymbols)
-        } catch {
-            return Self.searchPlaceholderFallbackSymbol
         }
     }
 
     nonisolated static func searchPlaceholderSymbol(from mostActiveSymbols: [MarketActiveSymbol]) -> String {
         normalizedMarketSymbols(mostActiveSymbols.map(\.symbol)).randomElement()
             ?? searchPlaceholderFallbackSymbol
-    }
-
-    private func marketAssets(credentials: AlpacaCredentials) async throws -> [AlpacaAsset] {
-        if let cached = assetCache.marketAssets,
-           let cacheDate = assetCache.marketAssetsDate,
-           Date().timeIntervalSince(cacheDate) < assetCache.marketAssetsTTL {
-            return cached
-        }
-
-        let fetchedAssets = try await services.markets.fetchMarketAssets(credentials: credentials)
-        let assets = fetchedAssets.filter { asset in
-            asset.symbol.isEmpty == false && asset.status?.lowercased() == "active"
-        }
-
-        assetCache.marketAssets = assets
-        assetCache.marketAssetsDate = Date()
-        return assets
     }
 
     private func ensureFavoritesWatchlist(credentials: AlpacaCredentials, reload: Bool = false) async throws -> AlpacaWatchlist {
@@ -1054,25 +1353,33 @@ extension AppModel {
     }
 
     nonisolated static func rankMarketAssets(_ assets: [AlpacaAsset], query: String, limit: Int) -> [AlpacaAsset] {
-        let normalizedQuery = query.uppercased()
-        let nameQuery = query.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, limit > 0 else {
+            return []
+        }
+
+        let normalizedQuery = trimmed.uppercased()
+        let lowerQuery = trimmed.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+        let wordBoundaryQuery = " " + lowerQuery
 
         return assets
             .compactMap { asset -> (asset: AlpacaAsset, score: Int)? in
                 let symbol = asset.symbol.uppercased()
-                let name = asset.name ?? ""
-                let foldedName = name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+                let nameLower = (asset.name ?? "")
+                    .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
 
                 let score: Int?
                 if symbol == normalizedQuery {
                     score = 0
                 } else if symbol.hasPrefix(normalizedQuery) {
                     score = 10
-                } else if foldedName.hasPrefix(nameQuery) {
+                } else if !nameLower.isEmpty && nameLower.hasPrefix(lowerQuery) {
                     score = 20
+                } else if !nameLower.isEmpty && nameLower.contains(wordBoundaryQuery) {
+                    score = 25
                 } else if symbol.contains(normalizedQuery) {
                     score = 30
-                } else if foldedName.localizedCaseInsensitiveContains(nameQuery) {
+                } else if !nameLower.isEmpty && nameLower.contains(lowerQuery) {
                     score = 40
                 } else {
                     score = nil
@@ -1097,19 +1404,6 @@ extension AppModel {
             }
             .prefix(limit)
             .map(\.asset)
-    }
-
-    private nonisolated static func debugMarketSearchLatency(
-        _ stage: String,
-        query: String,
-        startedAt: Date,
-        resultCount: Int? = nil
-    ) {
-        #if DEBUG
-        let latency = max(0, Int((Date().timeIntervalSince(startedAt) * 1_000).rounded()))
-        let count = resultCount.map { " count=\($0)" } ?? ""
-        print("[MarketSearch] \(stage) query=\(query) latency=\(latency)ms\(count)")
-        #endif
     }
 
     func invalidateFavoritesWatchlist(credentials: AlpacaCredentials) {
@@ -1146,13 +1440,16 @@ extension AppModel {
     }
 
     func resetMarketSearchCaches() {
-        assetCache.marketAssets = nil
-        assetCache.marketAssetsDate = nil
+        assetCache.inFlightSearchIndexTask?.cancel()
+        assetCache.inFlightSearchIndexTask = nil
+        assetCache.searchIndex = nil
+        assetCache.searchIndexDate = nil
+        assetCache.isSearchIndexStale = false
         assetCache.watchlistAssets = nil
         assetCache.watchlistAssetsDate = nil
         searchCache.popularSymbolsCache = [:]
         searchCache.popularSymbolsCacheDate = [:]
-        searchCache.resultCache = [:]
+        searchCache.quoteCache = [:]
         newsCache.pageCache = [:]
         optionCache.chainPageCache = [:]
         optionCache.expirationCache = [:]
@@ -1160,6 +1457,7 @@ extension AppModel {
         optionCache.latestTradeCache = [:]
         optionCache.barsPageCache = [:]
         optionCache.tradesPageCache = [:]
+        symbolOrdersCache = [:]
     }
 
     private static let optionExpirationPageSize = 10_000

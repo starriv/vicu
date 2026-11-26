@@ -1,6 +1,4 @@
-import RxSwift
 import SwiftUI
-import UIKit
 
 struct MarketsView: View {
     @Environment(AppModel.self) private var app
@@ -8,9 +6,25 @@ struct MarketsView: View {
     @State private var isLoading = false
     @State private var hasLoadError = false
     @State private var selectedMarketList: MarketListMode = .favorites
+    @State private var searchText = ""
+    @State private var isSearchPresented = false
+    @State private var searchStore = MarketSearchStore()
+    @State private var selectedSymbolDestination: MarketAssetDestination?
 
     private var overview: MarketOverview? {
         app.cachedMarketOverview
+    }
+
+    private var normalizedSearchQuery: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var isShowingSearchResults: Bool {
+        !normalizedSearchQuery.isEmpty
+    }
+
+    private var marketContextID: String {
+        "\(app.pageCacheScopeID ?? "none")-\(app.environment.rawValue)-\(app.hasCredentials)"
     }
 
     var body: some View {
@@ -20,35 +34,55 @@ struct MarketsView: View {
                     title: L10n.Common.noData,
                     systemImage: AppIcon.More.alpaca
                 )
-            } else if let overview {
-                TimelineView(.periodic(from: .now, by: 60)) { context in
-                    MarketStatusCard(
-                        overview: overview,
-                        referenceDate: context.date,
-                        cachedAt: app.cachedMarketOverviewAt,
-                        cacheIsStale: app.isMarketOverviewFromStaleCache
-                    )
-                }
-                MarketListModePicker(selection: $selectedMarketList)
-                MarketSymbolSection(mode: selectedMarketList, overview: overview)
-            } else if isLoading || !hasLoadError {
-                MarketOverviewSkeleton()
-            } else {
-                AppEmptyStateView(
-                    title: L10n.Common.noData,
-                    systemImage: AppIcon.Tab.markets
+            } else if isShowingSearchResults {
+                MarketSearchResultsView(
+                    query: normalizedSearchQuery,
+                    store: searchStore,
+                    favoriteSymbols: favoriteSymbolSet,
+                    onSelectScope: { searchStore.updateScope($0, app: app) },
+                    onOpenAsset: { openAssetDetail($0, recordRecent: true) },
+                    onToggleFavorite: toggleFavorite(_:)
                 )
+            } else if isSearchPresented {
+                MarketSearchLandingView(
+                    store: searchStore,
+                    favoriteSymbols: favoriteSymbolSet,
+                    ownedSymbols: ownedSymbolSet,
+                    onSelectRecent: { openAssetDetail($0, recordRecent: true) },
+                    onRemoveRecent: { searchStore.removeRecentSymbol($0, app: app) },
+                    onClearRecents: { searchStore.clearRecentSymbols(app: app) },
+                    onChangePopularSort: { searchStore.updatePopularSort($0, app: app) },
+                    onExpandPopular: {
+                        withAnimation(.snappy(duration: 0.2)) {
+                            searchStore.showsAllPopular = true
+                        }
+                    },
+                    onSelectPopular: { openAssetDetail($0, recordRecent: false) },
+                    onToggleFavorite: toggleFavorite(_:)
+                )
+            } else {
+                marketDiscoveryContent
             }
         }
+        .scrollDismissesKeyboard(.interactively)
+        .searchable(
+            text: $searchText,
+            isPresented: $isSearchPresented,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: Text(searchStore.defaultSearchSymbol)
+        )
+        .keyboardType(.asciiCapable)
+        .textInputAutocapitalization(.never)
+        .autocorrectionDisabled()
+        .submitLabel(.search)
+        .onSubmit(of: .search) {
+            handleSearchSubmit()
+        }
+        .navigationDestination(item: $selectedSymbolDestination) { destination in
+            AssetDetailView(symbol: destination.symbol)
+        }
         .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-                NavigationLink {
-                    MarketSearchView()
-                } label: {
-                    Image(systemName: AppIcon.Market.search)
-                }
-                .accessibilityLabel(L10n.Markets.searchTitle)
-
+            ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     NavigationLink {
                         WatchlistsView()
@@ -68,28 +102,126 @@ struct MarketsView: View {
                 }
             }
         }
-        .task {
-            await loadInitialOrRevalidate()
+        .task(id: marketContextID) {
+            async let marketsLoad: Void = loadInitialOrRevalidate()
+            async let searchLoad: Void = searchStore.handleContextAppearance(contextID: marketContextID, app: app)
+            _ = await (marketsLoad, searchLoad)
+            if !normalizedSearchQuery.isEmpty {
+                searchStore.updateQuery(normalizedSearchQuery, app: app, immediate: true)
+            }
         }
-        .task(id: marketBoundaryRefreshID) {
+        .task(id: app.cachedMarketOverviewAt) {
             await refreshMarketDataAtNextBoundary()
+        }
+        .onAppear {
+            searchStore.syncRecentSymbols(app: app)
+        }
+        .onDisappear {
+            searchStore.onDisappear()
         }
         .refreshable {
             await refreshAll(forceRefresh: true)
         }
+        .onChange(of: normalizedSearchQuery) { _, newValue in
+            searchStore.updateQuery(newValue, app: app, immediate: false)
+        }
+        .onChange(of: isSearchPresented) { _, presented in
+            if presented {
+                searchStore.syncRecentSymbols(app: app)
+            }
+        }
         .onChange(of: app.favoriteMarketSymbolsError) { _, message in
             showErrorMessage(message)
         }
+        .onChange(of: searchStore.lastCatalogErrorMessage) { _, _ in
+            if let message = searchStore.consumeCatalogErrorMessage() {
+                toastCenter.showErrorMessage(message)
+            }
+        }
     }
 
-    private var marketBoundaryRefreshID: String {
-        guard let overview else {
-            return "none"
-        }
+    @ViewBuilder
+    private var marketDiscoveryContent: some View {
+        if let overview {
+            TimelineView(.periodic(from: .now, by: 60)) { context in
+                MarketStatusCard(
+                    overview: overview,
+                    referenceDate: context.date,
+                    cachedAt: app.cachedMarketOverviewAt,
+                    cacheIsStale: app.isMarketOverviewFromStaleCache
+                )
+            }
 
-        let snapshot = MarketSessionSnapshot.current(for: overview)
-        let boundary = snapshot.nextBoundary?.timeIntervalSince1970 ?? 0
-        return "\(snapshot.session)-\(boundary)"
+            MarketListModePicker(selection: $selectedMarketList)
+
+            switch selectedMarketList {
+            case .favorites, .leaders:
+                MarketSymbolSection(mode: selectedMarketList, overview: overview)
+            case .trending:
+                if searchStore.shouldShowTrendingSection {
+                    SearchTrendingSection(
+                        symbols: searchStore.displayedPopularSymbols,
+                        sort: searchStore.popularSort,
+                        showsSkeleton: searchStore.shouldShowPopularSkeleton,
+                        canExpand: searchStore.canExpandPopularSymbols,
+                        favoriteSymbols: favoriteSymbolSet,
+                        ownedSymbols: ownedSymbolSet,
+                        onChangeSort: { searchStore.updatePopularSort($0, app: app) },
+                        onExpand: {
+                            withAnimation(.snappy(duration: 0.2)) {
+                                searchStore.showsAllPopular = true
+                            }
+                        },
+                        onSelect: { openAssetDetail($0, recordRecent: false) },
+                        onToggleFavorite: toggleFavorite(_:)
+                    )
+                }
+            }
+        } else if isLoading || !hasLoadError {
+            MarketOverviewSkeleton()
+        } else {
+            AppEmptyStateView(
+                title: L10n.Common.noData,
+                systemImage: AppIcon.Market.overviewEmpty
+            )
+        }
+    }
+
+    private var favoriteSymbolSet: Set<String> {
+        Set(app.favoriteMarketSymbols.map { $0.uppercased() })
+    }
+
+    private var ownedSymbolSet: Set<String> {
+        Set(app.portfolio.positions.map { $0.symbol.uppercased() })
+    }
+
+    private func handleSearchSubmit() {
+        let trimmed = normalizedSearchQuery
+        guard !trimmed.isEmpty else { return }
+
+        let upper = trimmed.uppercased()
+        if let exact = searchStore.results.first(where: { $0.symbol == upper }) {
+            openAssetDetail(exact.symbol, recordRecent: true)
+            return
+        }
+        searchStore.updateQuery(trimmed, app: app, immediate: true)
+    }
+
+    private func openAssetDetail(_ symbol: String, recordRecent: Bool) {
+        let normalizedSymbol = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !normalizedSymbol.isEmpty else { return }
+
+        if recordRecent {
+            searchStore.recordRecentSelection(normalizedSymbol, app: app)
+        }
+        isSearchPresented = false
+        selectedSymbolDestination = MarketAssetDestination(symbol: normalizedSymbol)
+    }
+
+    private func toggleFavorite(_ symbol: String) {
+        Task {
+            await app.toggleFavoriteMarketSymbol(symbol)
+        }
     }
 
     private func loadInitialOrRevalidate() async {
@@ -107,7 +239,13 @@ struct MarketsView: View {
     private func refreshAll(forceRefresh: Bool) async {
         async let overviewTask: Void = loadMarketData(forceRefresh: forceRefresh)
         async let favoritesTask: Void = app.refreshFavoriteMarketSymbols(forceReload: forceRefresh)
-        _ = await (overviewTask, favoritesTask)
+        async let searchRefreshTask: Void = refreshSearchIfNeeded(forceRefresh: forceRefresh)
+        _ = await (overviewTask, favoritesTask, searchRefreshTask)
+    }
+
+    private func refreshSearchIfNeeded(forceRefresh: Bool) async {
+        guard forceRefresh else { return }
+        await searchStore.refresh(app: app)
     }
 
     private func loadMarketData(forceRefresh: Bool) async {
@@ -175,1023 +313,15 @@ private extension MarketsView {
 }
 
 
-private struct MarketSearchSortMenu: View {
-    @Binding var selection: MarketMostActiveSort
-
-    var body: some View {
-        Menu {
-            ForEach(MarketMostActiveSort.displayCases) { sort in
-                Button {
-                    selection = sort
-                } label: {
-                    Label(sort.title, systemImage: selection == sort ? "checkmark" : sort.icon)
-                }
-            }
-        } label: {
-            Image(systemName: selection.icon)
-        }
-        .accessibilityLabel(L10n.Markets.searchPopularTitle)
-    }
-}
-
-enum MarketSearchPresentation {
-    case marketNavigation
-    case globalTab
-
-    var showsPageTitle: Bool {
-        self == .globalTab
-    }
-
-    var usesSystemSearchField: Bool {
-        self == .globalTab
-    }
-
-    var hidesTabBar: Bool {
-        self == .marketNavigation
-    }
-}
-
-struct MarketSearchView: View {
-    @Environment(AppModel.self) private var app
-    @Environment(AppToastCenter.self) private var toastCenter
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.dismissSearch) private var dismissSearch
-    @Binding private var externalQuery: String
-    private let usesExternalQuery: Bool
-    private let presentation: MarketSearchPresentation
-    private let submitID: Int
-    private let isExternalQueryPendingSubmit: Bool
-    private let openAssetOverride: ((String) -> Void)?
-    @State private var localQuery = ""
-    @State private var results: [MarketSearchResult] = []
-    @State private var popularSymbols: [MarketActiveSymbol] = []
-    @State private var popularSort: MarketMostActiveSort = .trades
-    @State private var isSearching = false
-    @State private var isLoadingPopularSymbols = false
-    @State private var defaultSearchSymbol = AppModel.searchPlaceholderFallbackSymbol
-    @State private var searchPipeline = MarketSearchPipeline()
-    @State private var assetDestination: MarketSearchAssetDestination?
-    @State private var searchTextSelectionTrigger = 0
-    @FocusState private var isSearchFocused: Bool
-
-    private var query: String {
-        usesExternalQuery ? externalQuery : localQuery
-    }
-
-    private var queryBinding: Binding<String> {
-        Binding(
-            get: { query },
-            set: { updateQuery($0) }
-        )
-    }
-
-    private var normalizedQuery: String {
-        query.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private var isShowingSeededDefaultSearchQuery: Bool {
-        isExternalQueryPendingSubmit && !normalizedQuery.isEmpty
-    }
-
-    private var showsPopularContent: Bool {
-        normalizedQuery.isEmpty || isShowingSeededDefaultSearchQuery
-    }
-
-    init(
-        query: Binding<String>? = nil,
-        presentation: MarketSearchPresentation = .marketNavigation,
-        submitID: Int = 0,
-        isExternalQueryPendingSubmit: Bool = false,
-        openAsset: ((String) -> Void)? = nil
-    ) {
-        _externalQuery = query ?? .constant("")
-        usesExternalQuery = query != nil
-        self.presentation = presentation
-        self.submitID = submitID
-        self.isExternalQueryPendingSubmit = isExternalQueryPendingSubmit
-        openAssetOverride = openAsset
-    }
-
-    var body: some View {
-        Group {
-            if presentation.showsPageTitle {
-                titledBody
-            } else {
-                immersiveBody
-            }
-        }
-        .toolbar(presentation.hidesTabBar ? .hidden : .automatic, for: .tabBar)
-        .toolbar {
-            if !presentation.showsPageTitle, showsPopularContent {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    popularSortPicker
-                }
-            }
-        }
-        .navigationDestination(item: $assetDestination) { destination in
-            AssetDetailView(symbol: destination.symbol)
-        }
-        .task {
-            bindSearchPipelineIfNeeded()
-            await app.refreshFavoriteMarketSymbols()
-        }
-        .task(id: popularSort) {
-            await loadPopularSymbols()
-        }
-        .onChange(of: normalizedQuery) { _, newValue in
-            acceptSearchInputChange(newValue)
-        }
-        .onChange(of: submitID) { _, _ in
-            submitSearch()
-        }
-        .onDisappear {
-            searchPipeline.cancel()
-        }
-    }
-
-    private var titledBody: some View {
-        BasicLayout(L10n.Markets.searchTitle, style: .scroll(spacing: 16)) {
-            searchContent
-        }
-        .toolbar {
-            if showsPopularContent {
-                ToolbarItem(placement: .topBarTrailing) {
-                    popularSortPicker
-                }
-            }
-        }
-    }
-
-    private var immersiveBody: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                searchContent
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, AppTheme.Spacing.pageHorizontal)
-            .padding(.top, AppTheme.Spacing.pageTop)
-            .padding(.bottom, AppTheme.Spacing.pageBottom + 64)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(AppTheme.ColorToken.pageBackground.ignoresSafeArea())
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            bottomSearchField
-        }
-    }
-
-    private var popularSortPicker: some View {
-        MarketSearchSortMenu(selection: $popularSort)
-    }
-
-    private func updateQuery(_ newValue: String, isUserEdit: Bool = true) {
-        if usesExternalQuery {
-            externalQuery = newValue
-        } else {
-            localQuery = newValue
-        }
-    }
-
-    private func openAssetDetail(_ symbol: String) {
-        let normalizedSymbol = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        guard !normalizedSymbol.isEmpty else {
-            return
-        }
-
-        isSearchFocused = false
-        dismissSearch()
-
-        if let openAssetOverride {
-            Task { @MainActor in
-                if presentation.usesSystemSearchField {
-                    try? await Task.sleep(nanoseconds: 320_000_000)
-                } else {
-                    await Task.yield()
-                }
-
-                openAssetOverride(normalizedSymbol)
-            }
-        } else {
-            assetDestination = MarketSearchAssetDestination(symbol: normalizedSymbol)
-        }
-    }
-
-    private func submitSearch() {
-        guard !normalizedQuery.isEmpty else {
-            return
-        }
-
-        if normalizedQuery != query {
-            updateQuery(normalizedQuery, isUserEdit: false)
-        }
-        searchPipeline.submit(normalizedQuery)
-    }
-
-    private func acceptSearchInputChange(_ newValue: String) {
-        let normalizedValue = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !presentation.usesSystemSearchField else {
-            return
-        }
-
-        searchPipeline.accept(normalizedValue)
-    }
-
-    private func focusSearchField(selectAll: Bool) {
-        isSearchFocused = true
-        if selectAll {
-            searchTextSelectionTrigger += 1
-        }
-
-        Task { @MainActor in
-            await Task.yield()
-            isSearchFocused = true
-            if selectAll {
-                searchTextSelectionTrigger += 1
-            }
-        }
-    }
-
-    private var bottomSearchField: some View {
-        Group {
-            if #available(iOS 26.0, *) {
-                glassSearchField
-            } else {
-                fallbackSearchField
-            }
-        }
-        .padding(.horizontal, AppTheme.Spacing.pageHorizontal)
-        .padding(.top, 8)
-        .padding(.bottom, 8)
-        .onAppear {
-            focusSearchField(selectAll: false)
-        }
-    }
-
-    @available(iOS 26.0, *)
-    private var glassSearchField: some View {
-        GlassEffectContainer(spacing: 10) {
-            searchFieldContent(usesGlass: true)
-        }
-    }
-
-    private var fallbackSearchField: some View {
-        searchFieldContent(usesGlass: false)
-    }
-
-    private func searchFieldContent(usesGlass: Bool) -> some View {
-        HStack(spacing: 10) {
-            searchInputCapsule(usesGlass: usesGlass)
-                .frame(maxWidth: .infinity)
-
-            if !query.isEmpty || !presentation.usesSystemSearchField {
-                searchExitButton(usesGlass: usesGlass)
-            }
-        }
-        .animation(.snappy(duration: 0.18), value: query.isEmpty)
-    }
-
-    @ViewBuilder
-    private func searchInputCapsule(usesGlass: Bool) -> some View {
-        let content = HStack(spacing: 12) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(searchIconColor)
-                .frame(width: 24, height: 24)
-
-            MarketSearchTextField(
-                text: queryBinding,
-                placeholder: defaultSearchSymbol,
-                textColor: UIColor(searchTextColor),
-                placeholderColor: UIColor(searchPlaceholderColor),
-                tintColor: UIColor(AppTheme.ColorToken.brand),
-                isFocused: isSearchFocused,
-                selectAllTrigger: searchTextSelectionTrigger,
-                onFocusChange: { isSearchFocused = $0 },
-                onSubmit: submitSearch
-            )
-        }
-        .font(.title2.weight(.medium))
-        .padding(.horizontal, 14)
-        .frame(height: 52)
-
-        if usesGlass {
-            if #available(iOS 26.0, *) {
-                content
-                    .glassEffect(
-                        .regular.tint(searchGlassTint).interactive(),
-                        in: .capsule
-                    )
-            } else {
-                content
-            }
-        } else {
-            content
-                .background(searchFieldBackground, in: Capsule())
-                .overlay {
-                    Capsule()
-                        .strokeBorder(searchFieldBorder)
-                }
-                .shadow(color: searchFieldShadowColor, radius: 12, y: 5)
-        }
-    }
-
-    @ViewBuilder
-    private func searchExitButton(usesGlass: Bool) -> some View {
-        let button = Button {
-            if query.isEmpty {
-                dismiss()
-            } else {
-                updateQuery("")
-                isSearchFocused = true
-            }
-        } label: {
-            Image(systemName: query.isEmpty ? "chevron.down" : "xmark")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(clearButtonForeground)
-                .frame(width: 52, height: 52)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(query.isEmpty ? L10n.Common.close : L10n.Common.clear)
-        .contentTransition(.symbolEffect(.replace))
-
-        if usesGlass {
-            if #available(iOS 26.0, *) {
-                button
-                    .glassEffect(
-                        .regular.tint(searchGlassTint).interactive(),
-                        in: .circle
-                    )
-            } else {
-                button
-            }
-        } else {
-            button
-                .background(searchFieldBackground, in: Circle())
-                .overlay {
-                    Circle()
-                        .strokeBorder(searchFieldBorder)
-                }
-                .shadow(color: searchFieldShadowColor, radius: 10, y: 4)
-        }
-    }
-
-    private var searchFieldBackground: Color {
-        colorScheme == .light ? Color(.systemBackground) : Color(.secondarySystemGroupedBackground)
-    }
-
-    private var searchFieldBorder: Color {
-        colorScheme == .light ? Color(.separator).opacity(0.18) : Color(.separator).opacity(0.22)
-    }
-
-    private var searchFieldShadowColor: Color {
-        .black.opacity(colorScheme == .light ? 0.05 : 0.18)
-    }
-
-    private var searchIconColor: Color {
-        colorScheme == .light ? Color(.secondaryLabel) : Color(.label)
-    }
-
-    private var searchTextColor: Color {
-        Color(.label)
-    }
-
-    private var searchPlaceholderColor: Color {
-        Color(.placeholderText)
-    }
-
-    private var clearButtonForeground: Color {
-        colorScheme == .light ? Color(.label) : Color(.label)
-    }
-
-    private var searchGlassTint: Color {
-        colorScheme == .light ? Color.white.opacity(0.14) : Color.white.opacity(0.08)
-    }
-
-    @ViewBuilder
-    private var searchContent: some View {
-        if !app.hasCredentials {
-            AppEmptyStateView(
-                title: L10n.Common.noData,
-                systemImage: AppIcon.More.alpaca
-            )
-        } else if showsPopularContent && isLoadingPopularSymbols && popularSymbols.isEmpty {
-            MarketSearchPopularSkeleton(rowCount: 7)
-        } else if showsPopularContent {
-            MarketSearchPopularView(
-                symbols: popularSymbols,
-                sort: popularSort,
-                isLoading: isLoadingPopularSymbols,
-                openAsset: openAssetDetail(_:)
-            )
-        } else if isSearching && results.isEmpty {
-            MarketSearchResultsSkeleton(rowCount: 7)
-        } else if results.isEmpty {
-            AppEmptyStateView(
-                title: L10n.Common.noData,
-                systemImage: "magnifyingglass"
-            )
-        } else {
-            MarketSearchPlainList {
-                ForEach(Array(results.enumerated()), id: \.element.id) { index, result in
-                    MarketSearchResultRow(result: result, openAsset: openAssetDetail(_:))
-
-                    if index < results.count - 1 {
-                        MarketSearchDivider()
-                    }
-                }
-            }
-        }
-    }
-
-    @MainActor
-    private func loadPopularSymbols() async {
-        let sort = popularSort
-        popularSymbols = app.hasCredentials ? app.cachedPopularMarketSymbols(sort: sort) ?? [] : []
-        defaultSearchSymbol = AppModel.searchPlaceholderSymbol(from: popularSymbols)
-        guard app.hasCredentials else {
-            isLoadingPopularSymbols = false
-            return
-        }
-
-        isLoadingPopularSymbols = true
-        defer {
-            if !Task.isCancelled, popularSort == sort {
-                isLoadingPopularSymbols = false
-            }
-        }
-        do {
-            let symbols = try await app.fetchSearchPopularMarketSymbols(limit: 12, sort: sort)
-            guard !Task.isCancelled, popularSort == sort else { return }
-            popularSymbols = symbols
-            defaultSearchSymbol = AppModel.searchPlaceholderSymbol(from: symbols)
-        } catch {
-            guard !Task.isCancelled, popularSort == sort, !error.isRequestCancellation else { return }
-            toastCenter.showError(error, locale: app.appLanguage.locale)
-        }
-    }
-
-    private func bindSearchPipelineIfNeeded() {
-        searchPipeline.bind(
-            hasCredentials: { app.hasCredentials },
-            search: { query, forceRefresh, emit in
-                try await app.searchMarketSymbolsProgressively(
-                    query,
-                    limit: 20,
-                    forceRefresh: forceRefresh,
-                    emit: emit
-                )
-            },
-            apply: applySearchState
-        )
-        acceptSearchInputChange(normalizedQuery)
-    }
-
-    private func applySearchState(_ state: MarketSearchPipeline.State) {
-        switch state {
-        case .idle:
-            results = []
-            isSearching = false
-        case .searching(_):
-            isSearching = true
-        case .cached(let query, let searchResults, let isFresh):
-            guard query == normalizedQuery else {
-                return
-            }
-
-            debugSearchRender("cached", query: query, count: searchResults.count)
-            results = searchResults
-            isSearching = !isFresh
-        case .partial(let query, let searchResults):
-            guard query == normalizedQuery else {
-                return
-            }
-
-            debugSearchRender("partial", query: query, count: searchResults.count)
-            results = searchResults
-            isSearching = true
-        case .success(let query, let searchResults):
-            guard query == normalizedQuery else {
-                return
-            }
-
-            debugSearchRender("enriched", query: query, count: searchResults.count)
-            results = searchResults
-            isSearching = false
-        case .failure(let query, let error):
-            guard query == normalizedQuery else {
-                return
-            }
-
-            isSearching = false
-            toastCenter.showError(error, locale: app.appLanguage.locale)
-        }
-    }
-
-    private func debugSearchRender(_ stage: String, query: String, count: Int) {
-        #if DEBUG
-        print("[MarketSearch] render.\(stage) query=\(query) count=\(count)")
-        #endif
-    }
-}
-
-private struct MarketSearchAssetDestination: Identifiable, Hashable {
+private struct MarketAssetDestination: Identifiable, Hashable {
     let symbol: String
-
     var id: String { symbol }
-}
-
-private struct MarketSearchTextField: UIViewRepresentable {
-    @Binding var text: String
-    let placeholder: String
-    let textColor: UIColor
-    let placeholderColor: UIColor
-    let tintColor: UIColor
-    let isFocused: Bool
-    let selectAllTrigger: Int
-    let onFocusChange: (Bool) -> Void
-    let onSubmit: () -> Void
-
-    func makeUIView(context: Context) -> UITextField {
-        let textField = UITextField(frame: .zero)
-        textField.delegate = context.coordinator
-        textField.borderStyle = .none
-        textField.backgroundColor = .clear
-        textField.clearButtonMode = .never
-        textField.keyboardType = .asciiCapable
-        textField.returnKeyType = .search
-        textField.enablesReturnKeyAutomatically = false
-        textField.autocapitalizationType = .none
-        textField.autocorrectionType = .no
-        textField.smartDashesType = .no
-        textField.smartQuotesType = .no
-        textField.spellCheckingType = .no
-        textField.adjustsFontForContentSizeCategory = true
-        textField.text = text
-        textField.attributedPlaceholder = attributedPlaceholder
-        textField.addTarget(
-            context.coordinator,
-            action: #selector(Coordinator.textDidChange(_:)),
-            for: .editingChanged
-        )
-        if isFocused {
-            DispatchQueue.main.async {
-                textField.enablesReturnKeyAutomatically = false
-                textField.becomeFirstResponder()
-                textField.reloadInputViews()
-                context.coordinator.selectAllIfNeeded(in: textField)
-            }
-        }
-        return textField
-    }
-
-    func updateUIView(_ textField: UITextField, context: Context) {
-        context.coordinator.parent = self
-
-        if textField.text != text {
-            context.coordinator.performProgrammaticTextUpdate {
-                textField.text = text
-            }
-        }
-
-        textField.keyboardType = .asciiCapable
-        textField.returnKeyType = .search
-        textField.enablesReturnKeyAutomatically = false
-        textField.textColor = textColor
-        textField.tintColor = tintColor
-        textField.font = Self.preferredFont
-        textField.attributedPlaceholder = attributedPlaceholder
-
-        if isFocused, !textField.isFirstResponder {
-            DispatchQueue.main.async {
-                textField.enablesReturnKeyAutomatically = false
-                textField.becomeFirstResponder()
-                textField.reloadInputViews()
-                context.coordinator.selectAllIfNeeded(in: textField)
-            }
-        } else if !isFocused, textField.isFirstResponder {
-            DispatchQueue.main.async {
-                textField.resignFirstResponder()
-            }
-        } else if isFocused {
-            context.coordinator.selectAllIfNeeded(in: textField)
-        }
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(parent: self)
-    }
-
-    private static var preferredFont: UIFont {
-        let baseFont = UIFont.systemFont(ofSize: 22, weight: .medium)
-        return UIFontMetrics(forTextStyle: .title2).scaledFont(for: baseFont)
-    }
-
-    private var attributedPlaceholder: NSAttributedString? {
-        let normalizedPlaceholder = placeholder.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalizedPlaceholder.isEmpty else {
-            return nil
-        }
-
-        return NSAttributedString(
-            string: normalizedPlaceholder,
-            attributes: [
-                .font: Self.preferredFont,
-                .foregroundColor: placeholderColor
-            ]
-        )
-    }
-
-    final class Coordinator: NSObject, UITextFieldDelegate {
-        var parent: MarketSearchTextField
-        private var handledSelectAllTrigger = 0
-        private var isProgrammaticTextUpdate = false
-
-        init(parent: MarketSearchTextField) {
-            self.parent = parent
-        }
-
-        @objc
-        func textDidChange(_ textField: UITextField) {
-            guard !isProgrammaticTextUpdate else {
-                return
-            }
-
-            parent.text = textField.text ?? ""
-        }
-
-        func performProgrammaticTextUpdate(_ update: () -> Void) {
-            isProgrammaticTextUpdate = true
-            update()
-            isProgrammaticTextUpdate = false
-        }
-
-        func textFieldDidBeginEditing(_ textField: UITextField) {
-            parent.onFocusChange(true)
-        }
-
-        func textFieldDidEndEditing(_ textField: UITextField) {
-            parent.onFocusChange(false)
-        }
-
-        func textFieldShouldReturn(_ textField: UITextField) -> Bool {
-            parent.onSubmit()
-            return false
-        }
-
-        func selectAllIfNeeded(in textField: UITextField) {
-            guard parent.selectAllTrigger != handledSelectAllTrigger else {
-                return
-            }
-
-            handledSelectAllTrigger = parent.selectAllTrigger
-            DispatchQueue.main.async {
-                guard textField.isFirstResponder else {
-                    return
-                }
-
-                textField.selectAll(nil)
-            }
-        }
-    }
-}
-
-@MainActor
-private final class MarketSearchPipeline {
-    enum State {
-        case idle
-        case searching(String)
-        case cached(String, [MarketSearchResult], isFresh: Bool)
-        case partial(String, [MarketSearchResult])
-        case success(String, [MarketSearchResult])
-        case failure(String, Error)
-    }
-
-    private struct SearchEvent {
-        let query: String
-        let force: Bool
-    }
-
-    private let inputSubject = PublishSubject<String>()
-    private let submitSubject = PublishSubject<String>()
-    private let disposeBag = DisposeBag()
-    private var searchTask: Task<Void, Never>?
-    private var isBound = false
-    private var activeQuery: String?
-    private var lastStartedQuery: String?
-    private var lastStartedAt: Date?
-    private var hasCredentials: (@MainActor () -> Bool)?
-    private var search: (@MainActor (String, Bool, @escaping @MainActor (MarketSearchLoadEvent) -> Void) async throws -> Void)?
-    private var apply: (@MainActor (State) -> Void)?
-
-    func bind(
-        hasCredentials: @escaping @MainActor () -> Bool,
-        search: @escaping @MainActor (String, Bool, @escaping @MainActor (MarketSearchLoadEvent) -> Void) async throws -> Void,
-        apply: @escaping @MainActor (State) -> Void
-    ) {
-        guard !isBound else {
-            return
-        }
-
-        isBound = true
-        self.hasCredentials = hasCredentials
-        self.search = search
-        self.apply = apply
-
-        let debouncedInput = inputSubject
-            .map(Self.normalizedQuery)
-            .distinctUntilChanged()
-            .debounce(.milliseconds(240), scheduler: MainScheduler.instance)
-            .map { SearchEvent(query: $0, force: false) }
-
-        let immediateSubmit = submitSubject
-            .map(Self.normalizedQuery)
-            .map { SearchEvent(query: $0, force: true) }
-
-        Observable.merge(debouncedInput, immediateSubmit)
-            .subscribe(onNext: { [weak self] event in
-                Task { @MainActor in
-                    self?.startSearch(event.query, force: event.force)
-                }
-            })
-            .disposed(by: disposeBag)
-    }
-
-    func accept(_ query: String) {
-        inputSubject.onNext(query)
-    }
-
-    func submit(_ query: String) {
-        submitSubject.onNext(query)
-    }
-
-    func cancel() {
-        searchTask?.cancel()
-        searchTask = nil
-        activeQuery = nil
-    }
-
-    private static func normalizedQuery(_ query: String) -> String {
-        query.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func startSearch(_ query: String, force: Bool = false) {
-        guard let hasCredentials, let search, let apply else {
-            return
-        }
-
-        guard !query.isEmpty, hasCredentials() else {
-            searchTask?.cancel()
-            activeQuery = nil
-            lastStartedQuery = nil
-            apply(.idle)
-            return
-        }
-
-        if !force, shouldSkipDuplicateSearch(query) {
-            return
-        }
-
-        searchTask?.cancel()
-        activeQuery = query
-        lastStartedQuery = query
-        lastStartedAt = Date()
-        apply(.searching(query))
-        searchTask = Task { @MainActor in
-            do {
-                try await search(query, force) { [weak self] event in
-                    guard !Task.isCancelled, self?.activeQuery == event.query else {
-                        return
-                    }
-
-                    switch event {
-                    case .cached(let eventQuery, let results, let isFresh):
-                        apply(.cached(eventQuery, results, isFresh: isFresh))
-                    case .partial(let eventQuery, let results):
-                        apply(.partial(eventQuery, results))
-                    case .enriched(let eventQuery, let results):
-                        apply(.success(eventQuery, results))
-                    }
-                }
-                try Task.checkCancellation()
-                if self.activeQuery == query {
-                    self.activeQuery = nil
-                }
-            } catch where error.isRequestCancellation {
-                return
-            } catch {
-                guard !Task.isCancelled else {
-                    return
-                }
-
-                if self.activeQuery == query {
-                    self.activeQuery = nil
-                }
-                apply(.failure(query, error))
-            }
-        }
-    }
-
-    private func shouldSkipDuplicateSearch(_ query: String) -> Bool {
-        if activeQuery == query {
-            return true
-        }
-
-        guard lastStartedQuery == query, let lastStartedAt else {
-            return false
-        }
-
-        return Date().timeIntervalSince(lastStartedAt) < 0.35
-    }
-}
-
-private struct MarketSearchPopularView: View {
-    let symbols: [MarketActiveSymbol]
-    let sort: MarketMostActiveSort
-    let isLoading: Bool
-    let openAsset: (String) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(alignment: .firstTextBaseline, spacing: 7) {
-                    Image(systemName: AppIcon.Market.popular)
-                        .font(.system(size: 17, weight: .semibold))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(AppTheme.ColorToken.warning)
-                        .accessibilityHidden(true)
-
-                    Text(L10n.Markets.searchPopularTitle)
-                        .font(AppTypography.rowTitle.weight(.semibold))
-                        .foregroundStyle(.primary)
-                }
-
-                Text(sort.searchPopularSubtitle)
-                    .font(AppTypography.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            if isLoading && symbols.isEmpty {
-                MarketSearchResultsSkeleton(rowCount: 7)
-            } else if symbols.isEmpty {
-                EmptyMarketRow(text: L10n.Markets.searchPopularUnavailable)
-            } else {
-                MarketSearchPlainList {
-                    ForEach(Array(symbols.enumerated()), id: \.element.id) { index, symbol in
-                        MarketSearchPopularRow(symbol: symbol, openAsset: openAsset)
-
-                        if index < symbols.count - 1 {
-                            MarketSearchDivider()
-                        }
-                    }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct MarketSearchPlainList<Content: View>: View {
-    let content: Content
-
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            content
-        }
-    }
-}
-
-private struct MarketSearchDivider: View {
-    var body: some View {
-        Divider()
-    }
-}
-
-private struct MarketSearchPopularRow: View {
-    let symbol: MarketActiveSymbol
-    let openAsset: (String) -> Void
-    @Environment(AppModel.self) private var app
-
-    var body: some View {
-        let isFavorite = app.isFavoriteMarketSymbol(symbol.symbol)
-
-        HStack(spacing: 14) {
-            Button {
-                openAsset(symbol.symbol)
-            } label: {
-                HStack(spacing: 14) {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(verbatim: symbol.symbol)
-                            .font(AppTypography.rowTitle.weight(.semibold))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-
-                        Text(AppFormatter.displayText(symbol.companyName))
-                            .font(AppTypography.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    VStack(alignment: .trailing, spacing: 5) {
-                        Text(AppFormatter.money(symbol.price))
-                            .font(AppTypography.rowValue)
-                            .lineLimit(1)
-
-                        Text(AppFormatter.signedPercent(symbol.percentChange))
-                            .font(AppTypography.caption.monospacedDigit().weight(.semibold))
-                            .foregroundStyle(symbol.isPositive ? AppTheme.ColorToken.positive : AppTheme.ColorToken.negative)
-                            .lineLimit(1)
-                    }
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                Task { await app.toggleFavoriteMarketSymbol(symbol.symbol) }
-            } label: {
-                Image(systemName: isFavorite ? "heart.fill" : "heart")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(isFavorite ? AppTheme.ColorToken.brand : AppTheme.ColorToken.icon)
-                    .frame(width: 42, height: 42)
-                    .background(Color(.tertiarySystemGroupedBackground), in: Circle())
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-        }
-        .frame(minHeight: 64)
-        .padding(.vertical, 10)
-    }
-}
-
-private struct MarketSearchResultRow: View {
-    let result: MarketSearchResult
-    let openAsset: (String) -> Void
-    @Environment(AppModel.self) private var app
-
-    var body: some View {
-        let isFavorite = app.isFavoriteMarketSymbol(result.symbol)
-
-        HStack(spacing: 14) {
-            Button {
-                openAsset(result.symbol)
-            } label: {
-                HStack(spacing: 14) {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(verbatim: result.symbol)
-                            .font(AppTypography.rowTitle.weight(.semibold))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-
-                        Text(result.companyName)
-                            .font(AppTypography.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    VStack(alignment: .trailing, spacing: 5) {
-                        Text(AppFormatter.money(result.price))
-                            .font(AppTypography.rowValue)
-                            .lineLimit(1)
-
-                        Text(AppFormatter.signedPercent(result.percentChange))
-                            .font(AppTypography.caption.monospacedDigit().weight(.semibold))
-                            .foregroundStyle(result.isPositive ? AppTheme.ColorToken.positive : AppTheme.ColorToken.negative)
-                            .lineLimit(1)
-                    }
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                Task { await app.toggleFavoriteMarketSymbol(result.symbol) }
-            } label: {
-                Image(systemName: isFavorite ? "heart.fill" : "heart")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(isFavorite ? AppTheme.ColorToken.brand : AppTheme.ColorToken.icon)
-                    .frame(width: 42, height: 42)
-                    .background(Color(.tertiarySystemGroupedBackground), in: Circle())
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-        }
-        .frame(minHeight: 64)
-        .padding(.vertical, 10)
-    }
 }
 
 enum MarketListMode: String, CaseIterable, Identifiable {
     case favorites
-    case popular
+    case trending
+    case leaders
 
     var id: String { rawValue }
 
@@ -1199,8 +329,10 @@ enum MarketListMode: String, CaseIterable, Identifiable {
         switch self {
         case .favorites:
             L10n.Markets.favorites
-        case .popular:
+        case .trending:
             L10n.Markets.popular
+        case .leaders:
+            L10n.Markets.leaders
         }
     }
 
@@ -1208,8 +340,10 @@ enum MarketListMode: String, CaseIterable, Identifiable {
         switch self {
         case .favorites:
             AppIcon.Market.favorites
-        case .popular:
+        case .trending:
             AppIcon.Market.popular
+        case .leaders:
+            AppIcon.Market.leaders
         }
     }
 }
@@ -1665,7 +799,7 @@ private struct MarketSymbolSection: View {
                         MarketSymbolRow(item: item)
                     }
                 }
-            case .popular:
+            case .leaders:
                 if items.isEmpty {
                     EmptyMarketRow(text: L10n.Markets.noActivityData)
                 } else {
@@ -1673,6 +807,8 @@ private struct MarketSymbolSection: View {
                         MarketSymbolRow(item: item)
                     }
                 }
+            case .trending:
+                EmptyView()
             }
         }
         .padding(.horizontal, 14)
@@ -1683,8 +819,10 @@ private struct MarketSymbolSection: View {
         switch mode {
         case .favorites:
             favoriteItems
-        case .popular:
+        case .leaders:
             overview.mostActive.map(MarketSymbolItem.init(activeSymbol:))
+        case .trending:
+            []
         }
     }
 
@@ -1703,21 +841,22 @@ private struct MarketSymbolSection: View {
 
         return favoriteSymbols.map { symbol in
             let normalizedSymbol = Self.normalizedSymbol(symbol)
-            let asset = app.favoriteMarketAssetBySymbol[normalizedSymbol]
+            let resolvedCompanyName = app.favoriteMarketAssetBySymbol[normalizedSymbol]?.name
+                ?? app.lookupSearchAsset(symbol: normalizedSymbol)?.displayName
 
             if let favoriteQuote = app.favoriteMarketQuotesBySymbol[normalizedSymbol] {
-                return MarketSymbolItem(activeSymbol: favoriteQuote, companyName: asset?.name)
+                return MarketSymbolItem(activeSymbol: favoriteQuote, companyName: resolvedCompanyName)
             }
 
             if let activeSymbol = activeBySymbol[normalizedSymbol] {
-                return MarketSymbolItem(activeSymbol: activeSymbol, companyName: asset?.name)
+                return MarketSymbolItem(activeSymbol: activeSymbol, companyName: resolvedCompanyName)
             }
 
             if let indexQuote = indexBySymbol[normalizedSymbol] {
-                return MarketSymbolItem(indexQuote: indexQuote, companyName: asset?.name)
+                return MarketSymbolItem(indexQuote: indexQuote, companyName: resolvedCompanyName)
             }
 
-            return MarketSymbolItem(symbol: normalizedSymbol, companyName: asset?.name, price: nil, percentChange: nil, isPositive: true)
+            return MarketSymbolItem(symbol: normalizedSymbol, companyName: resolvedCompanyName, price: nil, percentChange: nil, isPositive: true)
         }
     }
 
@@ -1734,7 +873,7 @@ struct MarketSymbolRow: View {
             AssetDetailView(symbol: item.symbol)
         } label: {
             HStack(spacing: 14) {
-                SymbolLogoView(symbol: item.symbol, size: 38)
+                SymbolLogoView(symbol: item.symbol, size: 38, usesGlass: false)
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(verbatim: item.symbol)

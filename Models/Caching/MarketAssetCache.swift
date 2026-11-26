@@ -2,9 +2,12 @@ import Foundation
 
 @MainActor
 final class MarketAssetCache {
-    var marketAssets: [AlpacaAsset]?
-    var marketAssetsDate: Date?
-    let marketAssetsTTL: TimeInterval = 60 * 60
+    let marketAssetsTTL: TimeInterval = 6 * 60 * 60
+
+    var searchIndex: MarketSearchIndex?
+    var searchIndexDate: Date?
+    var isSearchIndexStale = false
+    var inFlightSearchIndexTask: Task<MarketSearchIndex, Error>?
 
     var watchlistAssets: [AlpacaAsset]?
     var watchlistAssetsDate: Date?

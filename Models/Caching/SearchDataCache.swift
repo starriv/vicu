@@ -6,6 +6,6 @@ final class SearchDataCache {
     var popularSymbolsCacheDate: [MarketMostActiveSort: Date] = [:]
     let popularSymbolsCacheTTL: TimeInterval = 60
 
-    var resultCache: [SearchResultCacheKey: TimedCacheEntry<[MarketSearchResult]>] = [:]
-    let resultCacheTTL: TimeInterval = 20
+    var quoteCache: [String: TimedCacheEntry<MarketActiveSymbol>] = [:]
+    let quoteCacheTTL: TimeInterval = 30
 }

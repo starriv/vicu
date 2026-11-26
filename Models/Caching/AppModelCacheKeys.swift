@@ -7,11 +7,6 @@ struct TimedCacheEntry<Value> {
     let cachedAt: Date
 }
 
-struct SearchResultCacheKey: Hashable {
-    let query: String
-    let limit: Int
-}
-
 struct NewsPageCacheKey: Hashable {
     let symbol: String
     let startDay: String
@@ -59,6 +54,7 @@ enum PageCacheNamespace: String, CaseIterable, Identifiable, Codable, Sendable {
     case homePortfolio = "home.portfolio"
     case marketOverview = "markets.overview"
     case marketFavorites = "markets.favorites"
+    case marketAssets = "markets.assets"
     case assetDetail = "asset.detail"
     case assetPosition = "asset.position"
 
@@ -89,6 +85,7 @@ struct PageCachePolicy: Sendable {
     static let homePortfolio = PageCachePolicy(freshTimeToLive: 30, maximumAge: 24 * 60 * 60, schemaVersion: 2)
     static let marketOverview = PageCachePolicy(freshTimeToLive: 60, maximumAge: 24 * 60 * 60)
     static let marketFavorites = PageCachePolicy(freshTimeToLive: 45, maximumAge: 24 * 60 * 60)
+    static let marketAssets = PageCachePolicy(freshTimeToLive: 6 * 60 * 60, maximumAge: 7 * 24 * 60 * 60)
     static let assetDetail = PageCachePolicy(freshTimeToLive: 30, maximumAge: 6 * 60 * 60, schemaVersion: 2)
     static let assetPosition = PageCachePolicy(freshTimeToLive: 20, maximumAge: 24 * 60 * 60)
 
@@ -97,6 +94,7 @@ struct PageCachePolicy: Sendable {
         case .homePortfolio: return homePortfolio.schemaVersion
         case .marketOverview: return marketOverview.schemaVersion
         case .marketFavorites: return marketFavorites.schemaVersion
+        case .marketAssets: return marketAssets.schemaVersion
         case .assetDetail: return assetDetail.schemaVersion
         case .assetPosition: return assetPosition.schemaVersion
         }
@@ -706,6 +704,10 @@ enum AppPageCacheKeys {
 
     static func marketFavorites(credentials: AlpacaCredentials) -> PageCacheKey {
         PageCacheKey(scope: scope(credentials: credentials), namespace: .marketFavorites, key: "favorites")
+    }
+
+    static func marketAssets(credentials: AlpacaCredentials) -> PageCacheKey {
+        PageCacheKey(scope: scope(credentials: credentials), namespace: .marketAssets, key: "us_equity_catalog")
     }
 
     static func assetDetail(
