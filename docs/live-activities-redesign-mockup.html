@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<title>Vicu · 实时活动重设计视觉稿</title>
+<style>
+  :root {
+    --brand: #FCD72B;
+    --brand-ink: #384248;
+    --green: #30D158;
+    --red: #FF453A;
+    --orange: #FF9F0A;
+    --blue: #0A84FF;
+    --page: #060607;
+    --card-dark: rgba(28, 28, 30, 0.94);
+    --card-light: #FFFFFF;
+    --ink-dark: #FFFFFF;
+    --ink-light: #0B0B0C;
+    --sub-dark: rgba(255,255,255,0.58);
+    --sub-light: rgba(11,11,12,0.55);
+    --hair-dark: rgba(255,255,255,0.10);
+    --hair-light: rgba(11,11,12,0.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 56px 48px 80px;
+    background: var(--page);
+    color: #F2F2F4;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "PingFang SC", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+  h1 { font-size: 30px; letter-spacing: -0.5px; margin: 0 0 6px; }
+  .lede { color: rgba(255,255,255,0.55); font-size: 14px; margin: 0 0 44px; max-width: 720px; line-height: 1.6; }
+  h2 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.4px;
+    color: rgba(255,255,255,0.40); margin: 0 0 18px; font-weight: 600;
+  }
+  section { margin-bottom: 56px; }
+  .row { display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start; }
+  .col { display: flex; flex-direction: column; gap: 10px; }
+  .caption { font-size: 11px; color: rgba(255,255,255,0.38); letter-spacing: 0.4px; }
+  .stage { padding: 26px; border-radius: 30px; background: #0e0e10; border: 1px solid rgba(255,255,255,0.06); }
+  .stage.light { background: #ECECEE; border-color: rgba(0,0,0,0.06); }
+
+  /* ---------- Live Activity card ---------- */
+  .card {
+    width: 360px; border-radius: 26px; padding: 16px 18px 14px;
+    background: var(--card-dark); color: var(--ink-dark);
+    box-shadow: 0 18px 40px rgba(0,0,0,0.45), inset 0 0 0 0.5px rgba(255,255,255,0.07);
+    backdrop-filter: blur(22px);
+  }
+  .card.light {
+    background: var(--card-light); color: var(--ink-light);
+    box-shadow: 0 18px 36px rgba(0,0,0,0.14), inset 0 0 0 0.5px rgba(0,0,0,0.05);
+  }
+  .card-top { display: flex; justify-content: space-between; align-items: baseline; }
+  .sym { font-size: 19px; font-weight: 700; letter-spacing: -0.2px; }
+  .side { font-size: 11px; font-weight: 700; letter-spacing: 0.6px; margin-left: 8px; }
+  .side.buy { color: var(--green); }
+  .side.sell { color: var(--red); }
+  .card-top .right { font-size: 15px; font-weight: 600; }
+  .meta { font-size: 12px; color: var(--sub-dark); margin-top: 5px; }
+  .card.light .meta { color: var(--sub-light); }
+
+  .track { position: relative; height: 6px; border-radius: 3px; margin: 13px 0 9px; overflow: hidden;
+           background: rgba(255,255,255,0.12); }
+  .card.light .track { background: rgba(0,0,0,0.10); }
+  .track > i { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--brand); display: block; }
+  .track > i.warn { background: var(--orange); }
+  .track > i.done { background: var(--green); }
+  .track > b { position: absolute; top: -2px; width: 3px; height: 10px; border-radius: 2px; background: rgba(255,255,255,0.55); }
+
+  .status-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+  .pill { font-size: 10.5px; font-weight: 700; letter-spacing: 0.8px; padding: 3px 8px; border-radius: 7px; }
+  .pill.warn { color: var(--orange); background: rgba(255,159,10,0.14); }
+  .pill.good { color: var(--green); background: rgba(48,209,88,0.14); }
+  .pill.live { color: var(--blue); background: rgba(10,132,255,0.14); }
+  .pill.mute { color: var(--sub-dark); background: rgba(255,255,255,0.10); }
+  .card.light .pill.mute { color: var(--sub-light); background: rgba(0,0,0,0.06); }
+  .status-row .value { font-weight: 600; }
+  .asof { font-size: 11px; color: var(--sub-dark); margin-top: 6px; letter-spacing: 0.2px; }
+  .card.light .asof { color: var(--sub-light); }
+  .delta.up { color: var(--green); }
+  .delta.down { color: var(--red); }
+
+  .actions { display: flex; gap: 10px; margin-top: 12px; }
+  .actions button {
+    flex: 1; height: 34px; border-radius: 12px; border: 0; font-size: 13px; font-weight: 600;
+    background: rgba(255,255,255,0.12); color: var(--ink-dark);
+    font-family: inherit;
+  }
+  .card.light .actions button { background: rgba(0,0,0,0.06); color: var(--ink-light); }
+  .actions button.primary { background: var(--brand); color: var(--brand-ink); }
+  .actions button.danger { background: rgba(255,69,58,0.16); color: var(--red); }
+
+  /* ---------- Session timeline ---------- */
+  .timeline { margin: 14px 0 6px; }
+  .timeline .railWrap { position: relative; }
+  .timeline .rail { display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 2px; }
+  .timeline .seg { position: relative; height: 100%; }
+  .timeline .seg.over { background: rgba(255,255,255,0.10); }
+  .timeline .seg.pre  { background: rgba(255,255,255,0.18); }
+  .timeline .seg.reg  { background: rgba(255,255,255,0.30); }
+  .timeline .seg.aft  { background: rgba(255,255,255,0.16); }
+  .card.light .timeline .seg.over { background: rgba(0,0,0,0.07); }
+  .card.light .timeline .seg.pre  { background: rgba(0,0,0,0.13); }
+  .card.light .timeline .seg.reg  { background: rgba(0,0,0,0.24); }
+  .card.light .timeline .seg.aft  { background: rgba(0,0,0,0.11); }
+  .timeline .fill { position: absolute; left: 0; top: 0; height: 8px; background: var(--brand); opacity: 0.95; border-radius: 4px; }
+  .timeline .head { position: absolute; top: -3px; width: 13px; height: 13px; margin-left: -6.5px;
+                    border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 3px rgba(252,215,43,0.20); }
+  .timeline .labels { display: flex; margin-top: 7px; font-size: 9.5px; color: var(--sub-dark); letter-spacing: 0.4px; }
+  .card.light .timeline .labels { color: var(--sub-light); }
+  .timeline .labels span { text-align: center; }
+
+  .session-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; margin-top: 4px; }
+  .phase { font-size: 12px; font-weight: 700; letter-spacing: 1.2px; color: var(--brand); }
+  .countdown { font-size: 17px; font-weight: 600; }
+
+  /* ---------- Dynamic Island ---------- */
+  .island-expanded {
+    width: 380px; border-radius: 46px; background: #000; padding: 16px 20px 14px;
+    box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.10), 0 20px 44px rgba(0,0,0,0.55);
+    position: relative;
+  }
+  .notch { width: 96px; height: 26px; background: #000; border-radius: 14px; margin: 0 auto 10px; }
+  .island-row { display: flex; justify-content: space-between; align-items: flex-start; }
+  .island-bottom { margin-top: 12px; }
+  .island-bottom .track { margin: 0 0 8px; }
+
+  .di-strip { display: flex; align-items: center; gap: 22px; margin-top: 22px; }
+  .compact {
+    width: 136px; height: 40px; border-radius: 20px; background: #000;
+    display: flex; align-items: center; justify-content: space-between; padding: 0 12px;
+    box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.12);
+  }
+  .compact .left { font-size: 12px; font-weight: 700; letter-spacing: 0.4px; }
+  .ring { width: 18px; height: 18px; border-radius: 50%;
+          background: conic-gradient(var(--brand) 0 216deg, rgba(255,255,255,0.18) 216deg 360deg);
+          display: grid; place-items: center; }
+  .ring i { width: 12px; height: 12px; border-radius: 50%; background: #000; }
+  .minimal {
+    width: 40px; height: 40px; border-radius: 50%; background: #000; display: grid; place-items: center;
+    box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.12); color: var(--orange); font-size: 16px;
+  }
+
+  /* ---------- Watch ---------- */
+  .watch {
+    width: 182px; height: 208px; border-radius: 26px; background: #000; padding: 14px;
+    box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.12), 0 14px 30px rgba(0,0,0,0.5);
+    display: flex; flex-direction: column;
+  }
+  .watch .sym { font-size: 14px; }
+  .watch .price { font-size: 28px; font-weight: 700; margin-top: 6px; letter-spacing: -0.6px; }
+  .watch .pct { font-size: 13px; font-weight: 600; margin-top: 2px; }
+  .watch .spark { margin-top: auto; }
+  .watch .foot { font-size: 10px; color: var(--sub-dark); margin-top: 8px; }
+
+  /* ---------- Tokens ---------- */
+  .tokens { display: flex; gap: 10px; flex-wrap: wrap; }
+  .token { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 14px;
+           background: #101012; border: 1px solid rgba(255,255,255,0.07); font-size: 12px; color: rgba(255,255,255,0.72); }
+  .swatch { width: 22px; height: 22px; border-radius: 7px; }
+</style>
+</head>
+<body>
+
+<h1>Vicu · 实时活动重设计</h1>
+<p class="lede">
+  目标是让 Live Activity 从「撤单弹窗的镜像」变成交易日的常驻状态层：<b>时间类内容交给系统自更新</b>（离线也准确），
+  数值类内容一律标 <b>as of</b>（不假装实时）。下单、部分成交、成交由同一张订单卡跟到底。
+</p>
+
+<!-- ============ 1. 订单卡 ============ -->
+<section>
+  <h2>01 · 订单卡 · 锁屏</h2>
+  <div class="row">
+
+    <div class="col">
+      <div class="stage">
+        <div class="card">
+          <div class="card-top">
+            <div class="sym">AAPL<span class="side buy">买入</span></div>
+            <div class="right mono">6/10</div>
+          </div>
+          <div class="meta mono">10 股 · 限价 $231.00</div>
+          <div class="track"><i class="warn" style="width:60%"></i></div>
+          <div class="status-row">
+            <span class="pill warn">部分成交</span>
+            <span class="value mono">均价 $230.98</span>
+          </div>
+          <div class="asof mono">as of 10:12</div>
+          <div class="actions">
+            <button class="danger">撤单</button>
+            <button class="primary">查看订单</button>
+          </div>
+        </div>
+      </div>
+      <div class="caption">部分成交 · 撤单按钮走 LiveActivityIntent，不打开 App 也能撤</div>
+    </div>
+
+    <div class="col">
+      <div class="stage">
+        <div class="card">
+          <div class="card-top">
+            <div class="sym">NVDA<span class="side sell">卖出</span></div>
+            <div class="right mono">25/25</div>
+          </div>
+          <div class="meta mono">25 股 · 市价</div>
+          <div class="track"><i class="done" style="width:100%"></i></div>
+          <div class="status-row">
+            <span class="pill good">已成交</span>
+            <span class="value mono">$182.34</span>
+          </div>
+          <div class="asof mono">as of 09:31 · 已实现 +$412.20</div>
+          <div class="actions">
+            <button>查看订单</button>
+          </div>
+        </div>
+      </div>
+      <div class="caption">终结态 · 停留 15 分钟后自动消失，提醒仍交给本地通知</div>
+    </div>
+
+    <div class="col">
+      <div class="stage light">
+        <div class="card light">
+          <div class="card-top">
+            <div class="sym">TSLA<span class="side buy">买入</span></div>
+            <div class="right mono">0/8</div>
+          </div>
+          <div class="meta mono">8 股 · 限价 $240.00</div>
+          <div class="track"><i style="width:0%"></i></div>
+          <div class="status-row">
+            <span class="pill live">挂单中</span>
+            <span class="value mono">距限价 −1.2%</span>
+          </div>
+          <div class="asof mono">as of 10:12 · +2 笔在途</div>
+          <div class="actions">
+            <button class="danger">撤单</button>
+            <button class="primary">查看订单</button>
+          </div>
+        </div>
+      </div>
+      <div class="caption">浅色 · 多单聚合时显示「最近变动的一笔 + 在途笔数」</div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============ 2. 交易日卡 ============ -->
+<section>
+  <h2>02 · 交易日卡 · 锁屏（倒计时与进度条由系统自更新）</h2>
+  <div class="row">
+
+    <div class="col">
+      <div class="stage">
+        <div class="card">
+          <div class="card-top">
+            <div class="phase">REGULAR</div>
+            <div class="countdown mono">收盘 3:12:45</div>
+          </div>
+          <div class="timeline">
+            <div class="railWrap">
+              <div class="rail">
+                <div class="seg over" style="width:33.3%"></div>
+                <div class="seg pre"  style="width:22.9%"></div>
+                <div class="seg reg"  style="width:27.1%"></div>
+                <div class="seg aft"  style="width:16.7%"></div>
+              </div>
+              <div class="fill" style="width:62%"></div>
+              <div class="head" style="left:62%"></div>
+            </div>
+            <div class="labels">
+              <span style="width:33.3%">OVERNIGHT</span>
+              <span style="width:22.9%">PRE</span>
+              <span style="width:27.1%">REGULAR</span>
+              <span style="width:16.7%">AFTER</span>
+            </div>
+          </div>
+          <div class="session-row">
+            <span class="mono">账户 <span class="delta up">+$320.12 (+0.28%)</span></span>
+            <span class="mono" style="color:var(--sub-dark)">2 笔挂单</span>
+          </div>
+          <div class="asof mono">as of 10:12 · NYSE</div>
+        </div>
+      </div>
+      <div class="caption">时段轨按真实时长比例绘制，黄色进度随系统时间推进</div>
+    </div>
+
+    <div class="col">
+      <div class="stage light">
+        <div class="card light">
+          <div class="card-top">
+            <div class="phase" style="color:#B08A00">PRE-MARKET</div>
+            <div class="countdown mono">开盘 12:04</div>
+          </div>
+          <div class="timeline">
+            <div class="railWrap">
+              <div class="rail">
+                <div class="seg over" style="width:33.3%"></div>
+                <div class="seg pre"  style="width:22.9%"></div>
+                <div class="seg reg"  style="width:27.1%"></div>
+                <div class="seg aft"  style="width:16.7%"></div>
+              </div>
+              <div class="fill" style="width:51%"></div>
+              <div class="head" style="left:51%"></div>
+            </div>
+            <div class="labels">
+              <span style="width:33.3%">OVERNIGHT</span>
+              <span style="width:22.9%">PRE</span>
+              <span style="width:27.1%">REGULAR</span>
+              <span style="width:16.7%">AFTER</span>
+            </div>
+          </div>
+          <div class="session-row">
+            <span class="mono">账户 <span class="delta down">−$86.40 (−0.07%)</span></span>
+            <span class="mono" style="color:var(--sub-light)">无挂单</span>
+          </div>
+          <div class="asof mono">as of 08:58 · NYSE</div>
+        </div>
+      </div>
+      <div class="caption">盘前相位 · 同一张卡，只换强调色与文案</div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============ 3. 灵动岛 ============ -->
+<section>
+  <h2>03 · 灵动岛</h2>
+  <div class="row">
+
+    <div class="col">
+      <div class="stage" style="padding:34px 40px">
+        <div class="island-expanded">
+          <div class="notch"></div>
+          <div class="island-row">
+            <div>
+              <div class="sym">AAPL<span class="side buy">买入</span></div>
+              <div class="meta mono">10 股 · 限价 $231.00</div>
+            </div>
+            <div style="text-align:right">
+              <div class="mono" style="font-size:15px;font-weight:600">6/10</div>
+              <div class="pill warn" style="margin-top:6px;display:inline-block">部分成交</div>
+            </div>
+          </div>
+          <div class="island-bottom">
+            <div class="track" style="height:5px"><i class="warn" style="width:60%"></i></div>
+            <div class="status-row" style="font-size:12px">
+              <span class="mono" style="color:var(--sub-dark)">均价 $230.98 · as of 10:12</span>
+              <span class="actions" style="margin:0;gap:8px">
+                <button class="danger" style="height:28px;font-size:12px;padding:0 12px;flex:none">撤单</button>
+                <button class="primary" style="height:28px;font-size:12px;padding:0 12px;flex:none">查看</button>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="caption">展开态 · 订单卡优先占据灵动岛（relevanceScore 最高）</div>
+    </div>
+
+    <div class="col">
+      <div class="stage" style="padding:34px 40px">
+        <div class="island-expanded">
+          <div class="notch"></div>
+          <div class="island-row">
+            <div>
+              <div class="phase">REGULAR</div>
+              <div class="meta mono" style="margin-top:4px">NYSE · 9:30–16:00</div>
+            </div>
+            <div class="countdown mono">3:12:45</div>
+          </div>
+          <div class="island-bottom">
+            <div class="track" style="height:5px"><i style="width:62%"></i></div>
+            <div class="status-row" style="font-size:12px">
+              <span class="mono"><span class="delta up">+$320.12</span> <span style="color:var(--sub-dark)">(+0.28%)</span></span>
+              <span class="mono" style="color:var(--sub-dark)">2 笔挂单</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="caption">交易日卡展开态 · 倒计时每秒自更新，不唤醒 App</div>
+    </div>
+
+  </div>
+
+  <div class="di-strip">
+    <div class="col">
+      <div class="compact">
+        <span class="left">AAPL</span>
+        <span class="ring"><i></i></span>
+      </div>
+      <div class="caption">compact · 进度环 = 成交进度</div>
+    </div>
+    <div class="col">
+      <div class="compact">
+        <span class="left" style="color:var(--brand);font-size:11px">REG</span>
+        <span class="mono" style="font-size:12px;font-weight:600">3:12</span>
+      </div>
+      <div class="caption">compact · 距下一相位</div>
+    </div>
+    <div class="col">
+      <div class="minimal">◐</div>
+      <div class="caption">minimal</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4. 手表 ============ -->
+<section>
+  <h2>04 · Apple Watch Smart Stack（iOS 18+ supplementalActivityFamilies）</h2>
+  <div class="row">
+    <div class="col">
+      <div class="stage" style="padding:26px">
+        <div class="watch">
+          <div class="sym">AAPL<span class="side buy" style="font-size:9px">买入</span></div>
+          <div class="price mono">$230.98</div>
+          <div class="pct delta up mono">+0.42%</div>
+          <svg class="spark" width="154" height="46" viewBox="0 0 154 46" fill="none">
+            <path d="M0 34 L12 30 L24 32 L36 25 L48 28 L60 20 L72 22 L84 16 L96 19 L108 12 L120 15 L132 9 L144 12 L154 7"
+                  stroke="#FCD72B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <div class="foot mono">6/10 部分成交 · 10:12</div>
+        </div>
+      </div>
+      <div class="caption">手腕上只保留「看一眼就够」的三个数字</div>
+    </div>
+    <div class="col">
+      <div class="stage" style="padding:26px">
+        <div class="watch">
+          <div class="phase" style="font-size:10px">REGULAR</div>
+          <div class="price mono" style="font-size:26px">3:12:45</div>
+          <div class="pct mono" style="color:var(--sub-dark);font-size:12px">距收盘</div>
+          <div class="spark">
+            <div class="track" style="height:5px;margin:0"><i style="width:62%"></i></div>
+          </div>
+          <div class="foot mono">账户 <span class="delta up">+0.28%</span> · 2 笔挂单</div>
+        </div>
+      </div>
+      <div class="caption">交易日卡 · 手表端不需要图表</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5. Tokens ============ -->
+<section>
+  <h2>05 · 设计 token</h2>
+  <div class="tokens">
+    <div class="token"><span class="swatch" style="background:#FCD72B"></span>brand #FCD72B · 进度 / 强调</div>
+    <div class="token"><span class="swatch" style="background:#384248"></span>brandInk #384248 · 黄底文字</div>
+    <div class="token"><span class="swatch" style="background:#30D158"></span>positive · 买入 / 盈利</div>
+    <div class="token"><span class="swatch" style="background:#FF453A"></span>negative · 卖出 / 亏损</div>
+    <div class="token"><span class="swatch" style="background:#FF9F0A"></span>warning · 部分成交 / 撤单中</div>
+    <div class="token"><span class="swatch" style="background:#0A84FF"></span>info · 挂单中</div>
+    <div class="token">圆角 26 / 内块 18</div>
+    <div class="token">数字 monospacedDigit</div>
+    <div class="token">卡片内边距 16×18</div>
+  </div>
+</section>
+
+</body>
+</html>
