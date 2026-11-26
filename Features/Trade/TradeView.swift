@@ -18,21 +18,11 @@ struct TradeView: View {
         seed: TradeSeedContext? = nil,
         onSubmittedOrder: ((AlpacaOrder) -> Void)? = nil
     ) {
-        let defaultSizingMode: TradeSizingMode = {
-            if seed?.asset?.fractionable == false {
-                return .shares
-            }
-            if side == .sell, (NumberParser.decimal(from: seed?.position?.quantity) ?? 0) <= 0 {
-                return .shares
-            }
-            return .notional
-        }()
-
         _store = State(initialValue: TradeStore(
             symbol: symbol,
             side: side,
             orderType: .market,
-            sizingMode: defaultSizingMode,
+            sizingMode: .shares,
             seed: seed
         ))
         submittedOrderHandler = onSubmittedOrder
