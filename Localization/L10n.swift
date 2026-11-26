@@ -1853,4 +1853,103 @@ enum L10n {
         static func notionalRequiresDay(locale: Locale = .current) -> String { L10n.string("order.error.notional_requires_day", locale: locale) }
         static func extendedHoursRequiresLimitDayOrGTC(locale: Locale = .current) -> String { L10n.string("order.error.extended_hours_requires_limit_day_or_gtc", locale: locale) }
     }
+
+    enum LiveActivity {
+        static func orderStatus(_ phase: OrderActivityPhase, locale: Locale) -> String {
+            L10n.string("live_activity.order.status.\(orderStatusKey(phase))", locale: locale)
+        }
+
+        private static func orderStatusKey(_ phase: OrderActivityPhase) -> String {
+            switch phase {
+            case .submitted: "submitted"
+            case .working: "working"
+            case .partiallyFilled: "partially_filled"
+            case .cancelRequested: "cancel_requested"
+            case .filled: "filled"
+            case .canceled: "canceled"
+            case .rejected: "rejected"
+            case .expired: "expired"
+            case .replaced: "replaced"
+            }
+        }
+
+        static func detailAveragePrice(_ price: String, locale: Locale) -> String {
+            L10n.format("live_activity.order.detail.average_price_format", locale: locale, price)
+        }
+
+        static func detailLimitPrice(_ price: String, locale: Locale) -> String {
+            L10n.format("live_activity.order.detail.limit_price_format", locale: locale, price)
+        }
+
+        static func detailPrice(_ price: String, locale: Locale) -> String {
+            L10n.format("live_activity.order.detail.price_format", locale: locale, price)
+        }
+
+        static func detailNotional(_ amount: String, locale: Locale) -> String {
+            L10n.format("live_activity.order.detail.notional_format", locale: locale, amount)
+        }
+
+        static func asOf(_ time: String, locale: Locale) -> String {
+            L10n.format("live_activity.order.as_of_format", locale: locale, time)
+        }
+
+        static func additionalWorking(_ count: Int, locale: Locale) -> String {
+            L10n.format("live_activity.order.additional_working_format", locale: locale, count)
+        }
+
+        static func quantityShares(_ quantity: String, locale: Locale) -> String {
+            L10n.format("live_activity.order.quantity_shares_format", locale: locale, quantity)
+        }
+
+        static func cancelActionText(locale: Locale) -> String {
+            L10n.string("live_activity.order.action.cancel", locale: locale)
+        }
+
+        static func viewActionText(locale: Locale) -> String {
+            L10n.string("live_activity.order.action.view", locale: locale)
+        }
+
+        static func sessionPhase(_ session: MarketSessionKind, locale: Locale) -> String {
+            L10n.string("live_activity.session.phase.\(sessionPhaseKey(session))", locale: locale)
+        }
+
+        static func sessionPhaseShort(_ session: MarketSessionKind, locale: Locale) -> String {
+            L10n.string("live_activity.session.phase_short.\(sessionPhaseKey(session))", locale: locale)
+        }
+
+        private static func sessionPhaseKey(_ session: MarketSessionKind) -> String {
+            switch session {
+            case .overnight: "overnight"
+            case .preMarket: "pre_market"
+            case .regular: "regular"
+            case .afterHours: "after_hours"
+            }
+        }
+
+        static func sessionCloses(locale: Locale) -> String {
+            L10n.string("live_activity.session.closes", locale: locale)
+        }
+
+        static func sessionOpens(locale: Locale) -> String {
+            L10n.string("live_activity.session.opens", locale: locale)
+        }
+
+        static func workingOrders(_ count: Int, locale: Locale) -> String {
+            L10n.format("live_activity.session.working_orders_format", locale: locale, count)
+        }
+
+        static func noWorkingOrders(locale: Locale) -> String {
+            L10n.string("live_activity.session.no_working_orders", locale: locale)
+        }
+
+        static var settingsTitle: LocalizedStringKey { "live_activity.settings.title" }
+        static var settingsFooter: LocalizedStringKey { "live_activity.settings.footer" }
+        static var settingsEnabled: LocalizedStringKey { "live_activity.settings.enabled" }
+        static var settingsOrderCard: LocalizedStringKey { "live_activity.settings.order_card" }
+        static var settingsSessionCard: LocalizedStringKey { "live_activity.settings.session_card" }
+        static var settingsSystemDisabled: LocalizedStringKey { "live_activity.settings.system_disabled" }
+        static var settingsPreview: LocalizedStringKey { "live_activity.settings.preview" }
+        static var previewTitle: LocalizedStringKey { "live_activity.preview.title" }
+        static var previewFootnote: LocalizedStringKey { "live_activity.preview.footnote" }
+    }
 }

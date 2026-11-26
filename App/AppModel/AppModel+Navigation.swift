@@ -56,6 +56,26 @@ extension AppModel {
         pendingOrderDetailRequest = nil
     }
 
+    /// Entry point for `vicu://` URLs delivered by a Live Activity.
+    @discardableResult
+    func handleDeepLink(_ url: URL) -> Bool {
+        guard let destination = VicuDeepLink.destination(for: url) else {
+            return false
+        }
+
+        switch destination {
+        case .orderDetail(let orderID, let symbol, let armsCancellation):
+            if armsCancellation {
+                pendingCancellationOrderID = orderID
+                selectedTab = .orders
+            } else {
+                openOrderDetail(orderID: orderID, symbol: symbol)
+            }
+        }
+
+        return true
+    }
+
     func handleNotificationRoute(_ route: AppNotificationRoute) {
         switch route {
         case .orderDetail(let orderID, let symbol):

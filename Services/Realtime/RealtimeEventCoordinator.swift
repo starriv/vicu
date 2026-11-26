@@ -178,6 +178,7 @@ final class RealtimeEventCoordinator {
             locale: app.appLanguage.locale,
             preferences: app.notificationPreferences
         )
+        await app.liveActivities.tradeEventDidArrive(event)
     }
 
     private func refreshAfterEvent(credentials activeCredentials: AlpacaCredentials) async {

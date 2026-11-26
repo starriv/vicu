@@ -1,7 +1,9 @@
+import ActivityKit
 import SwiftUI
 
 struct NotificationSettingsView: View {
     @Environment(AppModel.self) private var app
+    @State private var liveActivitiesAvailable = true
 
     var body: some View {
         @Bindable var app = app
@@ -44,8 +46,61 @@ struct NotificationSettingsView: View {
             } footer: {
                 Text(L10n.NotificationSettings.footer)
             }
+
+            Section {
+                Toggle(isOn: $app.liveActivitySettings.isEnabled) {
+                    NotificationSettingsLabel(
+                        title: L10n.LiveActivity.settingsEnabled,
+                        systemImage: "lock.rectangle.stack.fill"
+                    )
+                }
+
+                Toggle(isOn: $app.liveActivitySettings.orderCardEnabled) {
+                    NotificationSettingsLabel(
+                        title: L10n.LiveActivity.settingsOrderCard,
+                        systemImage: "list.bullet.rectangle"
+                    )
+                }
+                .disabled(!app.liveActivitySettings.isEnabled)
+                .opacity(app.liveActivitySettings.isEnabled ? 1 : 0.55)
+
+                Toggle(isOn: $app.liveActivitySettings.sessionCardEnabled) {
+                    NotificationSettingsLabel(
+                        title: L10n.LiveActivity.settingsSessionCard,
+                        systemImage: "clock.badge.checkmark"
+                    )
+                }
+                .disabled(!app.liveActivitySettings.isEnabled)
+                .opacity(app.liveActivitySettings.isEnabled ? 1 : 0.55)
+
+                #if DEBUG
+                NavigationLink {
+                    LiveActivityPreviewView()
+                } label: {
+                    Text(L10n.LiveActivity.settingsPreview)
+                }
+                #endif
+            } header: {
+                Text(L10n.LiveActivity.settingsTitle)
+            } footer: {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(L10n.LiveActivity.settingsFooter)
+
+                    if !liveActivitiesAvailable {
+                        Label {
+                            Text(L10n.LiveActivity.settingsSystemDisabled)
+                        } icon: {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                        }
+                        .foregroundStyle(AppTheme.ColorToken.warning)
+                    }
+                }
+            }
         }
         .tint(AppTheme.ColorToken.brand)
+        .task {
+            liveActivitiesAvailable = ActivityAuthorizationInfo().areActivitiesEnabled
+        }
     }
 }
 

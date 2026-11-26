@@ -70,6 +70,9 @@ struct OrdersView: View {
             applyOrdersListRequest(initialRequest)
             applyOrdersListRequest(app.pendingOrdersListRequest, consumesAppRequest: true)
         }
+        .task(id: app.pendingCancellationOrderID) {
+            await presentPendingCancellationIfNeeded()
+        }
         .onChange(of: filterState) { _, newValue in
             reconcileTransientFilterTracking(with: newValue)
             filterPipeline.accept(newValue)
@@ -120,62 +123,49 @@ struct OrdersView: View {
         defer { actionOrderIDs.remove(order.id) }
 
         do {
-            await OrderActivityManager.updateCancellation(
-                for: order,
-                phase: .submitting,
-                message: L10n.Orders.cancelLiveActivitySubmitting(symbol: order.symbol, locale: locale)
-            )
             try await app.cancelOrder(order)
-            let message = L10n.Orders.cancelRequestedToast(symbol: order.symbol, locale: locale)
-            toastCenter.show(message)
-            await OrderActivityManager.endCancellation(
-                for: order,
-                phase: .submitted,
-                message: message
-            )
+            toastCenter.show(L10n.Orders.cancelRequestedToast(symbol: order.symbol, locale: locale))
             return true
         } catch {
             toastCenter.showError(error, locale: locale)
-            await OrderActivityManager.endCancellation(
-                for: order,
-                phase: .failed,
-                message: L10n.Orders.cancelLiveActivityFailed(symbol: order.symbol, locale: locale)
-            )
             return false
         }
-    }
-
-    private func showCancellationPromptActivity(for order: AlpacaOrder) async {
-        await OrderActivityManager.startCancellationPrompt(
-            for: order,
-            message: L10n.Orders.cancelLiveActivityAwaitingConfirmation(symbol: order.symbol, locale: locale)
-        )
-    }
-
-    private func dismissCancellationPromptActivity(for order: AlpacaOrder) async {
-        await OrderActivityManager.dismissCancellationPrompt(
-            for: order,
-            message: L10n.Orders.cancelLiveActivityDismissed(symbol: order.symbol, locale: locale)
-        )
     }
 
     private func presentCancellationSheet(for order: AlpacaOrder) {
         pendingCancellationOrder = order
         presentedSheet = .cancelOrder(OrderCancellationDraft(order: order))
-
-        Task {
-            await showCancellationPromptActivity(for: order)
-        }
     }
 
     private func handleSheetDismissed() {
-        guard let order = pendingCancellationOrder else {
+        pendingCancellationOrder = nil
+    }
+
+    /// A Live Activity can arm the cancel confirmation from the Lock Screen
+    /// (`vicu://order/<id>?action=cancel`). The order list is the only place that
+    /// owns that sheet, so it resolves the request once the order is available.
+    private func presentPendingCancellationIfNeeded() async {
+        guard let orderID = app.pendingCancellationOrderID else {
             return
         }
 
-        pendingCancellationOrder = nil
-        Task {
-            await dismissCancellationPromptActivity(for: order)
+        if let order = app.portfolio.orders.first(where: { $0.id == orderID }) {
+            app.pendingCancellationOrderID = nil
+            presentCancellationSheet(for: order)
+            return
+        }
+
+        await app.refresh()
+
+        guard app.pendingCancellationOrderID == orderID else {
+            return
+        }
+
+        if let order = app.portfolio.orders.first(where: { $0.id == orderID }) {
+            app.pendingCancellationOrderID = nil
+            presentCancellationSheet(for: order)
+        } else {
+            app.pendingCancellationOrderID = nil
         }
     }
 

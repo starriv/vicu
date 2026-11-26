@@ -83,6 +83,14 @@ enum AppConfigurationKeys {
         )
     }
 
+    enum LiveActivities {
+        static let settings = AppConfigurationKey<LiveActivitySettings>(
+            namespace: "live_activities",
+            name: LiveActivitySettings.storageKey,
+            defaultValue: .default
+        )
+    }
+
     enum Search {
         static func recentSymbols(credentials: AlpacaCredentials) -> AppConfigurationKey<[String]> {
             AppConfigurationKey(

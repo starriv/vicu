@@ -539,6 +539,34 @@ struct AlpacaTradeEvent: Decodable, Identifiable, Equatable, Sendable {
         case previousExecutionID = "previous_execution_id"
     }
 
+    init(
+        accountID: String? = nil,
+        at: String? = nil,
+        eventID: String? = nil,
+        eventULID: String? = nil,
+        event: String,
+        timestamp: String? = nil,
+        order: AlpacaOrder,
+        price: String? = nil,
+        quantity: String? = nil,
+        positionQuantity: String? = nil,
+        executionID: String? = nil,
+        previousExecutionID: String? = nil
+    ) {
+        self.accountID = accountID
+        self.at = at
+        self.eventID = eventID
+        self.eventULID = eventULID
+        self.event = event
+        self.timestamp = timestamp
+        self.order = order
+        self.price = price
+        self.quantity = quantity
+        self.positionQuantity = positionQuantity
+        self.executionID = executionID
+        self.previousExecutionID = previousExecutionID
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         accountID = try container.decodeFlexibleStringIfPresent(forKey: .accountID)

@@ -34,6 +34,17 @@ final class AppModel: AssetDetailServicing {
             notificationPreferences.save(to: services.configurationStore)
         }
     }
+    var liveActivitySettings: LiveActivitySettings = .default {
+        didSet {
+            liveActivitySettings.save(to: services.configurationStore)
+            Task { @MainActor [weak self] in
+                await self?.liveActivities.settingsDidChange()
+            }
+        }
+    }
+    /// Set by a Live Activity deep link (`vicu://order/<id>?action=cancel`); the
+    /// orders list resolves it into the cancel confirmation sheet.
+    var pendingCancellationOrderID: String?
     var logoDevAPIKey: String = "" {
         didSet {
             services.configurationStore.setValue(logoDevAPIKey, for: AppConfigurationKeys.Integrations.logoDevAPIKey)
@@ -93,6 +104,7 @@ final class AppModel: AssetDetailServicing {
     @ObservationIgnored let symbolOrdersCacheTTL: TimeInterval = 60
     @ObservationIgnored var credentialOperationGeneration = 0
     @ObservationIgnored lazy var realtimeCoordinator: RealtimeEventCoordinator = RealtimeEventCoordinator(app: self)
+    @ObservationIgnored lazy var liveActivities: LiveActivityCoordinator = LiveActivityCoordinator(app: self)
 
     init(services: AppServices = .live) {
         self.services = services
@@ -104,6 +116,7 @@ final class AppModel: AssetDetailServicing {
         self.isLogoDevEnabled = configurationStore.value(for: AppConfigurationKeys.Integrations.isLogoDevEnabled)
         self.showsChartTradeMarkers = configurationStore.value(for: AppConfigurationKeys.Chart.showsTradeMarkers)
         self.notificationPreferences = AppNotificationPreferences.load(from: configurationStore)
+        self.liveActivitySettings = LiveActivitySettings.load(from: configurationStore)
 
         if let notificationCenter = services.appNotifier as? AppNotificationCenter {
             notificationCenter.setResponseHandler { [weak self] route in

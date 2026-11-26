@@ -114,6 +114,9 @@ extension AppModel {
         } else if let firstFailure {
             applyPortfolioRefreshFailure(firstFailure, credentials: activeCredentials)
         }
+
+        await liveActivities.start()
+        await liveActivities.portfolioDidRefresh()
     }
 
     func refreshPositions() async throws {
@@ -383,6 +386,7 @@ extension AppModel {
             credentials: credentials
         )
         mergePortfolioOrder(order)
+        await liveActivities.orderDidChange(order)
         lastError = nil
 
         Task { @MainActor [weak self] in
@@ -409,6 +413,7 @@ extension AppModel {
         }
 
         replacePortfolioOrder(oldID: order.id, with: replacedOrder)
+        await liveActivities.orderDidChange(replacedOrder)
         lastError = nil
         return replacedOrder
     }
@@ -434,6 +439,7 @@ extension AppModel {
             )
             guard isCurrentCredentialContext(credentials) else { return .success(submittedOrder) }
             mergePortfolioOrder(submittedOrder)
+            await liveActivities.orderDidChange(submittedOrder)
             let appNotifier = services.appNotifier
             let notificationLocale = appLanguage.locale
             let notificationPreferencesSnapshot = notificationPreferences

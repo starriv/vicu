@@ -52,6 +52,7 @@
 		0A0000000000000000000118 /* Features/Alpaca/AlpacaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000218 /* Features/Alpaca/AlpacaView.swift */; };
 		0A0000000000000000000119 /* Shared/Utilities/AppFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000219 /* Shared/Utilities/AppFormatting.swift */; };
 		0A0000000000000000000120 /* Resources/Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000220 /* Resources/Assets.xcassets */; };
+		0B0000000000000000000120 /* Resources/Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000220 /* Resources/Assets.xcassets */; };
 		0A0000000000000000000121 /* DesignSystem/AppTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000221 /* DesignSystem/AppTypography.swift */; };
 		0A0F70000000000000000101 /* Models/Caching/OptionDataCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F70000000000000000201 /* Models/Caching/OptionDataCache.swift */; };
 		0A0F70000000000000000102 /* Models/Caching/SearchDataCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F70000000000000000202 /* Models/Caching/SearchDataCache.swift */; };
@@ -203,11 +204,26 @@
 		0C0F80000000000000000101 /* vicuTests/FinancialChartEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0F80000000000000000201 /* FinancialChartEngineTests.swift */; };
 		0AC0000000000000000C0002 /* Resources/AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0AC0000000000000000C0001 /* Resources/AppIcon.icon */; };
 		0AC0000000000000000C0004 /* Resources/PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 0AC0000000000000000C0003 /* Resources/PrivacyInfo.xcprivacy */; };
-		0B0000000000000000000101 /* Services/LiveActivities/OrderActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000000000000000000201 /* Services/LiveActivities/OrderActivityAttributes.swift */; };
-		0B0000000000000000000102 /* Services/LiveActivities/OrderActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000000000000000000202 /* Services/LiveActivities/OrderActivityManager.swift */; };
-		0B0000000000000000000103 /* Services/LiveActivities/OrderActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000000000000000000201 /* Services/LiveActivities/OrderActivityAttributes.swift */; };
-		0B0000000000000000000104 /* Widgets/OrderLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000000000000000000203 /* Widgets/OrderLiveActivityWidget.swift */; };
 		0B0000000000000000000105 /* VicuLiveActivities.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 0B0000000000000000000301 /* VicuLiveActivities.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		0B3A00000000000000000001 /* Shared/LiveActivities/LiveActivityModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B2A00000000000000000001 /* Shared/LiveActivities/LiveActivityModels.swift */; };
+		0B4A00000000000000000001 /* Shared/LiveActivities/LiveActivityModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B2A00000000000000000001 /* Shared/LiveActivities/LiveActivityModels.swift */; };
+		0B3A00000000000000000002 /* Shared/LiveActivities/ActivityDesign.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B2A00000000000000000002 /* Shared/LiveActivities/ActivityDesign.swift */; };
+		0B4A00000000000000000002 /* Shared/LiveActivities/ActivityDesign.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B2A00000000000000000002 /* Shared/LiveActivities/ActivityDesign.swift */; };
+		0B3A00000000000000000003 /* Shared/LiveActivities/OrderActivityCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B2A00000000000000000003 /* Shared/LiveActivities/OrderActivityCard.swift */; };
+		0B4A00000000000000000003 /* Shared/LiveActivities/OrderActivityCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B2A00000000000000000003 /* Shared/LiveActivities/OrderActivityCard.swift */; };
+		0B3A00000000000000000004 /* Shared/LiveActivities/SessionActivityCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B2A00000000000000000004 /* Shared/LiveActivities/SessionActivityCard.swift */; };
+		0B4A00000000000000000004 /* Shared/LiveActivities/SessionActivityCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B2A00000000000000000004 /* Shared/LiveActivities/SessionActivityCard.swift */; };
+		0B3A00000000000000000005 /* Shared/LiveActivities/VicuDeepLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B2A00000000000000000005 /* Shared/LiveActivities/VicuDeepLink.swift */; };
+		0B4A00000000000000000005 /* Shared/LiveActivities/VicuDeepLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B2A00000000000000000005 /* Shared/LiveActivities/VicuDeepLink.swift */; };
+		0B3A00000000000000000006 /* Services/LiveActivities/LiveActivityPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B2A00000000000000000006 /* Services/LiveActivities/LiveActivityPolicy.swift */; };
+		0B3A00000000000000000007 /* Services/LiveActivities/LiveActivityPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B2A00000000000000000007 /* Services/LiveActivities/LiveActivityPresentation.swift */; };
+		0B3A00000000000000000008 /* Services/LiveActivities/LiveActivitySettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B2A00000000000000000008 /* Services/LiveActivities/LiveActivitySettings.swift */; };
+		0B3A00000000000000000009 /* Services/LiveActivities/LiveActivityCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B2A00000000000000000009 /* Services/LiveActivities/LiveActivityCoordinator.swift */; };
+		0B3A0000000000000000000A /* Features/LiveActivities/LiveActivityPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B2A0000000000000000000A /* Features/LiveActivities/LiveActivityPreviewView.swift */; };
+		0B4A0000000000000000000B /* Widgets/VicuLiveActivitiesBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B2A0000000000000000000B /* Widgets/VicuLiveActivitiesBundle.swift */; };
+		0B4A0000000000000000000C /* Widgets/OrderActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B2A0000000000000000000C /* Widgets/OrderActivityWidget.swift */; };
+		0B4A0000000000000000000D /* Widgets/SessionActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B2A0000000000000000000D /* Widgets/SessionActivityWidget.swift */; };
+		0B5A0000000000000000000E /* vicuTests/LiveActivityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B2A0000000000000000000E /* vicuTests/LiveActivityTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -436,12 +452,23 @@
 		0C0F80000000000000000201 /* FinancialChartEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = vicuTests/FinancialChartEngineTests.swift; sourceTree = "<group>"; };
 		0AC0000000000000000C0001 /* Resources/AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = Resources/AppIcon.icon; sourceTree = "<group>"; };
 		0AC0000000000000000C0003 /* Resources/PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Resources/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		0B0000000000000000000201 /* Services/LiveActivities/OrderActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/LiveActivities/OrderActivityAttributes.swift; sourceTree = "<group>"; };
-		0B0000000000000000000202 /* Services/LiveActivities/OrderActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/LiveActivities/OrderActivityManager.swift; sourceTree = "<group>"; };
-		0B0000000000000000000203 /* Widgets/OrderLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Widgets/OrderLiveActivityWidget.swift; sourceTree = "<group>"; };
 		0B0000000000000000000204 /* Widgets/VicuLiveActivities-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Widgets/VicuLiveActivities-Info.plist"; sourceTree = "<group>"; };
 		0B0000000000000000000301 /* VicuLiveActivities.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VicuLiveActivities.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		0C0FA0000000000000000301 /* vicuTests.xctest */ = {isa = PBXFileReference; explicitFileType = "wrapper.cfbundle"; includeInIndex = 0; path = vicuTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		0B2A00000000000000000001 /* Shared/LiveActivities/LiveActivityModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/LiveActivities/LiveActivityModels.swift; sourceTree = "<group>"; };
+		0B2A00000000000000000002 /* Shared/LiveActivities/ActivityDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/LiveActivities/ActivityDesign.swift; sourceTree = "<group>"; };
+		0B2A00000000000000000003 /* Shared/LiveActivities/OrderActivityCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/LiveActivities/OrderActivityCard.swift; sourceTree = "<group>"; };
+		0B2A00000000000000000004 /* Shared/LiveActivities/SessionActivityCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/LiveActivities/SessionActivityCard.swift; sourceTree = "<group>"; };
+		0B2A00000000000000000005 /* Shared/LiveActivities/VicuDeepLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Shared/LiveActivities/VicuDeepLink.swift; sourceTree = "<group>"; };
+		0B2A00000000000000000006 /* Services/LiveActivities/LiveActivityPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/LiveActivities/LiveActivityPolicy.swift; sourceTree = "<group>"; };
+		0B2A00000000000000000007 /* Services/LiveActivities/LiveActivityPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/LiveActivities/LiveActivityPresentation.swift; sourceTree = "<group>"; };
+		0B2A00000000000000000008 /* Services/LiveActivities/LiveActivitySettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/LiveActivities/LiveActivitySettings.swift; sourceTree = "<group>"; };
+		0B2A00000000000000000009 /* Services/LiveActivities/LiveActivityCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/LiveActivities/LiveActivityCoordinator.swift; sourceTree = "<group>"; };
+		0B2A0000000000000000000A /* Features/LiveActivities/LiveActivityPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/LiveActivities/LiveActivityPreviewView.swift; sourceTree = "<group>"; };
+		0B2A0000000000000000000B /* Widgets/VicuLiveActivitiesBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Widgets/VicuLiveActivitiesBundle.swift; sourceTree = "<group>"; };
+		0B2A0000000000000000000C /* Widgets/OrderActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Widgets/OrderActivityWidget.swift; sourceTree = "<group>"; };
+		0B2A0000000000000000000D /* Widgets/SessionActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Widgets/SessionActivityWidget.swift; sourceTree = "<group>"; };
+		0B2A0000000000000000000E /* vicuTests/LiveActivityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = vicuTests/LiveActivityTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -585,9 +612,20 @@
 				0A0000000000000000000266 /* Features/Orders/OrdersFilterState.swift */,
 				0A0000000000000000000267 /* Features/Orders/OrdersFilterSheet.swift */,
 				0A0000000000000000000290 /* Features/Orders/OrderDetailView.swift */,
-				0B0000000000000000000201 /* Services/LiveActivities/OrderActivityAttributes.swift */,
-				0B0000000000000000000202 /* Services/LiveActivities/OrderActivityManager.swift */,
-				0B0000000000000000000203 /* Widgets/OrderLiveActivityWidget.swift */,
+				0B2A00000000000000000001 /* Shared/LiveActivities/LiveActivityModels.swift */,
+				0B2A00000000000000000002 /* Shared/LiveActivities/ActivityDesign.swift */,
+				0B2A00000000000000000003 /* Shared/LiveActivities/OrderActivityCard.swift */,
+				0B2A00000000000000000004 /* Shared/LiveActivities/SessionActivityCard.swift */,
+				0B2A00000000000000000005 /* Shared/LiveActivities/VicuDeepLink.swift */,
+				0B2A00000000000000000006 /* Services/LiveActivities/LiveActivityPolicy.swift */,
+				0B2A00000000000000000007 /* Services/LiveActivities/LiveActivityPresentation.swift */,
+				0B2A00000000000000000008 /* Services/LiveActivities/LiveActivitySettings.swift */,
+				0B2A00000000000000000009 /* Services/LiveActivities/LiveActivityCoordinator.swift */,
+				0B2A0000000000000000000A /* Features/LiveActivities/LiveActivityPreviewView.swift */,
+				0B2A0000000000000000000B /* Widgets/VicuLiveActivitiesBundle.swift */,
+				0B2A0000000000000000000C /* Widgets/OrderActivityWidget.swift */,
+				0B2A0000000000000000000D /* Widgets/SessionActivityWidget.swift */,
+				0B2A0000000000000000000E /* vicuTests/LiveActivityTests.swift */,
 				0B0000000000000000000204 /* Widgets/VicuLiveActivities-Info.plist */,
 				0A0000000000000000000218 /* Features/Alpaca/AlpacaView.swift */,
 				0A0000000000000000000247 /* Features/More/MoreView.swift */,
@@ -854,6 +892,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0B0000000000000000000120 /* Resources/Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -978,8 +1017,6 @@
 				0A0000000000000000000166 /* Features/Orders/OrdersFilterState.swift in Sources */,
 				0A0000000000000000000167 /* Features/Orders/OrdersFilterSheet.swift in Sources */,
 				0A0000000000000000000190 /* Features/Orders/OrderDetailView.swift in Sources */,
-				0B0000000000000000000101 /* Services/LiveActivities/OrderActivityAttributes.swift in Sources */,
-				0B0000000000000000000102 /* Services/LiveActivities/OrderActivityManager.swift in Sources */,
 				0A0000000000000000000118 /* Features/Alpaca/AlpacaView.swift in Sources */,
 				0A0000000000000000000119 /* Shared/Utilities/AppFormatting.swift in Sources */,
 				0A00000000000000000001C1 /* Shared/Utilities/ErrorCancellation.swift in Sources */,
@@ -1055,6 +1092,16 @@
 				0A0000000000000000000134 /* Features/Home/PositionsSummaryView.swift in Sources */,
 				0A0000000000000000000164 /* Features/Home/RecentOrdersSummaryView.swift in Sources */,
 				0A0000000000000000000135 /* Models/Portfolio/PortfolioState.swift in Sources */,
+				0B3A00000000000000000001 /* Shared/LiveActivities/LiveActivityModels.swift in Sources */,
+				0B3A00000000000000000002 /* Shared/LiveActivities/ActivityDesign.swift in Sources */,
+				0B3A00000000000000000003 /* Shared/LiveActivities/OrderActivityCard.swift in Sources */,
+				0B3A00000000000000000004 /* Shared/LiveActivities/SessionActivityCard.swift in Sources */,
+				0B3A00000000000000000005 /* Shared/LiveActivities/VicuDeepLink.swift in Sources */,
+				0B3A00000000000000000006 /* Services/LiveActivities/LiveActivityPolicy.swift in Sources */,
+				0B3A00000000000000000007 /* Services/LiveActivities/LiveActivityPresentation.swift in Sources */,
+				0B3A00000000000000000008 /* Services/LiveActivities/LiveActivitySettings.swift in Sources */,
+				0B3A00000000000000000009 /* Services/LiveActivities/LiveActivityCoordinator.swift in Sources */,
+				0B3A0000000000000000000A /* Features/LiveActivities/LiveActivityPreviewView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1062,8 +1109,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0B0000000000000000000103 /* Services/LiveActivities/OrderActivityAttributes.swift in Sources */,
-				0B0000000000000000000104 /* Widgets/OrderLiveActivityWidget.swift in Sources */,
+				0B4A00000000000000000001 /* Shared/LiveActivities/LiveActivityModels.swift in Sources */,
+				0B4A00000000000000000002 /* Shared/LiveActivities/ActivityDesign.swift in Sources */,
+				0B4A00000000000000000003 /* Shared/LiveActivities/OrderActivityCard.swift in Sources */,
+				0B4A00000000000000000004 /* Shared/LiveActivities/SessionActivityCard.swift in Sources */,
+				0B4A00000000000000000005 /* Shared/LiveActivities/VicuDeepLink.swift in Sources */,
+				0B4A0000000000000000000B /* Widgets/VicuLiveActivitiesBundle.swift in Sources */,
+				0B4A0000000000000000000C /* Widgets/OrderActivityWidget.swift in Sources */,
+				0B4A0000000000000000000D /* Widgets/SessionActivityWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1078,6 +1131,7 @@
 				0C0F90000000000000000101 /* vicuTests/PortfolioIntelligenceTests.swift in Sources */,
 				0C0FA1000000000000000101 /* vicuTests/MarketSearchEngineTests.swift in Sources */,
 				0C0FB1000000000000000101 /* vicuTests/AssetDetailStoreTests.swift in Sources */,
+				0B5A0000000000000000000E /* vicuTests/LiveActivityTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1203,6 +1257,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENTITLEMENTS_REQUIRED = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Vicu;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
@@ -1242,6 +1297,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENTITLEMENTS_REQUIRED = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Vicu;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";

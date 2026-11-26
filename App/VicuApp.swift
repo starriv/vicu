@@ -21,6 +21,7 @@ struct VicuApp: App {
 private struct RootView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
     /// Tab whose icon is drawn as selected. Lags `app.selectedTab` briefly (see `tabIconSwapDelay`);
     /// nil until the first sync so the restored tab never flashes the home icon.
     @State private var displayedSelectedTab: AppTab?
@@ -43,6 +44,18 @@ private struct RootView: View {
         }
         .overlay {
             AppToastOverlay()
+        }
+        .onOpenURL { url in
+            app.handleDeepLink(url)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else {
+                return
+            }
+
+            Task { @MainActor in
+                await app.liveActivities.sceneDidBecomeActive()
+            }
         }
         .environment(\.locale, app.appLanguage.locale)
         .preferredColorScheme(app.appearanceMode.colorScheme)

@@ -150,6 +150,7 @@ extension AppModel {
         let generation = nextCredentialOperationGeneration()
         environment = newEnvironment
         stopAccountEventListeners()
+        await liveActivities.stop()
         connectionDiagnostics = nil
         verifiedCredentialFingerprint = nil
         clearCredentialMessage()
@@ -188,6 +189,7 @@ extension AppModel {
                 services.stockStream.reset(credentials: credentialsToClear)
             }
             stopAccountEventListeners()
+            await liveActivities.stop()
             setCredentials(nil)
             connectionDiagnostics = nil
             verifiedCredentialFingerprint = nil
