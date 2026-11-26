@@ -20,6 +20,10 @@ struct VicuApp: App {
 
 private struct RootView: View {
     @Environment(AppModel.self) private var app
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Tab whose icon is drawn as selected. Lags `app.selectedTab` briefly (see `tabIconSwapDelay`);
+    /// nil until the first sync so the restored tab never flashes the home icon.
+    @State private var displayedSelectedTab: AppTab?
     @State private var ordersNavigationPath: [OrdersRoute] = []
 
     var body: some View {
@@ -45,12 +49,12 @@ private struct RootView: View {
     }
 
     private func appTabs(selection: Binding<AppTab>) -> some View {
-        let activeTab = selection.wrappedValue
+        let iconTab = displayedSelectedTab ?? selection.wrappedValue
 
         return TabView(selection: selection) {
             Tab(
                 L10n.Tab.home,
-                image: AppIcon.Tab.assetName(for: .home, isSelected: activeTab == .home),
+                image: AppIcon.Tab.assetName(for: .home, isSelected: iconTab == .home),
                 value: AppTab.home
             ) {
                 NavigationStack {
@@ -61,7 +65,7 @@ private struct RootView: View {
 
             Tab(
                 L10n.Tab.markets,
-                image: AppIcon.Tab.assetName(for: .markets, isSelected: activeTab == .markets),
+                image: AppIcon.Tab.assetName(for: .markets, isSelected: iconTab == .markets),
                 value: AppTab.markets
             ) {
                 NavigationStack {
@@ -72,7 +76,7 @@ private struct RootView: View {
 
             Tab(
                 L10n.Tab.orders,
-                image: AppIcon.Tab.assetName(for: .orders, isSelected: activeTab == .orders),
+                image: AppIcon.Tab.assetName(for: .orders, isSelected: iconTab == .orders),
                 value: AppTab.orders
             ) {
                 NavigationStack(path: $ordersNavigationPath) {
@@ -89,7 +93,7 @@ private struct RootView: View {
 
             Tab(
                 L10n.Tab.more,
-                image: AppIcon.Tab.assetName(for: .more, isSelected: activeTab == .more),
+                image: AppIcon.Tab.assetName(for: .more, isSelected: iconTab == .more),
                 value: AppTab.more
             ) {
                 NavigationStack {
@@ -101,6 +105,24 @@ private struct RootView: View {
         // Monochrome tab bar only; each tab's content re-applies the app accent
         // so buttons, links and pickers keep the brand color.
         .tint(.primary)
+        .task(id: app.selectedTab) {
+            let targetTab = app.selectedTab
+            guard let currentTab = displayedSelectedTab, !reduceMotion else {
+                // First sync, or no glass morph to wait for.
+                displayedSelectedTab = targetTab
+                return
+            }
+            guard currentTab != targetTab else {
+                return
+            }
+            // Wait for the Liquid Glass tab-selection morph to settle before swapping
+            // custom UITab images so the glass lens doesn't get interrupted mid-stretch.
+            try? await Task.sleep(for: Self.tabIconSwapDelay)
+            guard !Task.isCancelled else {
+                return
+            }
+            displayedSelectedTab = targetTab
+        }
         .task {
             openPendingOrderDetail(app.pendingOrderDetailRequest)
         }
@@ -108,6 +130,9 @@ private struct RootView: View {
             openPendingOrderDetail(request)
         }
     }
+
+    /// Tuned by eye against the iOS 26.0 tab bar selection morph; revisit if the system animation changes.
+    private static let tabIconSwapDelay: Duration = .milliseconds(260)
 
     private func openPendingOrderDetail(_ request: OrderDetailNavigationRequest?) {
         guard let request else {

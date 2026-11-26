@@ -95,16 +95,37 @@ struct AppGlassIconButton: View {
     }
 }
 
+enum AppGlassStyle {
+    /// Light lift shared by circular and capsule glass controls in screen headers.
+    static let controlTint = Color.white.opacity(0.10)
+}
+
 struct AppGlassCircleModifier: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
             content
-                .glassEffect(.regular.tint(Color.white.opacity(0.10)).interactive(), in: .circle)
+                .glassEffect(.regular.tint(AppGlassStyle.controlTint).interactive(), in: .circle)
         } else {
             content
                 .background(.ultraThinMaterial, in: Circle())
                 .overlay {
                     Circle()
+                        .strokeBorder(Color(.separator).opacity(0.16))
+                }
+        }
+    }
+}
+
+struct AppGlassCapsuleModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .glassEffect(.regular.tint(AppGlassStyle.controlTint).interactive(), in: .capsule)
+        } else {
+            content
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay {
+                    Capsule()
                         .strokeBorder(Color(.separator).opacity(0.16))
                 }
         }

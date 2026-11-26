@@ -237,49 +237,59 @@ private struct AssetDetailFixedHeader: View {
                     .scaleEffect(showsTitle ? 1 : 0.96)
             }
         } trailing: {
-            HStack(spacing: 8) {
-                AssetDetailHeaderShareButton(
-                    isPreparing: isPreparingShare,
-                    action: share
-                )
-
-                AppGlassIconButton(
-                    systemImage: isFavorite ? "heart.fill" : "heart",
-                    foregroundColor: isFavorite ? AppTheme.ColorToken.brand : .primary,
-                    accessibilityLabel: L10n.Markets.favorites,
-                    action: toggleFavorite
-                )
-            }
+            AssetDetailHeaderTrailingGroup(
+                isFavorite: isFavorite,
+                isPreparingShare: isPreparingShare,
+                share: share,
+                toggleFavorite: toggleFavorite
+            )
         }
         .animation(.smooth(duration: 0.18), value: showsTitle)
         .animation(.snappy(duration: 0.18), value: connectionStatus?.title)
     }
 }
 
-private struct AssetDetailHeaderShareButton: View {
-    let isPreparing: Bool
-    let action: () -> Void
+private struct AssetDetailHeaderTrailingGroup: View {
+    let isFavorite: Bool
+    let isPreparingShare: Bool
+    let share: () -> Void
+    let toggleFavorite: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            ZStack {
-                if isPreparing {
-                    ProgressView()
-                        .controlSize(.small)
-                        .tint(.primary)
-                } else {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(.primary)
+        HStack(spacing: 0) {
+            Button(action: share) {
+                ZStack {
+                    if isPreparingShare {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(.primary)
+                    } else {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .offset(y: -1)
+                    }
                 }
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
             }
-            .frame(width: 44, height: 44)
-            .contentShape(Circle())
+            .buttonStyle(.plain)
+            .disabled(isPreparingShare)
+            .accessibilityLabel(L10n.Common.share)
+
+            Button(action: toggleFavorite) {
+                Image(systemName: isFavorite ? "heart.fill" : "heart")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(isFavorite ? AppTheme.ColorToken.brand : .primary)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L10n.Markets.favorites)
+            .accessibilityAddTraits(isFavorite ? .isSelected : [])
         }
-        .buttonStyle(.plain)
-        .disabled(isPreparing)
-        .modifier(AppGlassCircleModifier())
-        .accessibilityLabel(L10n.Common.share)
+        .padding(.horizontal, 2)
+        .modifier(AppGlassCapsuleModifier())
     }
 }
 
