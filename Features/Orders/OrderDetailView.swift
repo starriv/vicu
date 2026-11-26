@@ -6,42 +6,56 @@ struct OrderDetailView: View {
     @State private var order: AlpacaOrder
     @State private var loadState: LoadState<AlpacaOrder>
     @State private var isAdditionalExpanded = false
+    /// False while `order` is still the navigation placeholder; failures then need a full-page error state.
+    @State private var hasRealOrder: Bool
+    @State private var isFetching = false
 
     init(order: AlpacaOrder) {
         _order = State(initialValue: order)
         _loadState = State(initialValue: .loaded(order))
+        _hasRealOrder = State(initialValue: true)
     }
 
     init(orderID: String, symbol: String? = nil) {
         let placeholder = AlpacaOrder.navigationPlaceholder(id: orderID, symbol: symbol)
         _order = State(initialValue: placeholder)
         _loadState = State(initialValue: .loading)
+        _hasRealOrder = State(initialValue: false)
     }
 
     var body: some View {
         BasicLayout(L10n.Orders.Detail.navigationTitle, titleDisplayMode: .inline, style: .scroll(spacing: 26)) {
-            VStack(alignment: .leading, spacing: 26) {
-                OrderDetailSection(title: L10n.Orders.Detail.title) {
-                    OrderDetailRows(fields: primaryFields)
+            if isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, minHeight: 280)
+            } else if case .failed(let message) = loadState {
+                ContentUnavailableView {
+                    Label(L10n.Orders.Detail.errorTitle, systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(message)
+                } actions: {
+                    Button(L10n.Orders.Detail.retry) {
+                        Task { await reloadAfterFailure() }
+                    }
+                    .buttonStyle(.bordered)
                 }
+                .frame(maxWidth: .infinity, minHeight: 320)
+            } else {
+                VStack(alignment: .leading, spacing: 26) {
+                    OrderDetailSection(title: L10n.Orders.Detail.title) {
+                        OrderDetailRows(fields: primaryFields)
+                    }
 
-                OrderDisclosureSection(
-                    title: L10n.Orders.Detail.additionalDetails,
-                    isExpanded: $isAdditionalExpanded
-                ) {
-                    OrderDetailRows(fields: additionalFields)
+                    OrderDisclosureSection(
+                        title: L10n.Orders.Detail.additionalDetails,
+                        isExpanded: $isAdditionalExpanded
+                    ) {
+                        OrderDetailRows(fields: additionalFields)
+                    }
                 }
             }
         }
         .toolbar(.hidden, for: .tabBar)
-        .toolbar {
-            if isLoading {
-                ToolbarItem(placement: .topBarTrailing) {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-            }
-        }
         .refreshable {
             await loadOrder()
         }
@@ -237,19 +251,41 @@ struct OrderDetailView: View {
     }
 
     private func loadOrder() async {
-        loadState = .loading
+        // Pull-to-refresh can fire while the initial `.task` fetch is still in flight.
+        guard !isFetching else {
+            return
+        }
+
+        isFetching = true
+        defer { isFetching = false }
 
         do {
             let fetchedOrder = try await app.fetchOrderDetail(orderID: order.id)
             try Task.checkCancellation()
             order = fetchedOrder
+            hasRealOrder = true
             loadState = .loaded(fetchedOrder)
         } catch where error.isOrderDetailCancellation {
-            return
+            // Our own task was cancelled because the view went away; `.task` reloads on reappear.
+            // Otherwise the request was cancelled underneath a visible page, so don't spin forever.
+            guard !Task.isCancelled, !hasRealOrder else {
+                return
+            }
+
+            loadState = .failed(APIErrorDisplayMessage.message(for: error, locale: app.appLanguage.locale))
         } catch {
-            loadState = .loaded(order)
-            toastCenter.showError(error, locale: app.appLanguage.locale)
+            if hasRealOrder {
+                loadState = .loaded(order)
+                toastCenter.showError(error, locale: app.appLanguage.locale)
+            } else {
+                loadState = .failed(APIErrorDisplayMessage.message(for: error, locale: app.appLanguage.locale))
+            }
         }
+    }
+
+    private func reloadAfterFailure() async {
+        loadState = .loading
+        await loadOrder()
     }
 }
 
