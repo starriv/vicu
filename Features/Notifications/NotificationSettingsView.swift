@@ -1,8 +1,10 @@
 import ActivityKit
 import SwiftUI
+import UserNotifications
 
 struct NotificationSettingsView: View {
     @Environment(AppModel.self) private var app
+    @State private var notificationAuthStatus: UNAuthorizationStatus = .authorized
     @State private var liveActivitiesAvailable = true
 
     var body: some View {
@@ -43,8 +45,31 @@ struct NotificationSettingsView: View {
                 }
                 .disabled(!app.notificationPreferences.isEnabled)
                 .opacity(app.notificationPreferences.isEnabled ? 1 : 0.55)
+
+                #if DEBUG
+                NavigationLink {
+                    NotificationPreviewView()
+                } label: {
+                    Text(app.appLanguage.locale.identifier.hasPrefix("zh") ? "通知样式预览" : "Notification Preview")
+                }
+                #endif
             } footer: {
-                Text(L10n.NotificationSettings.footer)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(L10n.NotificationSettings.footer)
+
+                    if notificationAuthStatus == .denied {
+                        Label {
+                            Text(
+                                app.appLanguage.locale.identifier.hasPrefix("zh")
+                                    ? "系统通知权限已关闭，请前往「设置」开启。"
+                                    : "Notifications are turned off in iOS Settings."
+                            )
+                        } icon: {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                        }
+                        .foregroundStyle(AppTheme.ColorToken.warning)
+                    }
+                }
             }
 
             Section {
@@ -99,6 +124,7 @@ struct NotificationSettingsView: View {
         }
         .tint(AppTheme.ColorToken.brand)
         .task {
+            notificationAuthStatus = await app.services.appNotifier.authorizationStatus()
             liveActivitiesAvailable = ActivityAuthorizationInfo().areActivitiesEnabled
         }
     }

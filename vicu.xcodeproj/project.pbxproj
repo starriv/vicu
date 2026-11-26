@@ -161,8 +161,12 @@
 		0A0F5000000000000000007 /* Services/Alpaca/Models/AlpacaOptionModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F5000000000000001007 /* Services/Alpaca/Models/AlpacaOptionModels.swift */; };
 		0A0F5000000000000000008 /* Services/Alpaca/Models/AlpacaNewsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F5000000000000001008 /* Services/Alpaca/Models/AlpacaNewsModels.swift */; };
 		0A0F5000000000000000009 /* Services/Alpaca/Models/AlpacaPortfolioModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F5000000000000001009 /* Services/Alpaca/Models/AlpacaPortfolioModels.swift */; };
-		0A00000000000000000001F2 /* Services/Notifications/AccountActivityNotificationCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F2 /* Services/Notifications/AccountActivityNotificationCenter.swift */; };
-		0A00000000000000000001F3 /* Services/Notifications/AppNotificationTemplates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F3 /* Services/Notifications/AppNotificationTemplates.swift */; };
+		0B7A00000000000000000001 /* Services/Notifications/NotificationSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B6A00000000000000000001 /* Services/Notifications/NotificationSettings.swift */; };
+		0B7A00000000000000000002 /* Services/Notifications/NotificationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B6A00000000000000000002 /* Services/Notifications/NotificationPolicy.swift */; };
+		0B7A00000000000000000003 /* Services/Notifications/NotificationPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B6A00000000000000000003 /* Services/Notifications/NotificationPresentation.swift */; };
+		0B7A00000000000000000004 /* Services/Notifications/NotificationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B6A00000000000000000004 /* Services/Notifications/NotificationCoordinator.swift */; };
+		0B7A00000000000000000005 /* Features/Notifications/NotificationPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B6A00000000000000000005 /* Features/Notifications/NotificationPreviewView.swift */; };
+		0B7A00000000000000000006 /* vicuTests/NotificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B6A00000000000000000006 /* vicuTests/NotificationTests.swift */; };
 		0A00000000000000000001F4 /* Features/Notifications/NotificationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F4 /* Features/Notifications/NotificationSettingsView.swift */; };
 		0A00000000000000000001F5 /* Models/Credentials/CredentialModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F5 /* Models/Credentials/CredentialModels.swift */; };
 		0A00000000000000000001F6 /* Models/Caching/AppModelCacheKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A00000000000000000002F6 /* Models/Caching/AppModelCacheKeys.swift */; };
@@ -408,8 +412,12 @@
 		0A0F5000000000000001007 /* Services/Alpaca/Models/AlpacaOptionModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Alpaca/Models/AlpacaOptionModels.swift; sourceTree = "<group>"; };
 		0A0F5000000000000001008 /* Services/Alpaca/Models/AlpacaNewsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Alpaca/Models/AlpacaNewsModels.swift; sourceTree = "<group>"; };
 		0A0F5000000000000001009 /* Services/Alpaca/Models/AlpacaPortfolioModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Alpaca/Models/AlpacaPortfolioModels.swift; sourceTree = "<group>"; };
-		0A00000000000000000002F2 /* Services/Notifications/AccountActivityNotificationCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Notifications/AccountActivityNotificationCenter.swift; sourceTree = "<group>"; };
-		0A00000000000000000002F3 /* Services/Notifications/AppNotificationTemplates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Notifications/AppNotificationTemplates.swift; sourceTree = "<group>"; };
+		0B6A00000000000000000001 /* Services/Notifications/NotificationSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Notifications/NotificationSettings.swift; sourceTree = "<group>"; };
+		0B6A00000000000000000002 /* Services/Notifications/NotificationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Notifications/NotificationPolicy.swift; sourceTree = "<group>"; };
+		0B6A00000000000000000003 /* Services/Notifications/NotificationPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Notifications/NotificationPresentation.swift; sourceTree = "<group>"; };
+		0B6A00000000000000000004 /* Services/Notifications/NotificationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Notifications/NotificationCoordinator.swift; sourceTree = "<group>"; };
+		0B6A00000000000000000005 /* Features/Notifications/NotificationPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Notifications/NotificationPreviewView.swift; sourceTree = "<group>"; };
+		0B6A00000000000000000006 /* vicuTests/NotificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = vicuTests/NotificationTests.swift; sourceTree = "<group>"; };
 		0A00000000000000000002F4 /* Features/Notifications/NotificationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Notifications/NotificationSettingsView.swift; sourceTree = "<group>"; };
 		0A00000000000000000002F5 /* Models/Credentials/CredentialModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/Credentials/CredentialModels.swift; sourceTree = "<group>"; };
 		0A00000000000000000002F6 /* Models/Caching/AppModelCacheKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models/Caching/AppModelCacheKeys.swift; sourceTree = "<group>"; };
@@ -700,8 +708,12 @@
 				0AF200000000000000000205 /* Services/PageServices/MarketsService.swift */,
 				0AF200000000000000000206 /* Services/PageServices/WatchlistsService.swift */,
 				0AF200000000000000000207 /* Services/PageServices/CredentialConnectionService.swift */,
-				0A00000000000000000002F2 /* Services/Notifications/AccountActivityNotificationCenter.swift */,
-				0A00000000000000000002F3 /* Services/Notifications/AppNotificationTemplates.swift */,
+				0B6A00000000000000000001 /* Services/Notifications/NotificationSettings.swift */,
+				0B6A00000000000000000002 /* Services/Notifications/NotificationPolicy.swift */,
+				0B6A00000000000000000003 /* Services/Notifications/NotificationPresentation.swift */,
+				0B6A00000000000000000004 /* Services/Notifications/NotificationCoordinator.swift */,
+				0B6A00000000000000000005 /* Features/Notifications/NotificationPreviewView.swift */,
+				0B6A00000000000000000006 /* vicuTests/NotificationTests.swift */,
 				0A0000000000000000000232 /* Features/Home/HomeHeroView.swift */,
 				0A0000000000000000000233 /* Features/Home/AccountMetricsView.swift */,
 				0A0000000000000000000234 /* Features/Home/PositionsSummaryView.swift */,
@@ -1081,8 +1093,11 @@
 				0AF200000000000000000105 /* Services/PageServices/MarketsService.swift in Sources */,
 				0AF200000000000000000106 /* Services/PageServices/WatchlistsService.swift in Sources */,
 				0AF200000000000000000107 /* Services/PageServices/CredentialConnectionService.swift in Sources */,
-				0A00000000000000000001F2 /* Services/Notifications/AccountActivityNotificationCenter.swift in Sources */,
-				0A00000000000000000001F3 /* Services/Notifications/AppNotificationTemplates.swift in Sources */,
+				0B7A00000000000000000001 /* Services/Notifications/NotificationSettings.swift in Sources */,
+				0B7A00000000000000000002 /* Services/Notifications/NotificationPolicy.swift in Sources */,
+				0B7A00000000000000000003 /* Services/Notifications/NotificationPresentation.swift in Sources */,
+				0B7A00000000000000000004 /* Services/Notifications/NotificationCoordinator.swift in Sources */,
+				0B7A00000000000000000005 /* Features/Notifications/NotificationPreviewView.swift in Sources */,
 				0A0000000000000000000146 /* Shared/Layouts/BasicLayout.swift in Sources */,
 				0A0000000000000000000147 /* Features/More/MoreView.swift in Sources */,
 				0A0000000000000000000149 /* Features/Settings/SettingsView.swift in Sources */,
@@ -1132,6 +1147,7 @@
 				0C0FA1000000000000000101 /* vicuTests/MarketSearchEngineTests.swift in Sources */,
 				0C0FB1000000000000000101 /* vicuTests/AssetDetailStoreTests.swift in Sources */,
 				0B5A0000000000000000000E /* vicuTests/LiveActivityTests.swift in Sources */,
+				0B7A00000000000000000006 /* vicuTests/NotificationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

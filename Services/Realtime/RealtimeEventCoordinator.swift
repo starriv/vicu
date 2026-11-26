@@ -84,8 +84,9 @@ final class RealtimeEventCoordinator {
 
         activityStreamDisposable = Disposables.create(eventSubscription, refreshSubscription)
 
-        Task {
-            await services.appNotifier.prepare()
+        Task { [weak self] in
+            guard let self else { return }
+            await services.appNotifier.prepare(locale: app?.appLanguage.locale ?? .current)
         }
     }
 
@@ -139,8 +140,9 @@ final class RealtimeEventCoordinator {
 
         tradeEventStreamDisposable = Disposables.create(eventSubscription, refreshSubscription)
 
-        Task {
-            await services.appNotifier.prepare()
+        Task { [weak self] in
+            guard let self else { return }
+            await services.appNotifier.prepare(locale: app?.appLanguage.locale ?? .current)
         }
     }
 
