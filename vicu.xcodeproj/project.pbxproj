@@ -58,7 +58,6 @@
 		0AF300000000000000000101 /* Services/API/APIServiceMiddleware.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AF300000000000000000201 /* Services/API/APIServiceMiddleware.swift */; };
 		0AF300000000000000000102 /* Services/API/APIServiceRx.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AF300000000000000000202 /* Services/API/APIServiceRx.swift */; };
 		0AF400000000000000000101 /* Services/Configuration/AppConfigurationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AF400000000000000000201 /* Services/Configuration/AppConfigurationStore.swift */; };
-		0AF400000000000000000102 /* Services/Configuration/UserDefaultsConfigurationMigrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AF400000000000000000202 /* Services/Configuration/UserDefaultsConfigurationMigrator.swift */; };
 		0AF400000000000000000103 /* Services/Persistence/SQLiteDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AF400000000000000000203 /* Services/Persistence/SQLiteDatabase.swift */; };
 		0AF100000000000000000102 /* Services/Alpaca/AlpacaEndpoints.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AF100000000000000000202 /* Services/Alpaca/AlpacaEndpoints.swift */; };
 		0AF100000000000000000103 /* Services/Alpaca/AlpacaInterceptors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AF100000000000000000203 /* Services/Alpaca/AlpacaInterceptors.swift */; };
@@ -278,7 +277,6 @@
 		0AF300000000000000000201 /* Services/API/APIServiceMiddleware.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/API/APIServiceMiddleware.swift; sourceTree = "<group>"; };
 		0AF300000000000000000202 /* Services/API/APIServiceRx.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/API/APIServiceRx.swift; sourceTree = "<group>"; };
 		0AF400000000000000000201 /* Services/Configuration/AppConfigurationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Configuration/AppConfigurationStore.swift; sourceTree = "<group>"; };
-		0AF400000000000000000202 /* Services/Configuration/UserDefaultsConfigurationMigrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Configuration/UserDefaultsConfigurationMigrator.swift; sourceTree = "<group>"; };
 		0AF400000000000000000203 /* Services/Persistence/SQLiteDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Persistence/SQLiteDatabase.swift; sourceTree = "<group>"; };
 		0AF100000000000000000202 /* Services/Alpaca/AlpacaEndpoints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Alpaca/AlpacaEndpoints.swift; sourceTree = "<group>"; };
 		0AF100000000000000000203 /* Services/Alpaca/AlpacaInterceptors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services/Alpaca/AlpacaInterceptors.swift; sourceTree = "<group>"; };
@@ -608,7 +606,6 @@
 				0AF300000000000000000202 /* Services/API/APIServiceRx.swift */,
 				0A0000000000000000000230 /* Services/App/AppServices.swift */,
 				0AF400000000000000000201 /* Services/Configuration/AppConfigurationStore.swift */,
-				0AF400000000000000000202 /* Services/Configuration/UserDefaultsConfigurationMigrator.swift */,
 				0AF400000000000000000203 /* Services/Persistence/SQLiteDatabase.swift */,
 				0AF200000000000000000201 /* Services/PageServices/HomeService.swift */,
 				0AF200000000000000000202 /* Services/PageServices/PortfolioService.swift */,
@@ -977,7 +974,6 @@
 				0AF300000000000000000102 /* Services/API/APIServiceRx.swift in Sources */,
 				0A0000000000000000000130 /* Services/App/AppServices.swift in Sources */,
 				0AF400000000000000000101 /* Services/Configuration/AppConfigurationStore.swift in Sources */,
-				0AF400000000000000000102 /* Services/Configuration/UserDefaultsConfigurationMigrator.swift in Sources */,
 				0AF400000000000000000103 /* Services/Persistence/SQLiteDatabase.swift in Sources */,
 				0AF200000000000000000101 /* Services/PageServices/HomeService.swift in Sources */,
 				0AF200000000000000000102 /* Services/PageServices/PortfolioService.swift in Sources */,

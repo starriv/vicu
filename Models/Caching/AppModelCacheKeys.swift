@@ -426,7 +426,6 @@ final class SQLitePageCacheStore: PageCacheStoring, @unchecked Sendable {
                 ON page_cache_entries(expires_at);
             """
         )
-        try migrateSchemaIfNeeded(in: database)
     }
 
     private func trimIfNeeded() {
@@ -473,16 +472,6 @@ final class SQLitePageCacheStore: PageCacheStoring, @unchecked Sendable {
             }
         } catch {
             reportFailure(error)
-        }
-    }
-
-    private static func migrateSchemaIfNeeded(in database: SQLiteDatabase) throws {
-        let rows = try database.query("PRAGMA table_info(page_cache_entries)")
-        let columnNames = Set(rows.compactMap { $0.string("name") })
-
-        if !columnNames.contains("last_accessed_at") {
-            try database.executeRaw("ALTER TABLE page_cache_entries ADD COLUMN last_accessed_at REAL;")
-            try database.executeRaw("UPDATE page_cache_entries SET last_accessed_at = cached_at WHERE last_accessed_at IS NULL;")
         }
     }
 

@@ -24,10 +24,6 @@ protocol AppConfigurationStoring: Sendable {
     func optionalValue<Value: Codable & Sendable>(for key: AppConfigurationKey<Value>) -> Value?
     func setValue<Value: Codable & Sendable>(_ value: Value, for key: AppConfigurationKey<Value>)
     func removeValue<Value: Codable & Sendable>(for key: AppConfigurationKey<Value>)
-    // Returns true only when a value has been explicitly written to the local store.
-    // Cloud overrides are intentionally excluded — this is used to gate migration
-    // (has the user ever set a value?) not to reflect the effective resolved value.
-    func hasValue<Value: Codable & Sendable>(for key: AppConfigurationKey<Value>) -> Bool
 }
 
 protocol CloudConfigurationStoring: Sendable {
@@ -83,7 +79,7 @@ enum AppConfigurationKeys {
         static func activityLastEventID(credentials: AlpacaCredentials) -> AppConfigurationKey<String> {
             AppConfigurationKey(
                 namespace: "runtime",
-                name: legacyRealtimeKey(prefix: "alpaca.activity", name: "last_event_id", credentials: credentials),
+                name: realtimeKey(prefix: "alpaca.activity", name: "last_event_id", credentials: credentials),
                 defaultValue: ""
             )
         }
@@ -91,7 +87,7 @@ enum AppConfigurationKeys {
         static func recentActivityRefIDs(credentials: AlpacaCredentials) -> AppConfigurationKey<[String]> {
             AppConfigurationKey(
                 namespace: "runtime",
-                name: legacyRealtimeKey(prefix: "alpaca.activity", name: "recent_ref_ids", credentials: credentials),
+                name: realtimeKey(prefix: "alpaca.activity", name: "recent_ref_ids", credentials: credentials),
                 defaultValue: []
             )
         }
@@ -99,7 +95,7 @@ enum AppConfigurationKeys {
         static func tradeLastEventID(credentials: AlpacaCredentials) -> AppConfigurationKey<String> {
             AppConfigurationKey(
                 namespace: "runtime",
-                name: legacyRealtimeKey(prefix: "alpaca.trade_event", name: "last_event_id", credentials: credentials),
+                name: realtimeKey(prefix: "alpaca.trade_event", name: "last_event_id", credentials: credentials),
                 defaultValue: ""
             )
         }
@@ -107,19 +103,12 @@ enum AppConfigurationKeys {
         static func recentTradeEventIDs(credentials: AlpacaCredentials) -> AppConfigurationKey<[String]> {
             AppConfigurationKey(
                 namespace: "runtime",
-                name: legacyRealtimeKey(prefix: "alpaca.trade_event", name: "recent_event_ids", credentials: credentials),
+                name: realtimeKey(prefix: "alpaca.trade_event", name: "recent_event_ids", credentials: credentials),
                 defaultValue: []
             )
         }
 
-        static func legacyKey<Value: Codable & Sendable>(
-            _ name: String,
-            defaultValue: Value
-        ) -> AppConfigurationKey<Value> {
-            AppConfigurationKey(namespace: "runtime", name: name, defaultValue: defaultValue)
-        }
-
-        private static func legacyRealtimeKey(
+        private static func realtimeKey(
             prefix: String,
             name: String,
             credentials: AlpacaCredentials
@@ -131,14 +120,6 @@ enum AppConfigurationKeys {
                 credentials.keyID
             ].joined(separator: ".")
         }
-    }
-
-    enum Migration {
-        static let userDefaultsV1 = AppConfigurationKey<Bool>(
-            namespace: "migration",
-            name: "user_defaults_configuration_v1",
-            defaultValue: false
-        )
     }
 }
 
@@ -176,11 +157,6 @@ final class CloudControlledConfigurationStore: AppConfigurationStoring {
 
     func removeValue<Value: Codable & Sendable>(for key: AppConfigurationKey<Value>) {
         localStore.removeValue(for: key)
-    }
-
-    // Delegates to the local store only. See AppConfigurationStoring.hasValue.
-    func hasValue<Value: Codable & Sendable>(for key: AppConfigurationKey<Value>) -> Bool {
-        localStore.hasValue(for: key)
     }
 
     func setCloudOverride<Value: Codable & Sendable>(_ value: Value?, for key: AppConfigurationKey<Value>) {
@@ -256,24 +232,6 @@ final class SQLiteAppConfigurationStore: AppConfigurationStoring {
             )
         } catch {
             reportFailure(error)
-        }
-    }
-
-    func hasValue<Value: Codable & Sendable>(for key: AppConfigurationKey<Value>) -> Bool {
-        do {
-            let rows = try database.query(
-                """
-                SELECT 1
-                FROM configuration_values
-                WHERE scope = ? AND namespace = ? AND key = ?
-                LIMIT 1
-                """,
-                bindings: [.text(scope.rawValue), .text(key.namespace), .text(key.name)]
-            )
-            return !rows.isEmpty
-        } catch {
-            reportFailure(error)
-            return false
         }
     }
 
@@ -397,14 +355,6 @@ final class MemoryAppConfigurationStore: AppConfigurationStoring, @unchecked Sen
         lock.unlock()
     }
 
-    func hasValue<Value: Codable & Sendable>(for key: AppConfigurationKey<Value>) -> Bool {
-        let storageID = AppConfigurationStorageID(key)
-        lock.lock()
-        let exists = values[storageID] != nil
-        lock.unlock()
-        return exists
-    }
-
     func clearValues() {
         lock.lock()
         values.removeAll()
@@ -459,7 +409,6 @@ enum AppConfigurationStoreFactory {
             )
         }
 
-        UserDefaultsConfigurationMigrator.migrateIfNeeded(to: store)
         return store
     }
 }
