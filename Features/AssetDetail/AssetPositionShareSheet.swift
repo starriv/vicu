@@ -9,39 +9,88 @@ struct AssetPositionSharePayload: Identifiable {
     let position: AlpacaPosition
 }
 
+enum AssetPositionShareScope: String, CaseIterable, Identifiable {
+    case intraday
+    case position
+
+    var id: String { rawValue }
+
+    func title(locale: Locale) -> String {
+        switch self {
+        case .intraday:
+            L10n.AssetPositionShare.intradayPL(locale: locale)
+        case .position:
+            L10n.AssetPositionShare.positionPL(locale: locale)
+        }
+    }
+
+    func performance(for position: AlpacaPosition) -> AssetPositionSharePerformance {
+        switch self {
+        case .intraday:
+            AssetPositionSharePerformance.intraday(position: position)
+        case .position:
+            AssetPositionSharePerformance.unrealized(position: position)
+        }
+    }
+
+    static func defaultScope(for position: AlpacaPosition) -> AssetPositionShareScope {
+        let intraday = AssetPositionSharePerformance.intraday(position: position)
+        let hasIntradayMovement = abs(intraday.amount ?? 0) > 0.0001 || abs(intraday.percent ?? 0) > 0.000001
+        if hasIntradayMovement {
+            return .intraday
+        }
+
+        let positionPerformance = AssetPositionSharePerformance.unrealized(position: position)
+        let hasPositionValue = positionPerformance.amount != nil || positionPerformance.percent != nil
+        return hasPositionValue ? .position : .intraday
+    }
+}
+
 struct AssetPositionShareSheet: View {
     @Environment(AppToastCenter.self) private var toastCenter
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
     @Environment(\.locale) private var locale
     let payload: AssetPositionSharePayload
+    @State private var selectedScope: AssetPositionShareScope
     @State private var renderedImage: AssetRenderedShareImage?
     @State private var isSavingImage = false
     @State private var didSaveImage = false
     @State private var saveAlert: AssetShareSaveAlert?
 
+    private static let contentMaxWidth: CGFloat = 356
+
+    init(payload: AssetPositionSharePayload) {
+        self.payload = payload
+        _selectedScope = State(initialValue: AssetPositionShareScope.defaultScope(for: payload.position))
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 22) {
+                VStack(spacing: 16) {
+                    scopePicker
                     preview
                     shareActions
                 }
                 .padding(.horizontal, AppTheme.Spacing.pageHorizontal)
-                .padding(.top, 12)
-                .padding(.bottom, 26)
+                .padding(.top, 8)
+                .padding(.bottom, 24)
                 .background(Color.clear)
             }
             .scrollBounceBehavior(.basedOnSize)
             .background(Color.clear)
             .scrollContentBackground(.hidden)
-            .task(id: "\(payload.id)-\(locale.identifier)-\(colorScheme)") {
+            .task(id: "\(payload.id)-\(selectedScope.rawValue)-\(locale.identifier)-\(colorScheme)") {
                 await Task.yield()
                 guard !Task.isCancelled else {
                     return
                 }
 
                 renderShareImage()
+            }
+            .onChange(of: selectedScope) { _, _ in
+                didSaveImage = false
             }
             .alert(item: $saveAlert) { alert in
                 if alert.showsSettingsButton {
@@ -73,6 +122,20 @@ struct AssetPositionShareSheet: View {
         }
     }
 
+    private var scopePicker: some View {
+        Picker("", selection: $selectedScope) {
+            ForEach(AssetPositionShareScope.allCases) { scope in
+                Text(scope.title(locale: locale))
+                    .tag(scope)
+            }
+        }
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        // Switching scope mid-save would swap the preview while the old card is still being written.
+        .disabled(isSavingImage)
+        .frame(maxWidth: Self.contentMaxWidth)
+    }
+
     @ViewBuilder
     private var preview: some View {
         if let renderedImage {
@@ -84,7 +147,7 @@ struct AssetPositionShareSheet: View {
                     RoundedRectangle(cornerRadius: 28, style: .continuous)
                         .strokeBorder(Color(.separator).opacity(0.16))
                 }
-                .frame(maxWidth: 370)
+                .frame(maxWidth: Self.contentMaxWidth)
                 .accessibilityLabel(L10n.AssetPositionShare.previewAccessibility)
         } else {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
@@ -93,7 +156,7 @@ struct AssetPositionShareSheet: View {
                 .overlay {
                     ProgressView()
                 }
-                .frame(maxWidth: 370)
+                .frame(maxWidth: Self.contentMaxWidth)
         }
     }
 
@@ -137,13 +200,12 @@ struct AssetPositionShareSheet: View {
                 )
             }
         }
-        .frame(maxWidth: 370)
+        .frame(maxWidth: Self.contentMaxWidth)
     }
 
     @MainActor
     private func renderShareImage() {
-        renderedImage = nil
-        let content = AssetPositionShareCard(payload: payload, locale: locale)
+        let content = AssetPositionShareCard(payload: payload, scope: selectedScope, locale: locale)
             .frame(width: 540, height: 675)
             .environment(\.colorScheme, colorScheme)
             .environment(\.locale, locale)
@@ -166,6 +228,7 @@ struct AssetPositionShareSheet: View {
             return
         }
 
+        let savingScope = selectedScope
         isSavingImage = true
         didSaveImage = false
         defer { isSavingImage = false }
@@ -178,7 +241,7 @@ struct AssetPositionShareSheet: View {
 
         do {
             try await AssetSharePhotoLibraryWriter.writePNGData(renderedImage.pngData)
-            didSaveImage = true
+            didSaveImage = selectedScope == savingScope
         } catch {
             toastCenter.showErrorMessage(L10n.AssetPositionShare.saveFailed(locale: locale))
         }
@@ -208,30 +271,19 @@ struct AssetPositionShareSheet: View {
 private struct AssetPositionShareCard: View {
     @Environment(\.colorScheme) private var colorScheme
     let payload: AssetPositionSharePayload
+    let scope: AssetPositionShareScope
     let locale: Locale
 
-    private var intradayPerformance: AssetPositionSharePerformance {
-        AssetPositionSharePerformance.intraday(position: payload.position)
-    }
-
-    private var unrealizedPerformance: AssetPositionSharePerformance {
-        AssetPositionSharePerformance.unrealized(position: payload.position)
+    private var performance: AssetPositionSharePerformance {
+        scope.performance(for: payload.position)
     }
 
     private var isPositive: Bool {
-        intradayPerformance.isPositive
+        performance.isPositive
     }
 
     private var tint: Color {
         isPositive ? AppTheme.ColorToken.positive : AppTheme.ColorToken.negative
-    }
-
-    private var unrealizedTint: Color {
-        guard let amount = unrealizedPerformance.amount else {
-            return style.primaryText
-        }
-
-        return amount >= 0 ? AppTheme.ColorToken.positive : AppTheme.ColorToken.negative
     }
 
     private var style: ShareCardStyle {
@@ -248,19 +300,19 @@ private struct AssetPositionShareCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 header
 
-                Spacer(minLength: 20)
+                Spacer(minLength: 26)
 
                 performanceBlock
 
-                Spacer(minLength: 22)
+                Spacer(minLength: 28)
 
-                metricsCard
+                priceStrip
 
                 ShareCardFooter(
                     timestampText: Date.now.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(locale)),
                     style: style
                 )
-                .padding(.top, 24)
+                .padding(.top, 26)
             }
             .padding(40)
         }
@@ -299,13 +351,13 @@ private struct AssetPositionShareCard: View {
 
     private var performanceBlock: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(L10n.AssetPositionShare.intradayPL(locale: locale))
+            Text(scope.title(locale: locale))
                 .font(.system(size: 14, weight: .bold, design: .rounded))
                 .foregroundStyle(style.metricTitleText)
                 .lineLimit(1)
 
-            Text(AppFormatter.signedMoney(intradayPerformance.amount))
-                .font(.system(size: 82, weight: .black, design: .rounded))
+            Text(AppFormatter.signedMoney(performance.amount))
+                .font(.system(size: 84, weight: .black, design: .rounded))
                 .monospacedDigit()
                 .tracking(-1.5)
                 .foregroundStyle(tint)
@@ -317,7 +369,7 @@ private struct AssetPositionShareCard: View {
                 Image(systemName: isPositive ? "arrow.up.right" : "arrow.down.right")
                     .font(.system(size: 15, weight: .bold))
 
-                Text(AppFormatter.signedPercent(intradayPerformance.percent, fractionLength: 2))
+                Text(AppFormatter.signedPercent(performance.percent, fractionLength: 2))
                     .font(.system(size: 22, weight: .bold, design: .rounded))
                     .monospacedDigit()
             }
@@ -325,71 +377,36 @@ private struct AssetPositionShareCard: View {
             .lineLimit(1)
             .minimumScaleFactor(0.68)
             .padding(.horizontal, 15)
-            .frame(height: 38)
+            .frame(height: 40)
             .background(style.pillBackground, in: Capsule())
             .overlay {
                 Capsule()
                     .strokeBorder(style.metricBorder, lineWidth: 1)
             }
-            .padding(.top, 12)
+            .padding(.top, 14)
         }
     }
 
-    private var metricsCard: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text(L10n.AssetPositionShare.unrealizedPL(locale: locale))
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(style.metricTitleText)
-                    .lineLimit(1)
-
-                Spacer(minLength: 8)
-
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(AppFormatter.signedMoney(unrealizedPerformance.amount))
-                        .font(.system(size: 22, weight: .black, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(unrealizedTint)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.64)
-
-                    if let unrealizedPercent = unrealizedPerformance.percent {
-                        Text(AppFormatter.signedPercent(unrealizedPercent, fractionLength: 2))
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundStyle(style.secondaryText)
-                            .lineLimit(1)
-                    }
-                }
-            }
-            .padding(.vertical, 16)
-            .padding(.horizontal, 20)
+    private var priceStrip: some View {
+        HStack(spacing: 0) {
+            AssetPositionSharePriceColumn(
+                title: L10n.AssetPositionShare.entryPrice(locale: locale),
+                value: AppFormatter.money(payload.position.averageEntryPrice),
+                style: style
+            )
 
             Rectangle()
                 .fill(style.divider)
-                .frame(height: 1)
-                .padding(.horizontal, 20)
+                .frame(width: 1)
+                .padding(.vertical, 14)
 
-            HStack(spacing: 0) {
-                AssetPositionSharePriceColumn(
-                    title: L10n.AssetPositionShare.entryPrice(locale: locale),
-                    value: AppFormatter.money(payload.position.averageEntryPrice),
-                    style: style
-                )
-
-                Rectangle()
-                    .fill(style.divider)
-                    .frame(width: 1)
-                    .padding(.vertical, 14)
-
-                AssetPositionSharePriceColumn(
-                    title: L10n.AssetPositionShare.latestPrice(locale: locale),
-                    value: AppFormatter.money(payload.position.currentPrice),
-                    style: style
-                )
-            }
-            .fixedSize(horizontal: false, vertical: true)
+            AssetPositionSharePriceColumn(
+                title: L10n.AssetPositionShare.latestPrice(locale: locale),
+                value: AppFormatter.money(payload.position.currentPrice),
+                style: style
+            )
         }
+        .fixedSize(horizontal: false, vertical: true)
         .background(style.metricBackground, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 22, style: .continuous)

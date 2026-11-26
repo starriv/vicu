@@ -909,8 +909,8 @@ enum L10n {
         static func saveFailed(locale: Locale) -> String { L10n.string("asset_position_share.save_failed", locale: locale) }
         static func entryPrice(locale: Locale) -> String { L10n.string("asset_position_share.entry_price", locale: locale) }
         static func latestPrice(locale: Locale) -> String { L10n.string("asset_position_share.latest_price", locale: locale) }
-        static func intradayPL(locale: Locale) -> String { L10n.string("position_detail.intraday_pl", locale: locale) }
-        static func unrealizedPL(locale: Locale) -> String { L10n.string("position_detail.unrealized_pl", locale: locale) }
+        static func intradayPL(locale: Locale) -> String { L10n.string("asset_position_share.intraday_pl", locale: locale) }
+        static func positionPL(locale: Locale) -> String { L10n.string("asset_position_share.position_pl", locale: locale) }
     }
 
     enum AssetShare {

@@ -2726,6 +2726,22 @@
         }
       }
     },
+    "asset_position_share.intraday_pl": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today's P/L"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当日盈亏"
+          }
+        }
+      }
+    },
     "asset_position_share.latest_price": {
       "extractionState": "stale",
       "localizations": {
@@ -2875,6 +2891,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "照片访问受限"
+          }
+        }
+      }
+    },
+    "asset_position_share.position_pl": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Position P/L"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "持仓盈亏"
           }
         }
       }

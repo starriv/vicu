@@ -2,7 +2,7 @@ import XCTest
 @testable import vicu
 
 final class AssetPositionSharePerformanceTests: XCTestCase {
-    func testSharePerformanceUsesCumulativeUnrealizedProfitLoss() {
+    func testSharePerformanceUsesUnrealizedProfitLoss() {
         let position = makePosition(
             unrealizedPL: "120.00",
             unrealizedPLPC: "0.25",
@@ -28,6 +28,51 @@ final class AssetPositionSharePerformanceTests: XCTestCase {
 
         XCTAssertEqual(performance.amount ?? .nan, 250.0, accuracy: 0.0001)
         XCTAssertEqual(performance.percent ?? .nan, 0.25, accuracy: 0.0001)
+    }
+
+    func testDefaultScopeUsesPositionWhenIntradayIsZero() {
+        let position = makePosition(
+            unrealizedPL: "240.00",
+            unrealizedPLPC: "0.24",
+            unrealizedIntradayPL: "0.00",
+            unrealizedIntradayPLPC: "0.00"
+        )
+
+        XCTAssertEqual(AssetPositionShareScope.defaultScope(for: position), .position)
+    }
+
+    func testDefaultScopeUsesIntradayWhenIntradayHasMovement() {
+        let position = makePosition(
+            unrealizedPL: "240.00",
+            unrealizedPLPC: "0.24",
+            unrealizedIntradayPL: "12.50",
+            unrealizedIntradayPLPC: "0.012"
+        )
+
+        XCTAssertEqual(AssetPositionShareScope.defaultScope(for: position), .intraday)
+    }
+
+    func testDefaultScopeUsesIntradayWhenOnlyPercentMoves() {
+        let position = makePosition(
+            unrealizedPL: "240.00",
+            unrealizedPLPC: "0.24",
+            unrealizedIntradayPL: "0.00",
+            unrealizedIntradayPLPC: "0.0005"
+        )
+
+        XCTAssertEqual(AssetPositionShareScope.defaultScope(for: position), .intraday)
+    }
+
+    func testDefaultScopeFallsBackToIntradayWhenNoPerformanceIsAvailable() {
+        let position = makePosition(
+            marketValue: nil,
+            costBasis: nil,
+            currentPrice: nil,
+            lastDayPrice: nil,
+            changeToday: nil
+        )
+
+        XCTAssertEqual(AssetPositionShareScope.defaultScope(for: position), .intraday)
     }
 
     private func makePosition(

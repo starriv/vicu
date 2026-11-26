@@ -155,7 +155,7 @@ struct AssetDetailView: View {
         }
         .sheet(item: $positionSharePayload) { payload in
             AssetPositionShareSheet(payload: payload)
-                .presentationDetents([.height(680)])
+                .presentationDetents([.height(700)])
                 .presentationDragIndicator(.visible)
         }
     }
