@@ -1131,7 +1131,6 @@ enum L10n {
     enum Tab {
         static var home: LocalizedStringKey { "tab.home" }
         static var markets: LocalizedStringKey { "tab.markets" }
-        static var search: LocalizedStringKey { "tab.search" }
         static var orders: LocalizedStringKey { "tab.orders" }
         static var trade: LocalizedStringKey { "tab.trade" }
         static var more: LocalizedStringKey { "tab.more" }

@@ -10,7 +10,7 @@ struct AppAccountAvatar: View {
     }
 
     var body: some View {
-        Image(AppIcon.Tab.home)
+        Image(AppIcon.Account.avatar)
             .renderingMode(.template)
             .resizable()
             .scaledToFit()

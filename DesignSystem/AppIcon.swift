@@ -1,10 +1,26 @@
 enum AppIcon {
     enum Tab {
-        static let home = "AlpacaTabIcon"
-        static let markets = "chart.line.uptrend.xyaxis"
-        static let search = "magnifyingglass"
-        static let orders = "list.bullet.rectangle"
-        static let more = "ellipsis.circle"
+        static let home = "TabHome"
+        static let homeFilled = "TabHomeFilled"
+        static let markets = "TabMarkets"
+        static let marketsFilled = "TabMarketsFilled"
+        static let orders = "TabOrders"
+        static let ordersFilled = "TabOrdersFilled"
+        static let more = "TabMore"
+        static let moreFilled = "TabMoreFilled"
+
+        static func assetName(for tab: AppTab, isSelected: Bool) -> String {
+            switch tab {
+            case .home:
+                return isSelected ? homeFilled : home
+            case .markets:
+                return isSelected ? marketsFilled : markets
+            case .orders:
+                return isSelected ? ordersFilled : orders
+            case .more:
+                return isSelected ? moreFilled : more
+            }
+        }
     }
 
     enum Portfolio {
@@ -27,6 +43,7 @@ enum AppIcon {
     }
 
     enum Account {
+        static let avatar = "AlpacaTabIcon"
         static let profile = "person.crop.circle.fill"
         static let buyingPower = "creditcard"
         static let cash = "dollarsign.circle"

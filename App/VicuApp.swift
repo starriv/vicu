@@ -20,13 +20,7 @@ struct VicuApp: App {
 
 private struct RootView: View {
     @Environment(AppModel.self) private var app
-    @State private var searchText = ""
-    @State private var searchPlaceholderSymbol = AppModel.searchPlaceholderFallbackSymbol
-    @State private var searchNavigationPath: [SearchRoute] = []
     @State private var ordersNavigationPath: [OrdersRoute] = []
-    @State private var searchSubmitID = 0
-    @State private var isSearchQueryPendingSubmit = false
-    @State private var isSearchPresented = false
 
     var body: some View {
         @Bindable var app = app
@@ -51,20 +45,36 @@ private struct RootView: View {
     }
 
     private func appTabs(selection: Binding<AppTab>) -> some View {
-        TabView(selection: selection) {
-            Tab(L10n.Tab.home, image: AppIcon.Tab.home, value: AppTab.home) {
+        let activeTab = selection.wrappedValue
+
+        return TabView(selection: selection) {
+            Tab(
+                L10n.Tab.home,
+                image: AppIcon.Tab.assetName(for: .home, isSelected: activeTab == .home),
+                value: AppTab.home
+            ) {
                 NavigationStack {
                     HomeView()
                 }
+                .tint(.accentColor)
             }
 
-            Tab(L10n.Tab.markets, systemImage: AppIcon.Tab.markets, value: AppTab.markets) {
+            Tab(
+                L10n.Tab.markets,
+                image: AppIcon.Tab.assetName(for: .markets, isSelected: activeTab == .markets),
+                value: AppTab.markets
+            ) {
                 NavigationStack {
                     MarketsView()
                 }
+                .tint(.accentColor)
             }
 
-            Tab(L10n.Tab.orders, systemImage: AppIcon.Tab.orders, value: AppTab.orders) {
+            Tab(
+                L10n.Tab.orders,
+                image: AppIcon.Tab.assetName(for: .orders, isSelected: activeTab == .orders),
+                value: AppTab.orders
+            ) {
                 NavigationStack(path: $ordersNavigationPath) {
                     OrdersView()
                         .navigationDestination(for: OrdersRoute.self) { route in
@@ -74,70 +84,29 @@ private struct RootView: View {
                             }
                         }
                 }
+                .tint(.accentColor)
             }
 
-            Tab(L10n.Tab.more, systemImage: AppIcon.Tab.more, value: AppTab.more) {
+            Tab(
+                L10n.Tab.more,
+                image: AppIcon.Tab.assetName(for: .more, isSelected: activeTab == .more),
+                value: AppTab.more
+            ) {
                 NavigationStack {
                     MoreView()
                 }
-            }
-
-            Tab(L10n.Tab.search, systemImage: AppIcon.Tab.search, value: AppTab.search, role: .search) {
-                NavigationStack(path: $searchNavigationPath) {
-                    MarketSearchView(
-                        query: searchTextBinding,
-                        presentation: .globalTab,
-                        submitID: searchSubmitID,
-                        isExternalQueryPendingSubmit: isSearchQueryPendingSubmit,
-                        openAsset: openSearchAssetDetail(_:)
-                    )
-                    .navigationDestination(for: SearchRoute.self) { route in
-                        switch route {
-                        case .asset(let symbol):
-                            AssetDetailView(symbol: symbol)
-                                .onAppear {
-                                    finishSearchAssetNavigation(symbol)
-                                }
-                        }
-                    }
-                }
-                .searchable(text: searchTextBinding, isPresented: $isSearchPresented, prompt: Text(searchPlaceholderSymbol))
-                .keyboardType(.asciiCapable)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.search)
-                .onSubmit(of: .search) {
-                    submitSearch()
-                }
+                .tint(.accentColor)
             }
         }
+        // Monochrome tab bar only; each tab's content re-applies the app accent
+        // so buttons, links and pickers keep the brand color.
+        .tint(.primary)
         .task {
-            // Handle navigation first so a notification deep link is not delayed
-            // by the placeholder network request.
             openPendingOrderDetail(app.pendingOrderDetailRequest)
-            if app.selectedTab == .search {
-                activateSearchTab()
-            }
-            await refreshSearchPlaceholderSymbol()
         }
         .onChange(of: app.pendingOrderDetailRequest) { _, request in
             openPendingOrderDetail(request)
         }
-        .onChange(of: app.selectedTab) { _, selectedTab in
-            guard selectedTab == .search else {
-                isSearchPresented = false
-                return
-            }
-
-            activateSearchTab()
-        }
-    }
-
-    private var searchTextBinding: Binding<String> {
-        Binding(
-            get: { searchText },
-            set: { updateSearchText($0, isUserEdit: true) }
-        )
     }
 
     private func openPendingOrderDetail(_ request: OrderDetailNavigationRequest?) {
@@ -151,63 +120,6 @@ private struct RootView: View {
         ordersNavigationPath = [.orderDetail(request)]
         app.consumeOrderDetailRequest(request)
     }
-
-    private func refreshSearchPlaceholderSymbol() async {
-        let symbol = await app.fetchSearchPlaceholderSymbol()
-        searchPlaceholderSymbol = symbol
-    }
-
-    private func activateSearchTab() {
-        guard searchNavigationPath.isEmpty else {
-            isSearchPresented = false
-            return
-        }
-
-        isSearchPresented = true
-    }
-
-    private func submitSearch() {
-        let normalizedSearchText = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalizedSearchText.isEmpty else {
-            isSearchQueryPendingSubmit = false
-            return
-        }
-
-        if searchText != normalizedSearchText {
-            updateSearchText(normalizedSearchText, isUserEdit: false)
-        }
-        isSearchQueryPendingSubmit = false
-        searchSubmitID += 1
-    }
-
-    private func updateSearchText(_ newValue: String, isUserEdit: Bool) {
-        if isUserEdit, newValue != searchText {
-            isSearchQueryPendingSubmit = !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        }
-
-        searchText = newValue
-    }
-
-    private func openSearchAssetDetail(_ symbol: String) {
-        let normalizedSymbol = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        guard !normalizedSymbol.isEmpty else {
-            return
-        }
-
-        searchNavigationPath.append(.asset(normalizedSymbol))
-    }
-
-    private func finishSearchAssetNavigation(_ symbol: String) {
-        guard searchNavigationPath.contains(.asset(symbol)) else {
-            return
-        }
-
-        isSearchPresented = false
-    }
-}
-
-private enum SearchRoute: Hashable {
-    case asset(String)
 }
 
 private enum OrdersRoute: Hashable {
