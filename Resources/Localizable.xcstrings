@@ -9156,6 +9156,22 @@
         }
       }
     },
+    "portfolio.chart_performance_accessibility": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Portfolio performance chart"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "投资组合业绩图表"
+          }
+        }
+      }
+    },
     "portfolio.empty.connect_action": {
       "localizations": {
         "en": {
@@ -9232,6 +9248,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "还没有历史数据"
+          }
+        }
+      }
+    },
+    "portfolio.mode.performance": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Performance"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "业绩"
+          }
+        }
+      }
+    },
+    "portfolio.mode.picker_accessibility": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Portfolio display mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "投资组合展示模式"
+          }
+        }
+      }
+    },
+    "portfolio.mode.value": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Value"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "价值"
           }
         }
       }

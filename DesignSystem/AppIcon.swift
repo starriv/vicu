@@ -27,6 +27,8 @@ enum AppIcon {
         static let connected = "checkmark.seal.fill"
         static let warning = "exclamationmark.triangle.fill"
         static let history = "chart.xyaxis.line"
+        static let modeValue = "dollarsign"
+        static let modePerformance = "percent"
         static let missingCredentials = "key.slash"
         static let allocation = "chart.pie.fill"
         static let leverage = "gauge.with.dots.needle.67percent"

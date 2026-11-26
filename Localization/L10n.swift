@@ -182,8 +182,12 @@ enum L10n {
     enum Portfolio {
         static var title: LocalizedStringKey { "portfolio.title" }
         static var yourPortfolio: LocalizedStringKey { "portfolio.your_portfolio" }
+        static var modeValue: LocalizedStringKey { "portfolio.mode.value" }
+        static var modePerformance: LocalizedStringKey { "portfolio.mode.performance" }
+        static var modePickerAccessibility: LocalizedStringKey { "portfolio.mode.picker_accessibility" }
         static var refreshAccessibility: LocalizedStringKey { "portfolio.refresh_accessibility" }
         static var chartAccessibility: LocalizedStringKey { "portfolio.chart_accessibility" }
+        static var performanceChartAccessibility: LocalizedStringKey { "portfolio.chart_performance_accessibility" }
     }
 
     enum HomeAI {

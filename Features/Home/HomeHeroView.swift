@@ -4,7 +4,7 @@ struct HomeHeroView: View {
     @Environment(AppModel.self) private var app
     var showsInitialSkeleton = false
 
-    @State private var chartMode: PortfolioChartMode = .equity
+    @State private var chartMode: PortfolioChartMode = .value
     @State private var chartSelection: PortfolioChartSelection?
     @State private var isChartScrubbing = false
 
@@ -37,23 +37,27 @@ struct HomeHeroView: View {
     }
 
     private func rangeChange(from history: [NormalizedPortfolioHistoryPoint]) -> PortfolioRangeChange {
-        PortfolioRangeChange(amount: history.last?.profitLoss, percent: history.last?.profitLossPercent)
+        guard let latest = history.last else {
+            return PortfolioRangeChange(amount: nil, percent: nil)
+        }
+        return PortfolioRangeChange(
+            amount: latest.profitLoss,
+            percent: PortfolioPerformanceSeries.ratio(for: latest)
+        )
     }
 
-    private func displayedHeroAmount(
-        from history: [NormalizedPortfolioHistoryPoint],
-        resolvedChange: PortfolioRangeChange
-    ) -> Double? {
+    private func displayedPortfolioValue(from history: [NormalizedPortfolioHistoryPoint]) -> Double? {
         if let selectedValue = chartSelection?.point.value {
             return selectedValue
         }
+        return portfolioValue(from: history)
+    }
 
-        switch chartMode {
-        case .equity:
-            return portfolioValue(from: history)
-        case .profitLoss:
-            return resolvedChange.amount
+    private func displayedPerformancePercent(resolvedChange: PortfolioRangeChange) -> Double? {
+        if let selectedValue = chartSelection?.point.value {
+            return selectedValue
         }
+        return resolvedChange.percent
     }
 
     private func displayedRangeChange(resolvedChange: PortfolioRangeChange) -> PortfolioRangeChange {
@@ -61,24 +65,27 @@ struct HomeHeroView: View {
             return resolvedChange
         }
 
-        return PortfolioRangeChange(amount: chartSelection.point.profitLoss, percent: chartSelection.point.profitLossPercent)
+        return PortfolioRangeChange(
+            amount: chartSelection.point.profitLoss,
+            percent: chartSelection.point.profitLossPercent
+        )
     }
 
     private func changeColor(for change: PortfolioRangeChange) -> Color {
-        guard let amount = change.amount else {
-            return .secondary
+        if let amount = change.amount {
+            return amount >= 0 ? AppTheme.ColorToken.positive : AppTheme.ColorToken.negative
         }
-
-        return amount >= 0 ? AppTheme.ColorToken.positive : AppTheme.ColorToken.negative
+        if let percent = change.percent {
+            return percent >= 0 ? AppTheme.ColorToken.positive : AppTheme.ColorToken.negative
+        }
+        return .secondary
     }
 
-    private func heroAmountColor(for heroAmount: Double?) -> Color {
-        guard chartMode == .profitLoss,
-              let amount = heroAmount else {
-            return .primary
+    private func performanceColor(for percent: Double?) -> Color {
+        guard let percent else {
+            return .secondary
         }
-
-        return amount >= 0 ? AppTheme.ColorToken.positive : AppTheme.ColorToken.negative
+        return percent >= 0 ? AppTheme.ColorToken.positive : AppTheme.ColorToken.negative
     }
 
     var body: some View {
@@ -102,42 +109,68 @@ struct HomeHeroView: View {
         let normalized = computeNormalizedHistory(now: referenceNow)
         let resolvedChange = rangeChange(from: normalized)
         let displayedChange = displayedRangeChange(resolvedChange: resolvedChange)
-        let heroAmount = displayedHeroAmount(from: normalized, resolvedChange: displayedChange)
 
         return VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
-                AppPriceText(
-                    heroAmount,
-                    font: AppTypography.heroValue,
-                    minimumScaleFactor: 0.82,
-                    isAnimated: true,
-                    animationDuration: chartSelection == nil ? 0.18 : 0.08,
-                    isSigned: chartMode == .profitLoss,
-                    notation: .compact,
-                    usesCompactFormatting: chartMode == .profitLoss
-                )
-                .foregroundStyle(heroAmountColor(for: heroAmount))
-                .frame(maxWidth: .infinity, alignment: .leading)
+                if #unavailable(iOS 26.0), app.environment == .paper {
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(AppTheme.ColorToken.brandDark)
+                            .frame(width: 6, height: 6)
 
-                HStack(spacing: 8) {
-                    Text(AppFormatter.signedCompactMoney(displayedChange.amount))
-                    Text("(\(AppFormatter.signedPercent(displayedChange.percent)))")
-                    Text(app.portfolio.historyRange.title)
-                        .foregroundStyle(.secondary)
-
-                    Spacer(minLength: 8)
-
-                    if app.environment == .paper {
                         Text(L10n.AccountDetail.paperBadge)
                             .font(AppTypography.caption.weight(.medium))
-                            .foregroundStyle(Color(.secondaryLabel))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Color(.tertiarySystemFill), in: Capsule())
+                            .foregroundStyle(.secondary)
                     }
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 3)
+                    .background(Color(.tertiarySystemFill), in: Capsule())
                 }
-                .font(AppTypography.heroDelta)
-                .foregroundStyle(changeColor(for: displayedChange))
+
+                switch chartMode {
+                case .value:
+                    let heroValue = displayedPortfolioValue(from: normalized)
+
+                    AppPriceText(
+                        heroValue,
+                        font: AppTypography.heroValue,
+                        minimumScaleFactor: 0.82,
+                        isAnimated: true,
+                        animationDuration: chartSelection == nil ? 0.18 : 0.08,
+                        notation: .compact,
+                        usesCompactFormatting: false
+                    )
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    HStack(spacing: 8) {
+                        Text(AppFormatter.signedCompactMoney(displayedChange.amount))
+                        Text("(\(AppFormatter.signedPercent(displayedChange.percent)))")
+                        Text(app.portfolio.historyRange.title)
+                            .foregroundStyle(.secondary)
+                            .opacity(chartSelection == nil ? 1 : 0)
+                    }
+                    .font(AppTypography.heroDelta)
+                    .foregroundStyle(changeColor(for: displayedChange))
+
+                case .performance:
+                    let heroPercent = displayedPerformancePercent(resolvedChange: displayedChange)
+
+                    Text(AppFormatter.signedPercent(heroPercent))
+                        .font(AppTypography.heroValue)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+                        .foregroundStyle(performanceColor(for: heroPercent))
+                        .contentTransition(.numericText(value: heroPercent ?? 0))
+                        .animation(.snappy(duration: chartSelection == nil ? 0.18 : 0.08), value: heroPercent)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Text(app.portfolio.historyRange.title)
+                        .font(AppTypography.heroDelta)
+                        .foregroundStyle(.secondary)
+                        .opacity(chartSelection == nil ? 1 : 0)
+                }
             }
 
             PortfolioChartView(
@@ -188,28 +221,47 @@ private struct PortfolioRangeChange: Equatable {
     let percent: Double?
 }
 
-private enum PortfolioChartMode: String, CaseIterable, Identifiable {
-    case equity
-    case profitLoss
+enum PortfolioChartMode: String, CaseIterable, Identifiable {
+    case value
+    case performance
 
     var id: String { rawValue }
 
     var icon: String {
         switch self {
-        case .equity:
-            AppIcon.Portfolio.history
-        case .profitLoss:
-            "chart.line.uptrend.xyaxis"
+        case .value:
+            AppIcon.Portfolio.modeValue
+        case .performance:
+            AppIcon.Portfolio.modePerformance
         }
     }
 
-    var title: String {
+    var title: LocalizedStringKey {
         switch self {
-        case .equity:
-            "Equity"
-        case .profitLoss:
-            "P/L"
+        case .value:
+            L10n.Portfolio.modeValue
+        case .performance:
+            L10n.Portfolio.modePerformance
         }
+    }
+}
+
+enum PortfolioPerformanceSeries {
+    static func ratio(for point: NormalizedPortfolioHistoryPoint) -> Double? {
+        if let pct = point.profitLossPercent, pct.isFinite {
+            return pct
+        }
+        guard let pl = point.profitLoss, pl.isFinite else {
+            return nil
+        }
+        let impliedBase = point.equity - pl
+        if impliedBase > 0.01 {
+            return pl / impliedBase
+        }
+        if abs(pl) <= 1e-9 {
+            return 0
+        }
+        return nil
     }
 }
 
@@ -308,7 +360,11 @@ private struct PortfolioChartView: View {
         ) { point in
             PortfolioChartDateLabelFormatter.string(from: point.date, range: range, locale: locale)
         }
-        .accessibilityLabel(L10n.Portfolio.chartAccessibility)
+        .accessibilityLabel(
+            mode == .value
+                ? L10n.Portfolio.chartAccessibility
+                : L10n.Portfolio.performanceChartAccessibility
+        )
     }
 
     private func clearSelection() {
@@ -336,7 +392,7 @@ private final class PortfolioChartSeriesCache {
         let firstTimestamp: TimeInterval?
         let lastTimestamp: TimeInterval?
         let lastEquity: Double?
-        let lastProfitLoss: Double?
+        let lastPerformanceRatio: Double?
         let checksum: Int
     }
 
@@ -354,10 +410,10 @@ private final class PortfolioChartSeriesCache {
         for point in history {
             hasher.combine(point.date.timeIntervalSince1970)
             switch mode {
-            case .equity:
+            case .value:
                 hasher.combine(point.equity)
-            case .profitLoss:
-                hasher.combine(point.profitLoss)
+            case .performance:
+                hasher.combine(PortfolioPerformanceSeries.ratio(for: point))
             }
         }
         let key = CacheKey(
@@ -368,7 +424,7 @@ private final class PortfolioChartSeriesCache {
             firstTimestamp: history.first?.date.timeIntervalSince1970,
             lastTimestamp: history.last?.date.timeIntervalSince1970,
             lastEquity: history.last?.equity,
-            lastProfitLoss: history.last?.profitLoss,
+            lastPerformanceRatio: history.last.flatMap(PortfolioPerformanceSeries.ratio(for:)),
             checksum: hasher.finalize()
         )
         if let lastKey, lastKey == key, let lastValue {
@@ -383,12 +439,13 @@ private final class PortfolioChartSeriesCache {
         dates.reserveCapacity(history.count)
 
         for point in history {
+            let resolvedPercent = PortfolioPerformanceSeries.ratio(for: point)
             let value: Double?
             switch mode {
-            case .equity:
+            case .value:
                 value = point.equity
-            case .profitLoss:
-                value = point.profitLoss
+            case .performance:
+                value = resolvedPercent
             }
 
             guard let value, value.isFinite else {
@@ -402,7 +459,7 @@ private final class PortfolioChartSeriesCache {
                     xPosition: xPosition,
                     value: value,
                     profitLoss: point.profitLoss,
-                    profitLossPercent: point.profitLossPercent
+                    profitLossPercent: resolvedPercent
                 )
             )
             financialPoints.append(
@@ -411,11 +468,11 @@ private final class PortfolioChartSeriesCache {
             dates.append(point.date)
         }
 
-        let baselinePolicy: FinancialChartBaselinePolicy = mode == .profitLoss
+        let baselinePolicy: FinancialChartBaselinePolicy = mode == .performance
             ? .softInclude(value: 0, maxExpansionRatio: 0.60, showsReferenceLine: true)
             : .none
-        let scaleConfig: FinancialChartYScaleConfig = mode == .profitLoss
-            ? .portfolioProfitLoss
+        let scaleConfig: FinancialChartYScaleConfig = mode == .performance
+            ? .portfolioPerformance
             : .portfolioEquity
         let xDomain = PortfolioChartTimeline.xDomain(for: range, dates: dates, now: referenceNow)
         let series = FinancialChartSeries(
@@ -426,7 +483,7 @@ private final class PortfolioChartSeriesCache {
             yScaleConfig: scaleConfig,
             allowsZoomAndPan: false
         )
-        let tint: Color = if mode == .profitLoss {
+        let tint: Color = if mode == .performance {
             (points.last?.value ?? 0) >= 0 ? AppTheme.ColorToken.positive : AppTheme.ColorToken.negative
         } else {
             AppTheme.ColorToken.brand
@@ -540,11 +597,10 @@ private struct PortfolioChartModePicker: View {
 
     var body: some View {
         Menu {
-            ForEach(PortfolioChartMode.allCases) { mode in
-                Button {
-                    selection = mode
-                } label: {
+            Picker(L10n.Portfolio.modePickerAccessibility, selection: $selection) {
+                ForEach(PortfolioChartMode.allCases) { mode in
                     Label(mode.title, systemImage: mode.icon)
+                        .tag(mode)
                 }
             }
         } label: {
@@ -557,7 +613,8 @@ private struct PortfolioChartModePicker: View {
         }
         .buttonStyle(.plain)
         .modifier(PortfolioChartModeButtonStyle())
-        .accessibilityLabel("Portfolio chart data")
+        .sensoryFeedback(.selection, trigger: selection)
+        .accessibilityLabel(L10n.Portfolio.modePickerAccessibility)
     }
 }
 

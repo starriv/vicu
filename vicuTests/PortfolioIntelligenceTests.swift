@@ -624,4 +624,53 @@ final class PortfolioIntelligenceTests: XCTestCase {
             changeToday: "0.016"
         )
     }
+
+    func testPortfolioPerformanceSeriesResolvesPercentAndImpliedFallback() {
+        XCTAssertEqual(PortfolioChartMode.allCases, [.value, .performance])
+
+        let explicitPoint = NormalizedPortfolioHistoryPoint(
+            date: Date(timeIntervalSince1970: 1_700_000_000),
+            equity: 5_523.15,
+            profitLoss: 399.54,
+            profitLossPercent: 0.0778
+        )
+        XCTAssertEqual(PortfolioPerformanceSeries.ratio(for: explicitPoint) ?? -1, 0.0778, accuracy: 0.0001)
+
+        let impliedPoint = NormalizedPortfolioHistoryPoint(
+            date: Date(timeIntervalSince1970: 1_700_000_300),
+            equity: 5_500.0,
+            profitLoss: 500.0,
+            profitLossPercent: nil
+        )
+        XCTAssertEqual(PortfolioPerformanceSeries.ratio(for: impliedPoint) ?? -1, 0.10, accuracy: 0.0001)
+
+        let zeroPreFundingPoint = NormalizedPortfolioHistoryPoint(
+            date: Date(timeIntervalSince1970: 1_700_000_600),
+            equity: 0.0,
+            profitLoss: 0.0,
+            profitLossPercent: nil
+        )
+        XCTAssertEqual(PortfolioPerformanceSeries.ratio(for: zeroPreFundingPoint) ?? -1, 0.0, accuracy: 0.0001)
+
+        let unknownPoint = NormalizedPortfolioHistoryPoint(
+            date: Date(timeIntervalSince1970: 1_700_000_900),
+            equity: 5_500.0,
+            profitLoss: nil,
+            profitLossPercent: nil
+        )
+        XCTAssertNil(PortfolioPerformanceSeries.ratio(for: unknownPoint))
+
+        let points = [
+            FinancialChartPoint(date: Date(timeIntervalSince1970: 1_700_000_000), x: 0, value: 0.0),
+            FinancialChartPoint(date: Date(timeIntervalSince1970: 1_700_000_300), x: 300, value: 0.0778)
+        ]
+        let solution = FinancialChartYAxisSolver.solve(
+            points: points,
+            kind: .area,
+            baselinePolicy: .softInclude(value: 0, maxExpansionRatio: 0.60, showsReferenceLine: true),
+            config: .portfolioPerformance
+        )
+        XCTAssertLessThan(solution.domain.upperBound - solution.domain.lowerBound, 0.15)
+        XCTAssertEqual(solution.baselinePlacement, .inPlot(value: 0))
+    }
 }
