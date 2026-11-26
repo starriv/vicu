@@ -16,6 +16,7 @@ enum AlpacaEndpoint: Sendable {
     case position(symbolOrAssetID: String)
     case closePosition(symbolOrAssetID: String)
     case recentOrders
+    case symbolOrders(symbol: String, status: String, limit: Int, after: String?)
     case order(id: String, nested: Bool)
     case cancelOrder(id: String)
     case replaceOrder(id: String)
@@ -49,7 +50,7 @@ enum AlpacaEndpoint: Sendable {
             APIPaths.AlpacaTrading.positions
         case .position(let symbolOrAssetID), .closePosition(let symbolOrAssetID):
             APIPaths.AlpacaTrading.position(symbolOrAssetID)
-        case .recentOrders, .submitOrder:
+        case .recentOrders, .symbolOrders, .submitOrder:
             APIPaths.AlpacaTrading.orders
         case .order(let id, _), .cancelOrder(let id), .replaceOrder(let id):
             APIPaths.AlpacaTrading.order(id)
@@ -137,6 +138,18 @@ enum AlpacaEndpoint: Sendable {
                 URLQueryItem(name: "limit", value: "50"),
                 URLQueryItem(name: "direction", value: "desc")
             ]
+        case .symbolOrders(let symbol, let status, let limit, let after):
+            var items = [
+                URLQueryItem(name: "status", value: status),
+                URLQueryItem(name: "symbols", value: symbol),
+                URLQueryItem(name: "limit", value: String(min(max(limit, 1), 500))),
+                URLQueryItem(name: "direction", value: "desc"),
+                URLQueryItem(name: "nested", value: "false")
+            ]
+            if let after, !after.isEmpty {
+                items.append(URLQueryItem(name: "after", value: after))
+            }
+            return items
         case .order(_, let nested):
             return nested ? [URLQueryItem(name: "nested", value: "true")] : []
         case .portfolioHistory(let range, let accountCreatedAt):

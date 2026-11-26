@@ -47,6 +47,14 @@ final class AppModel: AssetDetailServicing {
             )
         }
     }
+    var showsChartTradeMarkers = true {
+        didSet {
+            services.configurationStore.setValue(
+                showsChartTradeMarkers,
+                for: AppConfigurationKeys.Chart.showsTradeMarkers
+            )
+        }
+    }
     var favoriteMarketSymbols: [String] = []
     var favoriteMarketAssetBySymbol: [String: AlpacaAsset] = [:]
     var favoriteMarketQuotesBySymbol: [String: MarketActiveSymbol] = [:]
@@ -81,6 +89,8 @@ final class AppModel: AssetDetailServicing {
     @ObservationIgnored let searchCache = SearchDataCache()
     @ObservationIgnored let newsCache = NewsDataCache()
     @ObservationIgnored let optionCache = OptionDataCache()
+    @ObservationIgnored var symbolOrdersCache: [String: TimedCacheEntry<[AlpacaOrder]>] = [:]
+    @ObservationIgnored let symbolOrdersCacheTTL: TimeInterval = 60
     @ObservationIgnored var credentialOperationGeneration = 0
     @ObservationIgnored lazy var realtimeCoordinator: RealtimeEventCoordinator = RealtimeEventCoordinator(app: self)
 
@@ -92,6 +102,7 @@ final class AppModel: AssetDetailServicing {
         self.appLanguage = configurationStore.value(for: AppConfigurationKeys.App.appLanguage)
         self.logoDevAPIKey = configurationStore.value(for: AppConfigurationKeys.Integrations.logoDevAPIKey)
         self.isLogoDevEnabled = configurationStore.value(for: AppConfigurationKeys.Integrations.isLogoDevEnabled)
+        self.showsChartTradeMarkers = configurationStore.value(for: AppConfigurationKeys.Chart.showsTradeMarkers)
         self.notificationPreferences = AppNotificationPreferences.load(from: configurationStore)
 
         if let notificationCenter = services.appNotifier as? AppNotificationCenter {

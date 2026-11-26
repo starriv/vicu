@@ -55,7 +55,11 @@ struct OptionDetailView: View {
         .navigationTitle(store.descriptor.underlyingSymbol)
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            store.setShowsTradeMarkers(app.showsChartTradeMarkers)
             store.start(app: app)
+        }
+        .onChange(of: app.showsChartTradeMarkers) { _, isEnabled in
+            store.setShowsTradeMarkers(isEnabled)
         }
         .refreshable {
             store.reloadAll(forceReload: true)
@@ -170,6 +174,13 @@ private struct OptionPriceHeroSection: View {
                         label: nil,
                         isPositive: selectedChange.isPositive
                     )
+
+                    if store.showsTradeMarkers, store.selectedRange != .oneDay {
+                        let selectedMarkers = store.tradeMarkers(for: chartSelection.point)
+                        if !selectedMarkers.isEmpty {
+                            AssetChartTradeSelectionLine(markers: selectedMarkers)
+                        }
+                    }
                 } else if let periodChange = store.chartRenderModels.model(for: store.effectiveChartMode).periodPriceChange {
                     AssetPriceChangeLine(
                         change: periodChange.change,
@@ -191,6 +202,7 @@ private struct OptionPriceHeroSection: View {
 }
 
 private struct OptionChartSection: View {
+    @Environment(AppModel.self) private var app
     let store: OptionDetailStore
     @Binding var chartSelection: AssetChartSelection?
     @Binding var isChartScrubbing: Bool
@@ -204,6 +216,7 @@ private struct OptionChartSection: View {
                 model: store.chartRenderModels.model(for: store.effectiveChartMode),
                 isLoading: store.isLoadingChart,
                 range: store.selectedRange,
+                tradeMarkers: store.chartTradeMarkers,
                 selection: $chartSelection,
                 isScrubbing: $isChartScrubbing
             )
@@ -224,6 +237,10 @@ private struct OptionChartSection: View {
                             selection: Binding(
                                 get: { store.chartMode },
                                 set: { store.selectChartMode($0) }
+                            ),
+                            showsTradeMarkers: Binding(
+                                get: { app.showsChartTradeMarkers },
+                                set: { app.showsChartTradeMarkers = $0 }
                             )
                         )
                     }

@@ -474,4 +474,130 @@ final class FinancialChartEngineTests: XCTestCase {
         XCTAssertEqual(FinancialChartBaseCanvas.formatExtremaPrice(0.425), "$0.425")
         XCTAssertEqual(FinancialChartBaseCanvas.formatExtremaPrice(182.45), "$182.45")
     }
+
+    // MARK: - Non-Intraday Trade Marker Mapping & Layout Tests
+
+    func testTradeMarkerMapperIgnoresIntradayRange() {
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        let points = [
+            FinancialChartPoint(date: base, x: 0, value: 100),
+            FinancialChartPoint(date: base.addingTimeInterval(300), x: 1, value: 101)
+        ]
+        let executions = [
+            AssetTradeExecution(id: "1", symbol: "AAPL", side: .buy, executedAt: base.addingTimeInterval(60), quantity: 10, price: 100.5)
+        ]
+
+        let intradayResult = AssetTradeMarkerMapper.map(executions: executions, onto: points, range: .oneDay)
+        XCTAssertTrue(intradayResult.isEmpty)
+    }
+
+    func testTradeMarkerMapperAggregatesSameDayFillsAndSeparatesSides() {
+        let formatter = ISO8601DateFormatter()
+        let day1Bar = formatter.date(from: "2026-10-12T04:00:00Z")!
+        let day2Bar = formatter.date(from: "2026-10-13T04:00:00Z")!
+        let day3Bar = formatter.date(from: "2026-10-14T04:00:00Z")!
+
+        let points = [
+            FinancialChartPoint(date: day1Bar, x: 0, open: 100, high: 105, low: 98, close: 104),
+            FinancialChartPoint(date: day2Bar, x: 1, open: 104, high: 112, low: 103, close: 110),
+            FinancialChartPoint(date: day3Bar, x: 2, open: 110, high: 115, low: 108, close: 112)
+        ]
+
+        let executions = [
+            // Two buys on Day 1: 10 @ 100 + 30 @ 104 => 40 @ 103
+            AssetTradeExecution(id: "b1", symbol: "AAPL", side: .buy, executedAt: formatter.date(from: "2026-10-12T14:30:00Z")!, quantity: 10, price: 100),
+            AssetTradeExecution(id: "b2", symbol: "AAPL", side: .buy, executedAt: formatter.date(from: "2026-10-12T18:00:00Z")!, quantity: 30, price: 104),
+            // Same-day sell on Day 1
+            AssetTradeExecution(id: "s1", symbol: "AAPL", side: .sell, executedAt: formatter.date(from: "2026-10-12T19:30:00Z")!, quantity: 5, price: 105),
+            // Execution outside range should be excluded
+            AssetTradeExecution(id: "old", symbol: "AAPL", side: .buy, executedAt: formatter.date(from: "2026-09-01T15:00:00Z")!, quantity: 20, price: 90)
+        ]
+
+        let result = AssetTradeMarkerMapper.map(executions: executions, onto: points, range: .oneMonth)
+        XCTAssertEqual(result.markers.count, 2)
+        XCTAssertEqual(result.markers[0].side, .buy)
+        XCTAssertEqual(result.markers[0].x, 0)
+        XCTAssertEqual(result.markers[0].totalQuantity, 40, accuracy: 1e-6)
+        XCTAssertEqual(result.markers[0].averagePrice, 103.0, accuracy: 1e-6)
+        XCTAssertEqual(result.markers[0].fillCount, 2)
+
+        XCTAssertEqual(result.markers[1].side, .sell)
+        XCTAssertEqual(result.markers[1].x, 0)
+        XCTAssertEqual(result.markers[1].totalQuantity, 5, accuracy: 1e-6)
+        XCTAssertEqual(result.markers[1].averagePrice, 105.0, accuracy: 1e-6)
+        XCTAssertEqual(result.markers[1].fillCount, 1)
+
+        // O(1) scrubbing lookup finds both buy and sell on day 1
+        let lookedUp = result.markers(for: AssetChartPoint(financialPoint: points[0]))
+        XCTAssertEqual(lookedUp.count, 2)
+    }
+
+    func testTradeMarkerLayoutClustersNearbyMarkersAndSeparatesTracks() {
+        let baseDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let points = (0..<100).map { idx in
+            FinancialChartPoint(
+                date: baseDate.addingTimeInterval(Double(idx) * 86_400),
+                x: Double(idx),
+                open: 100,
+                high: 105,
+                low: 95,
+                close: 100
+            )
+        }
+
+        let coords = FinancialChartCoordinateSystem(
+            canvasSize: CGSize(width: 340, height: 228),
+            insets: .okxSimple,
+            xDomain: 0...99,
+            yDomain: 90...110
+        )
+
+        // Two buys 1 bar apart (~3.2pt apart < 18pt min spacing) should cluster into 1 visual badge,
+        // while a sell on the exact same bar remains on its separate upper track.
+        let markers = [
+            FinancialChartTradeMarker(id: "b1", side: .buy, x: 50, barDate: points[50].date, averagePrice: 99, totalQuantity: 10, fillCount: 1, barClose: 100, barHigh: 105, barLow: 95),
+            FinancialChartTradeMarker(id: "s1", side: .sell, x: 50, barDate: points[50].date, averagePrice: 103, totalQuantity: 5, fillCount: 1, barClose: 100, barHigh: 105, barLow: 95),
+            FinancialChartTradeMarker(id: "b2", side: .buy, x: 51, barDate: points[51].date, averagePrice: 98, totalQuantity: 20, fillCount: 2, barClose: 100, barHigh: 105, barLow: 95)
+        ]
+
+        let placed = FinancialChartTradeMarkerLayout.place(
+            markers: markers,
+            displayPoints: points,
+            kind: .area,
+            coordinateSystem: coords
+        )
+
+        let placedBuys = placed.filter { $0.side == .buy }
+        let placedSells = placed.filter { $0.side == .sell }
+        XCTAssertEqual(placedBuys.count, 1)
+        XCTAssertEqual(placedBuys[0].clusterCount, 3)
+        XCTAssertTrue(placedBuys[0].isBelowAnchor)
+        XCTAssertEqual(placedSells.count, 1)
+        XCTAssertFalse(placedSells[0].isBelowAnchor)
+        XCTAssertLessThan(placedSells[0].badgeCenter.y, placedBuys[0].badgeCenter.y)
+    }
+
+    func testTradeMarkerSeriesDigestChangesWhenMarkersToggle() {
+        let baseDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let points = [
+            FinancialChartPoint(date: baseDate, x: 0, value: 100),
+            FinancialChartPoint(date: baseDate.addingTimeInterval(86_400), x: 1, value: 105)
+        ]
+        let marker = FinancialChartTradeMarker(
+            id: "0-buy",
+            side: .buy,
+            x: 0,
+            barDate: baseDate,
+            averagePrice: 100,
+            totalQuantity: 10,
+            fillCount: 1,
+            barClose: 100,
+            barHigh: 101,
+            barLow: 99
+        )
+
+        let withoutMarkers = FinancialChartSeries(kind: .area, points: points)
+        let withMarkers = FinancialChartSeries(kind: .area, points: points, tradeMarkers: [marker])
+        XCTAssertNotEqual(withoutMarkers.id, withMarkers.id)
+    }
 }

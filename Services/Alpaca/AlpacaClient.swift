@@ -9,6 +9,7 @@ protocol AlpacaServicing: Sendable {
     func fetchOpenPosition(symbolOrAssetID: String, credentials: AlpacaCredentials) async throws -> AlpacaPosition?
     func closeOpenPosition(symbolOrAssetID: String, credentials: AlpacaCredentials) async throws -> AlpacaOrder
     func fetchRecentOrders(credentials: AlpacaCredentials) async throws -> [AlpacaOrder]
+    func fetchSymbolOrders(symbol: String, after: Date?, limit: Int, credentials: AlpacaCredentials) async throws -> [AlpacaOrder]
     func fetchOrder(id: String, nested: Bool, credentials: AlpacaCredentials) async throws -> AlpacaOrder
     func cancelOrder(id: String, credentials: AlpacaCredentials) async throws
     func replaceOrder(id: String, request: AlpacaReplaceOrderRequest, credentials: AlpacaCredentials) async throws -> AlpacaOrder
@@ -206,6 +207,32 @@ struct AlpacaClient: AlpacaServicing {
 
     func fetchRecentOrders(credentials: AlpacaCredentials) async throws -> [AlpacaOrder] {
         try await request(.recentOrders, credentials: credentials)
+    }
+
+    func fetchSymbolOrders(
+        symbol: String,
+        after: Date? = nil,
+        limit: Int = 500,
+        credentials: AlpacaCredentials
+    ) async throws -> [AlpacaOrder] {
+        let normalizedSymbol = Self.normalizedSymbol(symbol)
+        guard !normalizedSymbol.isEmpty else {
+            return []
+        }
+
+        let afterString = after.map { AlpacaMarketDataEndpoint.makeStockDataDateFormatter().string(from: $0) }
+        return try await request(
+            .symbolOrders(
+                symbol: normalizedSymbol,
+                // Only closed orders can carry fills worth marking; open orders (including
+                // partially filled ones) are merged from the portfolio. Using `all` let
+                // unfilled cancellations crowd older fills out of the 500-order page.
+                status: "closed",
+                limit: min(max(limit, 1), 500),
+                after: afterString
+            ),
+            credentials: credentials
+        )
     }
 
     func fetchOrder(id: String, nested: Bool = true, credentials: AlpacaCredentials) async throws -> AlpacaOrder {

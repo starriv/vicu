@@ -158,6 +158,14 @@ struct FinancialChartYScaleConfig: Hashable, Sendable {
         hardLowerBound: nil
     )
 
+    static let portfolioPerformance = FinancialChartYScaleConfig(
+        minRelativeSpan: 0.02,
+        minAbsoluteSpan: 0.002,
+        topPaddingFraction: 0.08,
+        bottomPaddingFraction: 0.08,
+        hardLowerBound: nil
+    )
+
     static let nonNegativeMetric = FinancialChartYScaleConfig(
         minRelativeSpan: 0.0,
         minAbsoluteSpan: 0.01,
@@ -274,6 +282,34 @@ struct FinancialChartStyle: Sendable {
     }
 }
 
+enum FinancialChartTradeSide: String, Equatable, Hashable, Sendable {
+    case buy
+    case sell
+}
+
+/// Aggregated buy or sell execution summary anchored to a single bar on a chart series.
+struct FinancialChartTradeMarker: Identifiable, Equatable, Hashable, Sendable {
+    let id: String
+    let side: FinancialChartTradeSide
+    let x: Double
+    let barDate: Date
+    let averagePrice: Double
+    let totalQuantity: Double
+    let fillCount: Int
+    let barClose: Double
+    let barHigh: Double
+    let barLow: Double
+}
+
+/// Pre-resolved screen-space marker geometry computed once per snapshot (never during 120Hz scrubbing).
+struct FinancialChartPlacedTradeMarker: Equatable, Sendable {
+    let side: FinancialChartTradeSide
+    let anchorPoint: CGPoint
+    let badgeCenter: CGPoint
+    let isBelowAnchor: Bool
+    let clusterCount: Int
+}
+
 struct FinancialChartSeries: Equatable, Sendable {
     let id: Int
     let kind: FinancialChartKind
@@ -282,6 +318,7 @@ struct FinancialChartSeries: Equatable, Sendable {
     let baselinePolicy: FinancialChartBaselinePolicy
     let yScaleConfig: FinancialChartYScaleConfig
     let allowsZoomAndPan: Bool
+    let tradeMarkers: [FinancialChartTradeMarker]
 
     static let empty = FinancialChartSeries(
         id: 0,
@@ -290,7 +327,8 @@ struct FinancialChartSeries: Equatable, Sendable {
         xDomain: 0...1,
         baselinePolicy: .none,
         yScaleConfig: .financialPrice,
-        allowsZoomAndPan: false
+        allowsZoomAndPan: false,
+        tradeMarkers: []
     )
 
     init(
@@ -301,7 +339,9 @@ struct FinancialChartSeries: Equatable, Sendable {
         xDomain: ClosedRange<Double>? = nil,
         baselinePolicy: FinancialChartBaselinePolicy = .none,
         yScaleConfig: FinancialChartYScaleConfig = .financialPrice,
-        allowsZoomAndPan: Bool = false
+        allowsZoomAndPan: Bool = false,
+        tradeMarkers: [FinancialChartTradeMarker] = [],
+        tradeMarkersDigest: Int? = nil
     ) {
         self.kind = kind
         self.points = points
@@ -309,12 +349,15 @@ struct FinancialChartSeries: Equatable, Sendable {
         self.baselinePolicy = baselinePolicy
         self.yScaleConfig = yScaleConfig
         self.allowsZoomAndPan = allowsZoomAndPan
+        self.tradeMarkers = tradeMarkers
+        let resolvedMarkersDigest = tradeMarkersDigest ?? Self.tradeMarkersDigest(for: tradeMarkers)
         self.id = id ?? Self.computeDigest(
             kind: kind,
             pointsDigest: pointsDigest ?? Self.pointsDigest(for: points),
             xDomain: self.xDomain,
             baselinePolicy: baselinePolicy,
-            yScaleConfig: yScaleConfig
+            yScaleConfig: yScaleConfig,
+            tradeMarkersDigest: resolvedMarkersDigest
         )
     }
 
@@ -333,6 +376,23 @@ struct FinancialChartSeries: Equatable, Sendable {
         return hasher.finalize()
     }
 
+    static func tradeMarkersDigest(for markers: [FinancialChartTradeMarker]) -> Int {
+        guard !markers.isEmpty else {
+            return 0
+        }
+        var hasher = Hasher()
+        hasher.combine(markers.count)
+        for marker in markers {
+            hasher.combine(marker.id)
+            hasher.combine(marker.side)
+            hasher.combine(marker.x)
+            hasher.combine(marker.averagePrice)
+            hasher.combine(marker.totalQuantity)
+            hasher.combine(marker.fillCount)
+        }
+        return hasher.finalize()
+    }
+
     private static func defaultXDomain(for points: [FinancialChartPoint]) -> ClosedRange<Double> {
         guard let first = points.first, let last = points.last, last.x > first.x else {
             return 0...1
@@ -345,7 +405,8 @@ struct FinancialChartSeries: Equatable, Sendable {
         pointsDigest: Int,
         xDomain: ClosedRange<Double>,
         baselinePolicy: FinancialChartBaselinePolicy,
-        yScaleConfig: FinancialChartYScaleConfig
+        yScaleConfig: FinancialChartYScaleConfig,
+        tradeMarkersDigest: Int
     ) -> Int {
         var hasher = Hasher()
         hasher.combine(kind)
@@ -354,6 +415,7 @@ struct FinancialChartSeries: Equatable, Sendable {
         hasher.combine(xDomain.upperBound)
         hasher.combine(baselinePolicy)
         hasher.combine(yScaleConfig)
+        hasher.combine(tradeMarkersDigest)
         return hasher.finalize()
     }
 }

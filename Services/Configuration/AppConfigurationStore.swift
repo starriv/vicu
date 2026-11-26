@@ -53,6 +53,14 @@ enum AppConfigurationKeys {
         )
     }
 
+    enum Chart {
+        static let showsTradeMarkers = AppConfigurationKey<Bool>(
+            namespace: "chart",
+            name: "shows_trade_markers",
+            defaultValue: true
+        )
+    }
+
     enum Integrations {
         static let logoDevAPIKey = AppConfigurationKey<String>(
             namespace: "integrations.logo_dev",

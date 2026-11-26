@@ -332,6 +332,7 @@ struct FinancialChartMorphingCanvas: View, Animatable {
     let style: FinancialChartStyle
     let fillsArea: Bool
     let showsEndpointDot: Bool
+    let toTradeMarkers: [FinancialChartPlacedTradeMarker]
     let isDarkMode: Bool
     let baseStep: CGFloat
     var animatedStep: CGFloat
@@ -384,6 +385,19 @@ struct FinancialChartMorphingCanvas: View, Animatable {
                 let coreRect = CGRect(x: tip.x - 3.25, y: tip.y - 3.25, width: 6.5, height: 6.5)
                 context.fill(Path(ellipseIn: haloRect), with: .color(blendedColor.opacity(0.24)))
                 context.fill(Path(ellipseIn: coreRect), with: .color(blendedColor))
+            }
+
+            // Gently fade settled trade markers in during the tail of the morph so handoff to BaseCanvas is seamless
+            if !toTradeMarkers.isEmpty, t > 0.70 {
+                let markerAlpha = Double((t - 0.70) / 0.30)
+                FinancialChartTradeMarkerRenderer.draw(
+                    context: &context,
+                    markers: toTradeMarkers,
+                    kind: fillsArea ? .area : .line,
+                    style: style,
+                    isDarkMode: isDarkMode,
+                    opacity: markerAlpha
+                )
             }
         }
         .allowsHitTesting(false)

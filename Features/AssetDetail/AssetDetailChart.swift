@@ -24,6 +24,15 @@ enum AssetChartMode: String, CaseIterable, Hashable, Identifiable, Sendable {
         }
     }
 
+    var localizedTitle: LocalizedStringKey {
+        switch self {
+        case .line:
+            L10n.Chart.line
+        case .candles:
+            L10n.Chart.candles
+        }
+    }
+
     var financialChartKind: FinancialChartKind {
         switch self {
         case .line:
@@ -80,9 +89,29 @@ struct AssetChartRenderModel: Sendable {
         isPeriodPositive ? AppTheme.ColorToken.positive : AppTheme.ColorToken.negative
     }
 
-    /// O(1) per SwiftUI body evaluation: reuses pre-converted `financialPoints` and precomputed `pointsDigest`
-    /// so 120Hz scrubbing never re-maps or re-hashes the full series.
-    func makeFinancialSeries(for range: AssetChartRange) -> FinancialChartSeries {
+    /// O(1) mode switch that reuses the precomputed points, digest, domain, and period metrics.
+    func withMode(_ newMode: AssetChartMode) -> AssetChartRenderModel {
+        guard mode != newMode else {
+            return self
+        }
+        return AssetChartRenderModel(
+            mode: newMode,
+            points: points,
+            financialPoints: financialPoints,
+            pointsDigest: pointsDigest,
+            xDomain: xDomain,
+            priceChangeBaseline: priceChangeBaseline,
+            periodPriceChange: periodPriceChange,
+            isPeriodPositive: isPeriodPositive
+        )
+    }
+
+    /// O(1) per SwiftUI body evaluation: reuses pre-converted `financialPoints`, precomputed `pointsDigest`,
+    /// and pre-hashed `tradeMarkers` so 120Hz scrubbing never re-maps or re-hashes the full series.
+    func makeFinancialSeries(
+        for range: AssetChartRange,
+        tradeMarkers: AssetChartTradeMarkerSet = .empty
+    ) -> FinancialChartSeries {
         let baselinePolicy: FinancialChartBaselinePolicy
         if range == .oneDay, mode == .line, let baseline = priceChangeBaseline {
             baselinePolicy = .softInclude(
@@ -94,6 +123,9 @@ struct AssetChartRenderModel: Sendable {
             baselinePolicy = .none
         }
 
+        let activeMarkers = range == .oneDay ? [] : tradeMarkers.markers
+        let activeMarkersDigest = range == .oneDay ? 0 : tradeMarkers.digest
+
         return FinancialChartSeries(
             pointsDigest: pointsDigest,
             kind: mode.financialChartKind,
@@ -101,7 +133,9 @@ struct AssetChartRenderModel: Sendable {
             xDomain: xDomain,
             baselinePolicy: baselinePolicy,
             yScaleConfig: .financialPrice,
-            allowsZoomAndPan: mode == .candles
+            allowsZoomAndPan: mode == .candles,
+            tradeMarkers: activeMarkers,
+            tradeMarkersDigest: activeMarkersDigest
         )
     }
 }
@@ -134,16 +168,8 @@ enum AssetChartPreprocessor {
             xDomain: xDomain,
             priceChangeBaseline: priceChangeBaseline
         )
-        let candleModel = mode == .candles
-            ? makeRenderModel(
-                points: points,
-                financialPoints: financialPoints,
-                pointsDigest: pointsDigest,
-                mode: .candles,
-                xDomain: xDomain,
-                priceChangeBaseline: priceChangeBaseline
-            )
-            : .empty(mode: .candles)
+        // Share the exact same CoW point arrays & precomputed digest for O(1) instant Line <-> Candles switching.
+        let candleModel = lineModel.withMode(.candles)
 
         return AssetChartRenderModels(
             line: lineModel,
@@ -200,13 +226,14 @@ struct AssetPriceChart: View {
     let model: AssetChartRenderModel
     let isLoading: Bool
     let range: AssetChartRange
+    var tradeMarkers: AssetChartTradeMarkerSet = .empty
     @Binding var selection: AssetChartSelection?
     @Binding var isScrubbing: Bool
 
     @State private var chartSelection: FinancialChartSelection?
 
     var body: some View {
-        let series = model.makeFinancialSeries(for: range)
+        let series = model.makeFinancialSeries(for: range, tradeMarkers: tradeMarkers)
         let activeTint: Color = if let selection, model.mode == .line {
             selection.isPositive ? AppTheme.ColorToken.positive : AppTheme.ColorToken.negative
         } else {
@@ -274,26 +301,107 @@ struct AssetPriceChart: View {
 
 struct AssetChartModePicker: View {
     @Binding var selection: AssetChartMode
+    var showsTradeMarkers: Binding<Bool>? = nil
 
     var body: some View {
         Menu {
-            ForEach(AssetChartMode.allCases) { mode in
-                Button {
-                    selection = mode
-                } label: {
-                    Label(mode.title, systemImage: mode.icon)
+            Section {
+                ForEach(AssetChartMode.allCases) { mode in
+                    Button {
+                        selection = mode
+                    } label: {
+                        if selection == mode {
+                            Label(mode.localizedTitle, systemImage: "checkmark")
+                        } else {
+                            Label(mode.localizedTitle, systemImage: mode.icon)
+                        }
+                    }
+                }
+            }
+
+            if let showsTradeMarkers {
+                Section {
+                    Toggle(isOn: showsTradeMarkers) {
+                        Label(L10n.Chart.tradeMarkers, systemImage: "arrow.up.arrow.down.circle")
+                    }
                 }
             }
         } label: {
-            Image(systemName: selection.icon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 34, height: 32)
-                .contentShape(Capsule())
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: selection.icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 34, height: 32)
+                    .contentShape(Capsule())
+
+                if showsTradeMarkers?.wrappedValue == true {
+                    Circle()
+                        .fill(AppTheme.ColorToken.positive)
+                        .frame(width: 5, height: 5)
+                        .offset(x: -6, y: 6)
+                }
+            }
         }
         .buttonStyle(.plain)
         .background(Color(.secondarySystemFill).opacity(0.75), in: Capsule())
-        .accessibilityLabel("Chart style")
+        .accessibilityLabel(L10n.Chart.optionsAccessibility)
+    }
+}
+
+/// Compact inline trade execution readout shown in the reserved hero subline while scrubbing
+/// over a bar that contains buy/sell fills (zero layout shift).
+struct AssetChartTradeSelectionLine: View {
+    let markers: [FinancialChartTradeMarker]
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(Array(markers.enumerated()), id: \.element.id) { index, marker in
+                if index > 0 {
+                    Text("·")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+
+                HStack(spacing: 4) {
+                    Text(marker.side == .buy ? "B" : "S")
+                        .font(.system(size: 9, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(width: 14, height: 14)
+                        .background(
+                            marker.side == .buy ? AppTheme.ColorToken.positive : AppTheme.ColorToken.negative,
+                            in: Circle()
+                        )
+
+                    Text(Self.summaryText(for: marker))
+                        .font(.footnote.weight(.medium).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.76)
+        .accessibilityElement(children: .combine)
+    }
+
+    private static func summaryText(for marker: FinancialChartTradeMarker) -> String {
+        let qtyText = formatQuantity(marker.totalQuantity)
+        let priceText = FinancialChartBaseCanvas.formatExtremaPrice(marker.averagePrice)
+        if marker.fillCount > 1 {
+            return "\(qtyText) @ \(priceText) (\(marker.fillCount))"
+        }
+        return "\(qtyText) @ \(priceText)"
+    }
+
+    private static func formatQuantity(_ value: Double) -> String {
+        guard value.isFinite else {
+            return AppFormatter.placeholder
+        }
+        let rounded = value.rounded()
+        if abs(value - rounded) < 1e-6 {
+            return rounded.formatted(.number.precision(.fractionLength(0)).locale(Locale(identifier: "en_US")))
+        }
+        return value.formatted(.number.precision(.fractionLength(0...4)).locale(Locale(identifier: "en_US")))
     }
 }
 

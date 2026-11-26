@@ -5,6 +5,7 @@ struct FinancialChartRenderSnapshot: Equatable, Sendable {
     let seriesID: Int
     let kind: FinancialChartKind
     let displayPoints: [FinancialChartPoint]
+    let placedTradeMarkers: [FinancialChartPlacedTradeMarker]
     let coordinateSystem: FinancialChartCoordinateSystem
     let ySolution: FinancialChartYAxisSolution
     let maxVolume: Double
@@ -28,7 +29,8 @@ struct FinancialChartRenderSnapshot: Equatable, Sendable {
             lhs.styleFingerprint == rhs.styleFingerprint &&
             lhs.displayPoints.count == rhs.displayPoints.count &&
             lhs.displayPoints.first == rhs.displayPoints.first &&
-            lhs.displayPoints.last == rhs.displayPoints.last
+            lhs.displayPoints.last == rhs.displayPoints.last &&
+            lhs.placedTradeMarkers == rhs.placedTradeMarkers
     }
 }
 
@@ -103,6 +105,16 @@ struct FinancialChartBaseCanvas: View, Equatable {
                 if style.showsHighLowCallouts {
                     drawCandleExtremaLabels(context: &context, coords: coords)
                 }
+            }
+
+            if !snapshot.placedTradeMarkers.isEmpty {
+                FinancialChartTradeMarkerRenderer.draw(
+                    context: &context,
+                    markers: snapshot.placedTradeMarkers,
+                    kind: snapshot.kind,
+                    style: style,
+                    isDarkMode: isDarkMode
+                )
             }
         }
         .allowsHitTesting(false)
@@ -206,23 +218,82 @@ struct FinancialChartBaseCanvas: View, Equatable {
             Text(Self.formatExtremaPrice(highest.high)).font(labelFont).foregroundStyle(labelColor)
         )
         let highSize = highText.measure(in: plotRect.size)
-        let highX = min(
+        var highX = min(
             max(coords.x(for: highest.x), plotRect.minX + highSize.width * 0.5 + 2),
             plotRect.maxX - highSize.width * 0.5 - 2
         )
         let highY = max(coords.y(for: highest.high) - highSize.height * 0.5 - 3, plotRect.minY - 8)
+        highX = adjustedExtremaX(
+            centerX: highX,
+            centerY: highY,
+            labelSize: highSize,
+            plotRect: plotRect,
+            side: .sell
+        )
         context.draw(highText, at: CGPoint(x: highX, y: highY), anchor: .center)
 
         let lowText = context.resolve(
             Text(Self.formatExtremaPrice(lowest.low)).font(labelFont).foregroundStyle(labelColor)
         )
         let lowSize = lowText.measure(in: plotRect.size)
-        let lowX = min(
+        var lowX = min(
             max(coords.x(for: lowest.x), plotRect.minX + lowSize.width * 0.5 + 2),
             plotRect.maxX - lowSize.width * 0.5 - 2
         )
         let lowY = min(coords.y(for: lowest.low) + lowSize.height * 0.5 + 3, plotRect.maxY + 6)
+        lowX = adjustedExtremaX(
+            centerX: lowX,
+            centerY: lowY,
+            labelSize: lowSize,
+            plotRect: plotRect,
+            side: .buy
+        )
         context.draw(lowText, at: CGPoint(x: lowX, y: lowY), anchor: .center)
+    }
+
+    private func adjustedExtremaX(
+        centerX: CGFloat,
+        centerY: CGFloat,
+        labelSize: CGSize,
+        plotRect: CGRect,
+        side: FinancialChartTradeSide
+    ) -> CGFloat {
+        guard !snapshot.placedTradeMarkers.isEmpty else {
+            return centerX
+        }
+        let labelRect = CGRect(
+            x: centerX - labelSize.width * 0.5 - 2,
+            y: centerY - labelSize.height * 0.5 - 2,
+            width: labelSize.width + 4,
+            height: labelSize.height + 4
+        )
+        let badgeRadius = FinancialChartTradeMarkerLayout.badgeDiameter * 0.5 + 2
+        guard let colliding = snapshot.placedTradeMarkers.first(where: { marker in
+            guard marker.side == side else { return false }
+            let badgeRect = CGRect(
+                x: marker.badgeCenter.x - badgeRadius,
+                y: marker.badgeCenter.y - badgeRadius,
+                width: badgeRadius * 2,
+                height: badgeRadius * 2
+            )
+            return labelRect.intersects(badgeRect)
+        }) else {
+            return centerX
+        }
+
+        let offset = labelSize.width * 0.5 + badgeRadius + 4
+        let rightCandidate = colliding.badgeCenter.x + offset
+        let leftCandidate = colliding.badgeCenter.x - offset
+        let minX = plotRect.minX + labelSize.width * 0.5 + 2
+        let maxX = plotRect.maxX - labelSize.width * 0.5 - 2
+
+        if rightCandidate <= maxX {
+            return rightCandidate
+        }
+        if leftCandidate >= minX {
+            return leftCandidate
+        }
+        return centerX
     }
 
     /// Adaptive precision for candlestick High/Low callouts so sub-dollar options

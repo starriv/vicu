@@ -189,6 +189,9 @@
 		0A0F8000000000000000010D /* DesignSystem/Charts/Options/OptionPayoffModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F8000000000000000020D /* DesignSystem/Charts/Options/OptionPayoffModel.swift */; };
 		0A0F8000000000000000010E /* DesignSystem/Charts/Options/OptionPayoffChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F8000000000000000020E /* DesignSystem/Charts/Options/OptionPayoffChartView.swift */; };
 		0A0F8000000000000000010B /* Features/AssetDetail/Chart/AssetIntradaySessionMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F8000000000000000020B /* Features/AssetDetail/Chart/AssetIntradaySessionMapper.swift */; };
+		0A0F80000000000000000110 /* DesignSystem/Charts/Engine/FinancialChartTradeMarkerLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F80000000000000000210 /* DesignSystem/Charts/Engine/FinancialChartTradeMarkerLayout.swift */; };
+		0A0F80000000000000000111 /* DesignSystem/Charts/Rendering/FinancialChartTradeMarkerRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F80000000000000000211 /* DesignSystem/Charts/Rendering/FinancialChartTradeMarkerRenderer.swift */; };
+		0A0F80000000000000000112 /* Features/AssetDetail/Chart/AssetTradeMarkerMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F80000000000000000212 /* Features/AssetDetail/Chart/AssetTradeMarkerMapper.swift */; };
 		0C0F80000000000000000101 /* vicuTests/FinancialChartEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0F80000000000000000201 /* FinancialChartEngineTests.swift */; };
 		0AC0000000000000000C0002 /* Resources/AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 0AC0000000000000000C0001 /* Resources/AppIcon.icon */; };
 		0AC0000000000000000C0004 /* Resources/PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 0AC0000000000000000C0003 /* Resources/PrivacyInfo.xcprivacy */; };
@@ -411,6 +414,9 @@
 		0A0F8000000000000000020D /* DesignSystem/Charts/Options/OptionPayoffModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Charts/Options/OptionPayoffModel.swift; sourceTree = "<group>"; };
 		0A0F8000000000000000020E /* DesignSystem/Charts/Options/OptionPayoffChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Charts/Options/OptionPayoffChartView.swift; sourceTree = "<group>"; };
 		0A0F8000000000000000020B /* Features/AssetDetail/Chart/AssetIntradaySessionMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/Chart/AssetIntradaySessionMapper.swift; sourceTree = "<group>"; };
+		0A0F80000000000000000210 /* DesignSystem/Charts/Engine/FinancialChartTradeMarkerLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Charts/Engine/FinancialChartTradeMarkerLayout.swift; sourceTree = "<group>"; };
+		0A0F80000000000000000211 /* DesignSystem/Charts/Rendering/FinancialChartTradeMarkerRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem/Charts/Rendering/FinancialChartTradeMarkerRenderer.swift; sourceTree = "<group>"; };
+		0A0F80000000000000000212 /* Features/AssetDetail/Chart/AssetTradeMarkerMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/Chart/AssetTradeMarkerMapper.swift; sourceTree = "<group>"; };
 		0C0F80000000000000000201 /* FinancialChartEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = vicuTests/FinancialChartEngineTests.swift; sourceTree = "<group>"; };
 		0AC0000000000000000C0001 /* Resources/AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = Resources/AppIcon.icon; sourceTree = "<group>"; };
 		0AC0000000000000000C0003 /* Resources/PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Resources/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -609,6 +615,9 @@
 				0A0F8000000000000000020D /* DesignSystem/Charts/Options/OptionPayoffModel.swift */,
 				0A0F8000000000000000020E /* DesignSystem/Charts/Options/OptionPayoffChartView.swift */,
 				0A0F8000000000000000020B /* Features/AssetDetail/Chart/AssetIntradaySessionMapper.swift */,
+				0A0F80000000000000000210 /* DesignSystem/Charts/Engine/FinancialChartTradeMarkerLayout.swift */,
+				0A0F80000000000000000211 /* DesignSystem/Charts/Rendering/FinancialChartTradeMarkerRenderer.swift */,
+				0A0F80000000000000000212 /* Features/AssetDetail/Chart/AssetTradeMarkerMapper.swift */,
 				0A90A90A90A90A90A90A9002 /* DesignSystem/Components/QuoteSizeRatioBar.swift */,
 				0A91A91A91A91A91A91A9102 /* DesignSystem/Components/AppMarqueeText.swift */,
 				0A0000000000000000000263 /* Shared/Reactive/RxPolling.swift */,
@@ -981,6 +990,9 @@
 				0A0F8000000000000000010D /* DesignSystem/Charts/Options/OptionPayoffModel.swift in Sources */,
 				0A0F8000000000000000010E /* DesignSystem/Charts/Options/OptionPayoffChartView.swift in Sources */,
 				0A0F8000000000000000010B /* Features/AssetDetail/Chart/AssetIntradaySessionMapper.swift in Sources */,
+				0A0F80000000000000000110 /* DesignSystem/Charts/Engine/FinancialChartTradeMarkerLayout.swift in Sources */,
+				0A0F80000000000000000111 /* DesignSystem/Charts/Rendering/FinancialChartTradeMarkerRenderer.swift in Sources */,
+				0A0F80000000000000000112 /* Features/AssetDetail/Chart/AssetTradeMarkerMapper.swift in Sources */,
 				0A90A90A90A90A90A90A9001 /* DesignSystem/Components/QuoteSizeRatioBar.swift in Sources */,
 				0A91A91A91A91A91A91A9101 /* DesignSystem/Components/AppMarqueeText.swift in Sources */,
 				0A0000000000000000000163 /* Shared/Reactive/RxPolling.swift in Sources */,

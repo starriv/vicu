@@ -10,8 +10,10 @@ final class OptionDetailStore {
 
     var selectedRange: AssetChartRange = .oneDay
     var chartMode: AssetChartMode = .line
+    var showsTradeMarkers = true
     private(set) var snapshotModel: OptionDetailSnapshotModel
     private(set) var chartRenderModels: AssetChartRenderModels = .empty
+    private(set) var chartTradeMarkers: AssetChartTradeMarkerSet = .empty
     private(set) var tradeRows: [OptionTradeRowModel] = []
     private(set) var nextTradePageToken: String?
     private(set) var isLoadingSnapshot = false
@@ -39,6 +41,9 @@ final class OptionDetailStore {
     @ObservationIgnored private var activeChartRequest: OptionDetailChartRequest?
     @ObservationIgnored private var activeTradeRequest: OptionDetailTradesRequest?
     @ObservationIgnored private var chartRenderTask: Task<Void, Never>?
+    @ObservationIgnored private var tradeExecutionsLoadTask: Task<Void, Never>?
+    @ObservationIgnored private var tradeExecutions: [AssetTradeExecution] = []
+    @ObservationIgnored private var hasLoadedTradeExecutions = false
     @ObservationIgnored private var chartRenderRevision = 0
     @ObservationIgnored private var chartCache: [OptionDetailChartCacheKey: OptionDetailChartCacheEntry] = [:]
     @ObservationIgnored private var tradeKeys = Set<String>()
@@ -98,6 +103,8 @@ final class OptionDetailStore {
         tradeLoadMoreDisposeBag = DisposeBag()
         chartRenderTask?.cancel()
         chartRenderTask = nil
+        tradeExecutionsLoadTask?.cancel()
+        tradeExecutionsLoadTask = nil
         chartRenderRevision += 1
         activeChartRequest = nil
         activeTradeRequest = nil
@@ -111,6 +118,46 @@ final class OptionDetailStore {
     func reloadAll(forceReload: Bool = true) {
         snapshotRefreshRequests.onNext(forceReload)
         reloadChart(forceReload: forceReload)
+        if showsTradeMarkers && selectedRange != .oneDay {
+            loadTradeExecutions(forceRefresh: forceReload)
+        } else if forceReload {
+            hasLoadedTradeExecutions = false
+        }
+    }
+
+    func setShowsTradeMarkers(_ enabled: Bool) {
+        guard showsTradeMarkers != enabled else {
+            if enabled, selectedRange != .oneDay, !hasLoadedTradeExecutions {
+                loadTradeExecutions(forceRefresh: false)
+            }
+            return
+        }
+
+        showsTradeMarkers = enabled
+        guard enabled else {
+            tradeExecutionsLoadTask?.cancel()
+            tradeExecutionsLoadTask = nil
+            chartTradeMarkers = .empty
+            return
+        }
+
+        guard selectedRange != .oneDay else {
+            chartTradeMarkers = .empty
+            return
+        }
+
+        if hasLoadedTradeExecutions {
+            recomputeChartTradeMarkers()
+        } else {
+            loadTradeExecutions(forceRefresh: false)
+        }
+    }
+
+    func tradeMarkers(for point: AssetChartPoint) -> [FinancialChartTradeMarker] {
+        guard showsTradeMarkers, selectedRange != .oneDay else {
+            return []
+        }
+        return chartTradeMarkers.markers(for: point)
     }
 
     func selectRange(_ range: AssetChartRange) {
@@ -119,9 +166,16 @@ final class OptionDetailStore {
         }
 
         selectedRange = range
+        if range == .oneDay {
+            chartTradeMarkers = .empty
+        } else if showsTradeMarkers && !hasLoadedTradeExecutions {
+            loadTradeExecutions(forceRefresh: false)
+        }
+
         if applyCachedChart(for: range, mode: effectiveChartMode) {
             chartErrorMessage = nil
             isLoadingChart = false
+            recomputeChartTradeMarkers()
         } else {
             reloadChart(forceReload: false)
         }
@@ -140,6 +194,7 @@ final class OptionDetailStore {
         if applyCachedChart(for: selectedRange, mode: effectiveChartMode) {
             chartErrorMessage = nil
             isLoadingChart = false
+            recomputeChartTradeMarkers()
         } else if let cachedBars = chartCache[OptionDetailChartCacheKey(range: selectedRange, mode: .line)]?.bars {
             scheduleChartRender(
                 bars: cachedBars,
@@ -537,6 +592,7 @@ final class OptionDetailStore {
             if self.selectedRange == range, self.effectiveChartMode == mode {
                 self.chartRenderModels = renderModels
                 self.isLoadingChart = false
+                self.recomputeChartTradeMarkers()
                 #if DEBUG
                 let periodChangeText: String
                 if let periodPriceChange = renderModels.line.periodPriceChange {
@@ -557,6 +613,84 @@ final class OptionDetailStore {
                 )
                 #endif
             }
+        }
+    }
+
+    private func loadTradeExecutions(forceRefresh: Bool) {
+        guard showsTradeMarkers, let app else {
+            return
+        }
+
+        if !forceRefresh, tradeExecutionsLoadTask != nil {
+            return
+        }
+
+        tradeExecutionsLoadTask?.cancel()
+        let requestedSymbol = contractSymbol
+        let afterDate = AssetTradeMarkerMapper.historyStartDate()
+        tradeExecutionsLoadTask = Task { @MainActor [weak self, weak app] in
+            defer {
+                if let self, !Task.isCancelled {
+                    self.tradeExecutionsLoadTask = nil
+                }
+            }
+            guard let self, let app else {
+                return
+            }
+
+            do {
+                let orders = try await app.fetchSymbolOrders(
+                    symbol: requestedSymbol,
+                    after: afterDate,
+                    forceRefresh: forceRefresh
+                )
+                try Task.checkCancellation()
+                guard self.contractSymbol == requestedSymbol else {
+                    return
+                }
+
+                let parsed = await Task.detached(priority: .utility) {
+                    AssetTradeMarkerMapper.executions(from: orders, symbol: requestedSymbol)
+                }.value
+                try Task.checkCancellation()
+                guard self.contractSymbol == requestedSymbol else {
+                    return
+                }
+
+                self.tradeExecutions = parsed
+                self.hasLoadedTradeExecutions = true
+                self.recomputeChartTradeMarkers()
+            } catch where error.isRequestCancellation {
+                return
+            } catch {
+                return
+            }
+        }
+    }
+
+    private func recomputeChartTradeMarkers() {
+        guard showsTradeMarkers, selectedRange != .oneDay, !tradeExecutions.isEmpty else {
+            if !chartTradeMarkers.isEmpty {
+                chartTradeMarkers = .empty
+            }
+            return
+        }
+
+        let activePoints = chartRenderModels.model(for: effectiveChartMode).financialPoints
+        guard !activePoints.isEmpty else {
+            if !chartTradeMarkers.isEmpty {
+                chartTradeMarkers = .empty
+            }
+            return
+        }
+
+        let nextMarkers = AssetTradeMarkerMapper.map(
+            executions: tradeExecutions,
+            onto: activePoints,
+            range: selectedRange
+        )
+        if chartTradeMarkers != nextMarkers {
+            chartTradeMarkers = nextMarkers
         }
     }
 }

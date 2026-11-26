@@ -144,6 +144,7 @@ struct FinancialChartView: View {
                                 style: activeSnapshot.style,
                                 fillsArea: activeSnapshot.kind == .area,
                                 showsEndpointDot: activeSnapshot.style.showsEndpointPulse && !viewport.isZoomed,
+                                toTradeMarkers: activeSnapshot.placedTradeMarkers,
                                 isDarkMode: activeSnapshot.isDarkMode,
                                 baseStep: morphBaseStep,
                                 animatedStep: morphAnimatedStep
@@ -284,11 +285,18 @@ struct FinancialChartView: View {
             coordinateSystem: coordinateSystem,
             ySolution: ySolution
         )
+        let placedTradeMarkers = FinancialChartTradeMarkerLayout.place(
+            markers: series.tradeMarkers,
+            displayPoints: displayPoints,
+            kind: series.kind,
+            coordinateSystem: coordinateSystem
+        )
 
         return FinancialChartRenderSnapshot(
             seriesID: series.id,
             kind: series.kind,
             displayPoints: displayPoints,
+            placedTradeMarkers: placedTradeMarkers,
             coordinateSystem: coordinateSystem,
             ySolution: ySolution,
             maxVolume: maxVolume,

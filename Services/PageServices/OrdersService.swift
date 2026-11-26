@@ -2,6 +2,7 @@ import Foundation
 
 protocol OrdersServicing: Sendable {
     func fetchRecentOrders(credentials: AlpacaCredentials) async throws -> [AlpacaOrder]
+    func fetchSymbolOrders(symbol: String, after: Date?, limit: Int, credentials: AlpacaCredentials) async throws -> [AlpacaOrder]
     func fetchOrder(id: String, nested: Bool, credentials: AlpacaCredentials) async throws -> AlpacaOrder
     func cancelOrder(id: String, credentials: AlpacaCredentials) async throws
     func replaceOrder(id: String, request: AlpacaReplaceOrderRequest, credentials: AlpacaCredentials) async throws -> AlpacaOrder
@@ -16,6 +17,15 @@ struct OrdersService: OrdersServicing {
 
     func fetchRecentOrders(credentials: AlpacaCredentials) async throws -> [AlpacaOrder] {
         try await alpaca.fetchRecentOrders(credentials: credentials)
+    }
+
+    func fetchSymbolOrders(
+        symbol: String,
+        after: Date? = nil,
+        limit: Int = 500,
+        credentials: AlpacaCredentials
+    ) async throws -> [AlpacaOrder] {
+        try await alpaca.fetchSymbolOrders(symbol: symbol, after: after, limit: limit, credentials: credentials)
     }
 
     func fetchOrder(id: String, nested: Bool, credentials: AlpacaCredentials) async throws -> AlpacaOrder {

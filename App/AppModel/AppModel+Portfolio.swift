@@ -302,6 +302,57 @@ extension AppModel {
         return order
     }
 
+    func fetchSymbolOrders(
+        symbol: String,
+        after: Date? = nil,
+        forceRefresh: Bool = false
+    ) async throws -> [AlpacaOrder] {
+        guard let activeCredentials = credentials else {
+            throw APIClientError.underlying(L10n.Credentials.apiKeyRequired(locale: appLanguage.locale))
+        }
+
+        let normalizedSymbol = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !normalizedSymbol.isEmpty else {
+            return []
+        }
+
+        // Key by the requested window too, so callers with different `after` dates
+        // don't get each other's results. Rounded to the day to keep the key stable.
+        let afterDayKey = after.map { String(Int($0.timeIntervalSince1970 / 86_400)) } ?? "all"
+        let cacheKey = "\(normalizedSymbol)|\(afterDayKey)"
+        let now = Date()
+        if !forceRefresh,
+           let cached = symbolOrdersCache[cacheKey],
+           now.timeIntervalSince(cached.cachedAt) < symbolOrdersCacheTTL {
+            return mergedWithPortfolioOrders(cached.value, symbol: normalizedSymbol)
+        }
+
+        let fetched = try await services.orders.fetchSymbolOrders(
+            symbol: normalizedSymbol,
+            after: after,
+            limit: 500,
+            credentials: activeCredentials
+        )
+        guard isCurrentCredentialContext(activeCredentials) else {
+            return []
+        }
+
+        symbolOrdersCache[cacheKey] = TimedCacheEntry(value: fetched, cachedAt: Date())
+        return mergedWithPortfolioOrders(fetched, symbol: normalizedSymbol)
+    }
+
+    private func mergedWithPortfolioOrders(_ fetched: [AlpacaOrder], symbol normalizedSymbol: String) -> [AlpacaOrder] {
+        var ordersByID: [String: AlpacaOrder] = [:]
+        ordersByID.reserveCapacity(fetched.count + 8)
+        for order in fetched {
+            ordersByID[order.id] = order
+        }
+        for order in portfolio.orders where order.symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() == normalizedSymbol {
+            ordersByID[order.id] = order
+        }
+        return Array(ordersByID.values)
+    }
+
     func cancelOrder(_ order: AlpacaOrder) async throws {
         guard order.supportsCancellation else {
             throw APIClientError.underlying(L10n.Orders.actionNotCancelable(locale: appLanguage.locale))
@@ -419,6 +470,10 @@ extension AppModel {
         } else {
             portfolio.orders.insert(order, at: 0)
         }
+        let normalizedSymbol = order.symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if !normalizedSymbol.isEmpty {
+            symbolOrdersCache.removeValue(forKey: normalizedSymbol)
+        }
         portfolio.hasLoadedOrders = true
     }
 
@@ -454,6 +509,7 @@ extension AppModel {
     func clearPortfolioSnapshot() {
         portfolioHistoryTask?.cancel()
         portfolioHistoryTask = nil
+        symbolOrdersCache = [:]
         portfolio.clear()
     }
 

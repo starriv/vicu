@@ -1072,6 +1072,15 @@ enum L10n {
         static func languageSimplifiedChineseText(locale: Locale) -> String { L10n.string("settings.language.simplified_chinese", locale: locale) }
     }
 
+    enum Chart {
+        static var sectionTitle: LocalizedStringKey { "chart.section_title" }
+        static var line: LocalizedStringKey { "chart.style.line" }
+        static var candles: LocalizedStringKey { "chart.style.candles" }
+        static var optionsAccessibility: LocalizedStringKey { "chart.options.accessibility" }
+        static var tradeMarkers: LocalizedStringKey { "chart.trade_markers.title" }
+        static var tradeMarkersFooter: LocalizedStringKey { "chart.trade_markers.footer" }
+    }
+
     enum NotificationSettings {
         static var title: LocalizedStringKey { "notifications.title" }
         static var allowNotifications: LocalizedStringKey { "notifications.allow" }

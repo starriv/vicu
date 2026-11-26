@@ -92,6 +92,7 @@ enum AppIcon {
     enum Settings {
         static let appearance = "circle.lefthalf.filled"
         static let language = "globe"
+        static let tradeMarkers = "arrow.up.arrow.down.circle.fill"
         static let logoDev = "photo.on.rectangle.angled"
         static let apiKey = "key.horizontal.fill"
         static let privacyPolicy = "hand.raised.fill"

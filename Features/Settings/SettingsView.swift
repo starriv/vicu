@@ -39,6 +39,21 @@ struct SettingsView: View {
             }
 
             Section {
+                Toggle(isOn: $app.showsChartTradeMarkers) {
+                    AppSettingsRow(
+                        title: L10n.Chart.tradeMarkers,
+                        systemImage: AppIcon.Settings.tradeMarkers,
+                        badgeColor: .green
+                    )
+                }
+                .tint(.green)
+            } header: {
+                Text(L10n.Chart.sectionTitle)
+            } footer: {
+                Text(L10n.Chart.tradeMarkersFooter)
+            }
+
+            Section {
                 Toggle(isOn: $app.isLogoDevEnabled.animation(.snappy)) {
                     AppSettingsRow(
                         title: L10n.Settings.logoDevEnabled,
