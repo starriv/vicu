@@ -17,6 +17,8 @@ protocol AssetDetailServicing: AnyObject {
 
     func fetchOpenPosition(symbol: String) async throws -> AlpacaPosition?
 
+    func fetchSymbolOrders(symbol: String, after: Date?, forceRefresh: Bool) async throws -> [AlpacaOrder]
+
     func streamAssetMarketData(
         symbol: String,
         feed: AlpacaMarketDataFeed,

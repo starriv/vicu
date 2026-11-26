@@ -11,7 +11,7 @@ struct AssetQuoteHistorySheet: View {
 
     @State private var selectedRange: QuoteHistoryRange = .fiveMinutes
     @State private var rows: [QuoteHistoryRowModel] = []
-    @State private var spreadPoints: [QuoteHistorySpreadPoint] = []
+    @State private var spreadSeries: FinancialChartSeries?
     @State private var nextPageToken: String?
     @State private var isLoading = false
     @State private var isLoadingMore = false
@@ -27,7 +27,7 @@ struct AssetQuoteHistorySheet: View {
                         QuoteHistoryCurrentCard(row: latestRow)
                     }
 
-                    QuoteHistorySpreadCard(points: spreadPoints, quoteCount: rows.count)
+                    QuoteHistorySpreadCard(series: spreadSeries, quoteCount: rows.count)
 
                     QuoteHistoryRowsCard(
                         rows: rows,
@@ -98,16 +98,44 @@ struct AssetQuoteHistorySheet: View {
                 return
             }
 
-            let pageRows = page.quotes.map { QuoteHistoryRowModel(symbol: symbol, quote: $0) }
-            nextPageToken = page.nextPageToken
+            let existingRows = reset ? [] : rows
+            let incomingQuotes = page.quotes
+            let targetSymbol = symbol
+            let processed = await Task.detached(priority: .userInitiated) { () -> (rows: [QuoteHistoryRowModel], series: FinancialChartSeries?) in
+                let pageRows = incomingQuotes.map { QuoteHistoryRowModel(symbol: targetSymbol, quote: $0) }
+                let combinedRows: [QuoteHistoryRowModel]
+                if existingRows.isEmpty {
+                    combinedRows = pageRows
+                } else {
+                    var seen = Set(existingRows.map(\.id))
+                    combinedRows = existingRows + pageRows.filter { seen.insert($0.id).inserted }
+                }
+                let points = QuoteHistorySpreadPoint.makePoints(from: combinedRows)
+                let series: FinancialChartSeries? = points.count >= 2
+                    ? FinancialChartSeries(
+                        kind: .line,
+                        points: points.map { point in
+                            FinancialChartPoint(
+                                date: point.date,
+                                x: point.date.timeIntervalSince1970,
+                                value: point.spread
+                            )
+                        },
+                        baselinePolicy: .none,
+                        yScaleConfig: .nonNegativeMetric,
+                        allowsZoomAndPan: false
+                    )
+                    : nil
+                return (combinedRows, series)
+            }.value
 
-            if reset {
-                rows = pageRows
-            } else {
-                appendUnique(pageRows)
+            guard !Task.isCancelled else {
+                return
             }
 
-            spreadPoints = QuoteHistorySpreadPoint.makePoints(from: rows)
+            nextPageToken = page.nextPageToken
+            rows = processed.rows
+            spreadSeries = processed.series
         } catch where error.isRequestCancellation {
             return
         } catch {
@@ -117,7 +145,7 @@ struct AssetQuoteHistorySheet: View {
 
             if reset {
                 rows = []
-                spreadPoints = []
+                spreadSeries = nil
             }
             hasLoadError = true
             toastCenter.showError(error, locale: app.appLanguage.locale)
@@ -131,11 +159,6 @@ struct AssetQuoteHistorySheet: View {
         }
 
         await loadQuotes(reset: false)
-    }
-
-    private func appendUnique(_ newRows: [QuoteHistoryRowModel]) {
-        var seen = Set(rows.map(\.id))
-        rows.append(contentsOf: newRows.filter { seen.insert($0.id).inserted })
     }
 }
 
@@ -191,7 +214,7 @@ private enum QuoteHistoryRange: String, CaseIterable, Identifiable {
     }
 }
 
-private struct QuoteHistoryRowModel: Identifiable, Equatable {
+private struct QuoteHistoryRowModel: Identifiable, Equatable, Sendable {
     let id: String
     let date: Date?
     let timeText: String
@@ -307,7 +330,7 @@ private struct QuoteHistoryCurrentCard: View {
 }
 
 private struct QuoteHistorySpreadCard: View {
-    let points: [QuoteHistorySpreadPoint]
+    let series: FinancialChartSeries?
     let quoteCount: Int
 
     var body: some View {
@@ -321,21 +344,7 @@ private struct QuoteHistorySpreadCard: View {
                     .foregroundStyle(.secondary)
             }
 
-            if points.count >= 2 {
-                let series = FinancialChartSeries(
-                    kind: .line,
-                    points: points.map { point in
-                        FinancialChartPoint(
-                            date: point.date,
-                            x: point.date.timeIntervalSince1970,
-                            value: point.spread
-                        )
-                    },
-                    baselinePolicy: .none,
-                    yScaleConfig: .nonNegativeMetric,
-                    allowsZoomAndPan: false
-                )
-
+            if let series {
                 StaticSparklineChartView(
                     series: series,
                     style: FinancialChartStyle(
@@ -495,12 +504,14 @@ private struct QuoteHistorySpreadPoint: Identifiable, Equatable {
 }
 
 private enum QuoteHistoryFormat {
+    private static let formatter = LockedQuoteHistoryTimeFormatter()
+
     static func time(_ date: Date?) -> String {
         guard let date else {
             return AppFormatter.placeholder
         }
 
-        return timeFormatter.string(from: date)
+        return formatter.string(from: date)
     }
 
     static func spread(bid: Double?, ask: Double?) -> Double? {
@@ -541,12 +552,22 @@ private enum QuoteHistoryFormat {
 
         return String(value)
     }
+}
 
-    private static let timeFormatter: DateFormatter = {
+// @unchecked Sendable: DateFormatter access guarded by NSLock
+private final class LockedQuoteHistoryTimeFormatter: @unchecked Sendable {
+    private let lock = NSLock()
+    private let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = .current
         formatter.timeStyle = .medium
         formatter.dateStyle = .none
         return formatter
     }()
+
+    func string(from date: Date) -> String {
+        lock.lock()
+        defer { lock.unlock() }
+        return timeFormatter.string(from: date)
+    }
 }

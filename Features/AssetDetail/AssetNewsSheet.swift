@@ -153,7 +153,15 @@ struct AssetNewsSheet: View {
                 return
             }
 
-            let pageRows = page.articles.map(AssetNewsRowModel.init(article:))
+            let articles = page.articles
+            let pageRows = await Task.detached(priority: .userInitiated) {
+                articles.map(AssetNewsRowModel.init(article:))
+            }.value
+
+            guard !Task.isCancelled else {
+                return
+            }
+
             nextPageToken = page.nextPageToken
 
             if reset {
@@ -217,7 +225,7 @@ private struct AssetNewsLoadMoreTrigger: Equatable {
     let count: Int
 }
 
-private struct AssetNewsRowModel: Identifiable, Equatable {
+private struct AssetNewsRowModel: Identifiable, Equatable, Sendable {
     let id: String
     let headline: String
     let summary: String?
@@ -249,27 +257,16 @@ private struct AssetNewsRowModel: Identifiable, Equatable {
             return nil
         }
 
-        let normalized = value
-            .replacingOccurrences(of: "\n", with: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return normalized.isEmpty ? nil : htmlDecoded(normalized)
-    }
-
-    private static func htmlDecoded(_ value: String) -> String {
-        guard value.contains("&"),
-              let data = value.data(using: .utf8),
-              let attributed = try? NSAttributedString(
-                data: data,
-                options: [
-                    .documentType: NSAttributedString.DocumentType.html,
-                    .characterEncoding: String.Encoding.utf8.rawValue
-                ],
-                documentAttributes: nil
-              ) else {
-            return value
+        var normalized = value.replacingOccurrences(of: "\n", with: " ")
+        if normalized.contains("<") {
+            // Strip markup before decoding entities, so encoded text like `&lt;` survives
+            // as a literal character instead of being removed as a tag.
+            normalized = normalized
+                .replacingOccurrences(of: "<[^<>]+>", with: " ", options: .regularExpression)
+                .replacingOccurrences(of: " {2,}", with: " ", options: .regularExpression)
         }
-
-        return attributed.string.trimmingCharacters(in: .whitespacesAndNewlines)
+        normalized = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalized.isEmpty ? nil : AssetNewsHTMLDecoder.decode(normalized)
     }
 
     private static func sourceText(_ value: String?) -> String {
@@ -287,9 +284,7 @@ private struct AssetNewsRowModel: Identifiable, Equatable {
 
         let age = abs(date.timeIntervalSinceNow)
         if age < 7 * 24 * 60 * 60 {
-            let relativeFormatter = RelativeDateTimeFormatter()
-            relativeFormatter.unitsStyle = .short
-            return relativeFormatter.localizedString(for: date, relativeTo: Date())
+            return AssetNewsRelativeTimeFormatter.shared.string(for: date)
         }
 
         return date.formatted(date: .abbreviated, time: .shortened)
@@ -301,6 +296,90 @@ private struct AssetNewsRowModel: Identifiable, Equatable {
         }
 
         return URL(string: value)
+    }
+}
+
+/// Fast pure-Swift HTML entity decoder that avoids spinning up WebKit's `NSAttributedString(.html)` parser.
+enum AssetNewsHTMLDecoder {
+    private static let namedEntities: [Substring: Character] = [
+        "amp": "&",
+        "lt": "<",
+        "gt": ">",
+        "quot": "\"",
+        "apos": "'",
+        "nbsp": " ",
+        "ndash": "–",
+        "mdash": "—",
+        "hellip": "…",
+        "lsquo": "‘",
+        "rsquo": "’",
+        "ldquo": "“",
+        "rdquo": "”"
+    ]
+
+    static func decode(_ text: String) -> String {
+        guard text.contains("&") else {
+            return text
+        }
+
+        var result = String()
+        result.reserveCapacity(text.count)
+        var index = text.startIndex
+
+        while index < text.endIndex {
+            if text[index] == "&",
+               let semicolon = text[index...].firstIndex(of: ";"),
+               text.distance(from: index, to: semicolon) <= 12 {
+                let entityStart = text.index(after: index)
+                let entity = text[entityStart..<semicolon]
+                if let decoded = decodeEntity(entity) {
+                    result.append(decoded)
+                    index = text.index(after: semicolon)
+                    continue
+                }
+            }
+
+            result.append(text[index])
+            index = text.index(after: index)
+        }
+
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func decodeEntity(_ entity: Substring) -> Character? {
+        if entity.hasPrefix("#") {
+            let numeric = entity.dropFirst()
+            let scalarValue: UInt32?
+            if numeric.hasPrefix("x") || numeric.hasPrefix("X") {
+                scalarValue = UInt32(numeric.dropFirst(), radix: 16)
+            } else {
+                scalarValue = UInt32(numeric, radix: 10)
+            }
+            if let scalarValue, let scalar = UnicodeScalar(scalarValue) {
+                return Character(scalar)
+            }
+            return nil
+        }
+
+        return namedEntities[entity]
+    }
+}
+
+// @unchecked Sendable: RelativeDateTimeFormatter access guarded by NSLock
+private final class AssetNewsRelativeTimeFormatter: @unchecked Sendable {
+    static let shared = AssetNewsRelativeTimeFormatter()
+
+    private let lock = NSLock()
+    private let formatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return formatter
+    }()
+
+    func string(for date: Date) -> String {
+        lock.lock()
+        defer { lock.unlock() }
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
 

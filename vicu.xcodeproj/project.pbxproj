@@ -33,6 +33,14 @@
 		0A0F90000000000000000106 /* Features/Home/HomeAICopilotSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F90000000000000000206 /* Features/Home/HomeAICopilotSheet.swift */; };
 		0C0F90000000000000000101 /* vicuTests/PortfolioIntelligenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0F90000000000000000201 /* PortfolioIntelligenceTests.swift */; };
 		0C0FA1000000000000000101 /* vicuTests/MarketSearchEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0FA1000000000000000201 /* MarketSearchEngineTests.swift */; };
+		0C0FB1000000000000000101 /* vicuTests/AssetDetailStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C0FB1000000000000000201 /* AssetDetailStoreTests.swift */; };
+		0A0FB0000000000000000101 /* Features/AssetDetail/Store/AssetDetailRealtimeBatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0FB0000000000000000201 /* Features/AssetDetail/Store/AssetDetailRealtimeBatch.swift */; };
+		0A0FB0000000000000000102 /* Features/AssetDetail/Store/AssetDetailBarSeries.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0FB0000000000000000202 /* Features/AssetDetail/Store/AssetDetailBarSeries.swift */; };
+		0A0FB0000000000000000103 /* Features/AssetDetail/Components/AssetDetailSharedComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0FB0000000000000000203 /* Features/AssetDetail/Components/AssetDetailSharedComponents.swift */; };
+		0A0FB0000000000000000104 /* Features/AssetDetail/Components/AssetDetailChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0FB0000000000000000204 /* Features/AssetDetail/Components/AssetDetailChrome.swift */; };
+		0A0FB0000000000000000105 /* Features/AssetDetail/Components/AssetDetailHeroAndChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0FB0000000000000000205 /* Features/AssetDetail/Components/AssetDetailHeroAndChart.swift */; };
+		0A0FB0000000000000000106 /* Features/AssetDetail/Components/AssetDetailPanels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0FB0000000000000000206 /* Features/AssetDetail/Components/AssetDetailPanels.swift */; };
+		0A0FB0000000000000000107 /* Features/AssetDetail/Navigation/InteractivePopGestureRestorer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0FB0000000000000000207 /* Features/AssetDetail/Navigation/InteractivePopGestureRestorer.swift */; };
 		0A0000000000000000000114 /* Features/Markets/MarketsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000214 /* Features/Markets/MarketsView.swift */; };
 		0A0F60000000000000000103 /* Features/Markets/MarketIndexProxyPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0F60000000000000000203 /* Features/Markets/MarketIndexProxyPanel.swift */; };
 		0A0FA0000000000000000101 /* Features/Search/MarketSearchEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0FA0000000000000000201 /* Features/Search/MarketSearchEngine.swift */; };
@@ -260,6 +268,14 @@
 		0A0F90000000000000000206 /* Features/Home/HomeAICopilotSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Home/HomeAICopilotSheet.swift; sourceTree = "<group>"; };
 		0C0F90000000000000000201 /* PortfolioIntelligenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = vicuTests/PortfolioIntelligenceTests.swift; sourceTree = "<group>"; };
 		0C0FA1000000000000000201 /* MarketSearchEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = vicuTests/MarketSearchEngineTests.swift; sourceTree = "<group>"; };
+		0C0FB1000000000000000201 /* AssetDetailStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = vicuTests/AssetDetailStoreTests.swift; sourceTree = "<group>"; };
+		0A0FB0000000000000000201 /* Features/AssetDetail/Store/AssetDetailRealtimeBatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/Store/AssetDetailRealtimeBatch.swift; sourceTree = "<group>"; };
+		0A0FB0000000000000000202 /* Features/AssetDetail/Store/AssetDetailBarSeries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/Store/AssetDetailBarSeries.swift; sourceTree = "<group>"; };
+		0A0FB0000000000000000203 /* Features/AssetDetail/Components/AssetDetailSharedComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/Components/AssetDetailSharedComponents.swift; sourceTree = "<group>"; };
+		0A0FB0000000000000000204 /* Features/AssetDetail/Components/AssetDetailChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/Components/AssetDetailChrome.swift; sourceTree = "<group>"; };
+		0A0FB0000000000000000205 /* Features/AssetDetail/Components/AssetDetailHeroAndChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/Components/AssetDetailHeroAndChart.swift; sourceTree = "<group>"; };
+		0A0FB0000000000000000206 /* Features/AssetDetail/Components/AssetDetailPanels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/Components/AssetDetailPanels.swift; sourceTree = "<group>"; };
+		0A0FB0000000000000000207 /* Features/AssetDetail/Navigation/InteractivePopGestureRestorer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/AssetDetail/Navigation/InteractivePopGestureRestorer.swift; sourceTree = "<group>"; };
 		0A0000000000000000000214 /* Features/Markets/MarketsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Markets/MarketsView.swift; sourceTree = "<group>"; };
 		0A0F60000000000000000203 /* Features/Markets/MarketIndexProxyPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Markets/MarketIndexProxyPanel.swift; sourceTree = "<group>"; };
 		0A0FA0000000000000000201 /* Features/Search/MarketSearchEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Search/MarketSearchEngine.swift; sourceTree = "<group>"; };
@@ -515,12 +531,20 @@
 				0A0F90000000000000000206 /* Features/Home/HomeAICopilotSheet.swift */,
 				0C0F90000000000000000201 /* PortfolioIntelligenceTests.swift */,
 				0C0FA1000000000000000201 /* MarketSearchEngineTests.swift */,
+				0C0FB1000000000000000201 /* AssetDetailStoreTests.swift */,
 				0A0000000000000000000260 /* Features/Home/AccountView.swift */,
 				0A0000000000000000000268 /* Features/Home/AccountActivityView.swift */,
 				0A0000000000000000000262 /* Features/Home/HomeAccountPolling.swift */,
 				0A0000000000000000000283 /* Features/AssetDetail/AssetDetailStore.swift */,
+				0A0FB0000000000000000201 /* Features/AssetDetail/Store/AssetDetailRealtimeBatch.swift */,
+				0A0FB0000000000000000202 /* Features/AssetDetail/Store/AssetDetailBarSeries.swift */,
 				0A0F60000000000000000202 /* Features/AssetDetail/AssetDetailServicing.swift */,
 				0A0000000000000000000284 /* Features/AssetDetail/AssetDetailView.swift */,
+				0A0FB0000000000000000203 /* Features/AssetDetail/Components/AssetDetailSharedComponents.swift */,
+				0A0FB0000000000000000204 /* Features/AssetDetail/Components/AssetDetailChrome.swift */,
+				0A0FB0000000000000000205 /* Features/AssetDetail/Components/AssetDetailHeroAndChart.swift */,
+				0A0FB0000000000000000206 /* Features/AssetDetail/Components/AssetDetailPanels.swift */,
+				0A0FB0000000000000000207 /* Features/AssetDetail/Navigation/InteractivePopGestureRestorer.swift */,
 				0A0000000000000000000286 /* Features/AssetDetail/AssetDetailChart.swift */,
 				0A0000000000000000000298 /* Features/AssetDetail/AssetQuoteHistorySheet.swift */,
 				0A00000000000000000002E0 /* Features/AssetDetail/AssetNewsSheet.swift */,
@@ -904,8 +928,15 @@
 				0A0000000000000000000168 /* Features/Home/AccountActivityView.swift in Sources */,
 				0A0000000000000000000162 /* Features/Home/HomeAccountPolling.swift in Sources */,
 				0A0000000000000000000183 /* Features/AssetDetail/AssetDetailStore.swift in Sources */,
+				0A0FB0000000000000000101 /* Features/AssetDetail/Store/AssetDetailRealtimeBatch.swift in Sources */,
+				0A0FB0000000000000000102 /* Features/AssetDetail/Store/AssetDetailBarSeries.swift in Sources */,
 				0A0F60000000000000000102 /* Features/AssetDetail/AssetDetailServicing.swift in Sources */,
 				0A0000000000000000000184 /* Features/AssetDetail/AssetDetailView.swift in Sources */,
+				0A0FB0000000000000000103 /* Features/AssetDetail/Components/AssetDetailSharedComponents.swift in Sources */,
+				0A0FB0000000000000000104 /* Features/AssetDetail/Components/AssetDetailChrome.swift in Sources */,
+				0A0FB0000000000000000105 /* Features/AssetDetail/Components/AssetDetailHeroAndChart.swift in Sources */,
+				0A0FB0000000000000000106 /* Features/AssetDetail/Components/AssetDetailPanels.swift in Sources */,
+				0A0FB0000000000000000107 /* Features/AssetDetail/Navigation/InteractivePopGestureRestorer.swift in Sources */,
 				0A0000000000000000000186 /* Features/AssetDetail/AssetDetailChart.swift in Sources */,
 				0A0000000000000000000198 /* Features/AssetDetail/AssetQuoteHistorySheet.swift in Sources */,
 				0A00000000000000000001E0 /* Features/AssetDetail/AssetNewsSheet.swift in Sources */,
@@ -1046,6 +1077,7 @@
 				0C0F80000000000000000101 /* vicuTests/FinancialChartEngineTests.swift in Sources */,
 				0C0F90000000000000000101 /* vicuTests/PortfolioIntelligenceTests.swift in Sources */,
 				0C0FA1000000000000000101 /* vicuTests/MarketSearchEngineTests.swift in Sources */,
+				0C0FB1000000000000000101 /* vicuTests/AssetDetailStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

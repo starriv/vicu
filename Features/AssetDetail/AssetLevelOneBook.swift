@@ -5,8 +5,6 @@ struct AssetLevelOneBook: View {
     let askPrice: Double?
     let bidSize: Double?
     let askSize: Double?
-    let bidExchange: String?
-    let askExchange: String?
     let spread: Double?
     let quoteTime: String?
     let showHistory: () -> Void
@@ -192,6 +190,7 @@ private enum AssetQuoteNumber {
     }
 }
 
+@MainActor
 private enum AssetQuoteTimeFormatter {
     static func shortTime(_ text: String?) -> String? {
         guard let date = AlpacaDateParser.date(text) else {

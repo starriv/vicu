@@ -1,5 +1,24 @@
 import Foundation
 
+struct AssetParsedMarketBar: Sendable {
+    let bar: AlpacaMarketBar
+    let date: Date
+    let minuteKey: Int
+
+    init(bar: AlpacaMarketBar, date: Date) {
+        self.bar = bar
+        self.date = date
+        self.minuteKey = Int(floor(date.timeIntervalSince1970 / 60))
+    }
+
+    init?(bar: AlpacaMarketBar) {
+        guard let date = AlpacaDateParser.date(bar.timestamp) else {
+            return nil
+        }
+        self.init(bar: bar, date: date)
+    }
+}
+
 struct AssetChartRenderInput: Sendable {
     let bars: [AssetChartInputBar]
     let xDomain: ClosedRange<Double>?
@@ -13,11 +32,65 @@ struct AssetIntradaySessionContext: Sendable {
     let latestTrade: AlpacaRealtimeTrade?
     let quote: AlpacaRealtimeQuote?
     let latestOvernightBar: AlpacaMarketBar?
-    let overnightSupplementBars: [AlpacaMarketBar]
+    let overnightSupplementEntries: [AssetParsedMarketBar]
     let previousClose: Double?
     let dayOpen: Double?
     let latestCoreSessionClose: Double?
     let currentPrice: Double?
+
+    init(
+        symbol: String,
+        feed: AlpacaMarketDataFeed,
+        sessionProgress: MarketSessionProgress?,
+        latestTrade: AlpacaRealtimeTrade?,
+        quote: AlpacaRealtimeQuote?,
+        latestOvernightBar: AlpacaMarketBar?,
+        overnightSupplementEntries: [AssetParsedMarketBar],
+        previousClose: Double?,
+        dayOpen: Double?,
+        latestCoreSessionClose: Double?,
+        currentPrice: Double?
+    ) {
+        self.symbol = symbol
+        self.feed = feed
+        self.sessionProgress = sessionProgress
+        self.latestTrade = latestTrade
+        self.quote = quote
+        self.latestOvernightBar = latestOvernightBar
+        self.overnightSupplementEntries = overnightSupplementEntries
+        self.previousClose = previousClose
+        self.dayOpen = dayOpen
+        self.latestCoreSessionClose = latestCoreSessionClose
+        self.currentPrice = currentPrice
+    }
+
+    init(
+        symbol: String,
+        feed: AlpacaMarketDataFeed,
+        sessionProgress: MarketSessionProgress?,
+        latestTrade: AlpacaRealtimeTrade?,
+        quote: AlpacaRealtimeQuote?,
+        latestOvernightBar: AlpacaMarketBar?,
+        overnightSupplementBars: [AlpacaMarketBar],
+        previousClose: Double?,
+        dayOpen: Double?,
+        latestCoreSessionClose: Double?,
+        currentPrice: Double?
+    ) {
+        self.init(
+            symbol: symbol,
+            feed: feed,
+            sessionProgress: sessionProgress,
+            latestTrade: latestTrade,
+            quote: quote,
+            latestOvernightBar: latestOvernightBar,
+            overnightSupplementEntries: overnightSupplementBars.compactMap(AssetParsedMarketBar.init(bar:)),
+            previousClose: previousClose,
+            dayOpen: dayOpen,
+            latestCoreSessionClose: latestCoreSessionClose,
+            currentPrice: currentPrice
+        )
+    }
 }
 
 /// Pure, testable mapper that translates raw Alpaca bars + intraday session schedules
@@ -33,7 +106,20 @@ enum AssetIntradaySessionMapper {
         priceChangeBaseline: Double?,
         context: AssetIntradaySessionContext
     ) -> AssetChartRenderInput {
-        let parsedSource = preParseBars(sourceBars)
+        makeRenderInput(
+            fromParsedBars: preParseBars(sourceBars),
+            range: range,
+            priceChangeBaseline: priceChangeBaseline,
+            context: context
+        )
+    }
+
+    static func makeRenderInput(
+        fromParsedBars parsedSource: [AssetParsedMarketBar],
+        range: AssetChartRange,
+        priceChangeBaseline: Double?,
+        context: AssetIntradaySessionContext
+    ) -> AssetChartRenderInput {
         let indexedSourceBars = indexedInputBars(from: parsedSource)
 
         guard range == .oneDay else {
@@ -192,26 +278,11 @@ enum AssetIntradaySessionMapper {
 
     // MARK: - Private Helpers
 
-    private struct ParsedBar: Sendable {
-        let bar: AlpacaMarketBar
-        let date: Date
-        let minuteKey: Int
+    private static func preParseBars(_ bars: [AlpacaMarketBar]) -> [AssetParsedMarketBar] {
+        bars.compactMap(AssetParsedMarketBar.init(bar:))
     }
 
-    private static func preParseBars(_ bars: [AlpacaMarketBar]) -> [ParsedBar] {
-        bars.compactMap { bar in
-            guard let date = AlpacaDateParser.date(bar.timestamp) else {
-                return nil
-            }
-            return ParsedBar(
-                bar: bar,
-                date: date,
-                minuteKey: Int(floor(date.timeIntervalSince1970 / 60))
-            )
-        }
-    }
-
-    private static func indexedInputBars(from parsedBars: [ParsedBar]) -> [AssetChartInputBar] {
+    private static func indexedInputBars(from parsedBars: [AssetParsedMarketBar]) -> [AssetChartInputBar] {
         parsedBars.enumerated().map { offset, item in
             AssetChartInputBar(bar: item.bar, date: item.date, xPosition: Double(offset))
         }
@@ -240,7 +311,7 @@ enum AssetIntradaySessionMapper {
     }
 
     private static func extendedSessionFallbackInput(
-        from parsedBars: [ParsedBar],
+        from parsedBars: [AssetParsedMarketBar],
         priceChangeBaseline: Double?,
         context: AssetIntradaySessionContext
     ) -> AssetChartRenderInput? {
@@ -302,7 +373,7 @@ enum AssetIntradaySessionMapper {
     }
 
     private static func activeSessionInput(
-        from parsedBars: [ParsedBar],
+        from parsedBars: [AssetParsedMarketBar],
         priceChangeBaseline: Double?,
         context: AssetIntradaySessionContext
     ) -> AssetChartRenderInput? {
@@ -472,13 +543,17 @@ enum AssetIntradaySessionMapper {
     }
 
     private static func overnightChartBars(
-        referenceBar: ParsedBar?,
+        referenceBar: AssetParsedMarketBar?,
         context: AssetIntradaySessionContext
-    ) -> [ParsedBar] {
-        var barsByKey: [Int: ParsedBar] = [:]
+    ) -> [AssetParsedMarketBar] {
+        var barsByKey: [Int: AssetParsedMarketBar] = [:]
+        barsByKey.reserveCapacity(context.overnightSupplementEntries.count + 1)
 
-        for bar in context.overnightSupplementBars {
-            storeOvernightBar(bar, in: &barsByKey)
+        for entry in context.overnightSupplementEntries {
+            if let existing = barsByKey[entry.minuteKey], existing.date > entry.date {
+                continue
+            }
+            barsByKey[entry.minuteKey] = entry
         }
 
         if let latestBar = latestOvernightChartBar(referenceBar: referenceBar?.bar, context: context) {
@@ -496,16 +571,14 @@ enum AssetIntradaySessionMapper {
             .sorted { $0.date < $1.date }
     }
 
-    private static func storeOvernightBar(_ bar: AlpacaMarketBar, in barsByKey: inout [Int: ParsedBar]) {
-        guard let date = AlpacaDateParser.date(bar.timestamp) else {
+    private static func storeOvernightBar(_ bar: AlpacaMarketBar, in barsByKey: inout [Int: AssetParsedMarketBar]) {
+        guard let candidate = AssetParsedMarketBar(bar: bar) else {
             return
         }
-        let key = Int(floor(date.timeIntervalSince1970 / 60))
-        let candidate = ParsedBar(bar: bar, date: date, minuteKey: key)
-        if let existing = barsByKey[key], existing.date > candidate.date {
+        if let existing = barsByKey[candidate.minuteKey], existing.date > candidate.date {
             return
         }
-        barsByKey[key] = candidate
+        barsByKey[candidate.minuteKey] = candidate
     }
 
     private static func applyingLatestRealtimePrice(
@@ -586,7 +659,7 @@ enum AssetIntradaySessionMapper {
         return preferredDate >= fallbackDate ? preferred : fallback
     }
 
-    private static func chartQuotePrice(_ quote: AlpacaRealtimeQuote?) -> Double? {
+    static func chartQuotePrice(_ quote: AlpacaRealtimeQuote?) -> Double? {
         guard let quote else { return nil }
         switch (hasValidMarketPrice(quote.bidPrice), hasValidMarketPrice(quote.askPrice)) {
         case (true, true):

@@ -262,10 +262,14 @@ private struct MarketSessionTimelineSessionPosition {
         }
     }
 
-    private static func easternMinutes(from date: Date) -> Int {
+    private static let easternCalendar: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "America/New_York") ?? .current
-        let components = calendar.dateComponents([.hour, .minute], from: date)
+        return calendar
+    }()
+
+    private static func easternMinutes(from date: Date) -> Int {
+        let components = easternCalendar.dateComponents([.hour, .minute], from: date)
         return (components.hour ?? 0) * 60 + (components.minute ?? 0)
     }
 }

@@ -9,46 +9,88 @@ final class AssetDetailStore {
     private static let supplementalSnapshotRefreshInterval: UInt64 = 30_000_000_000
     private static let supplementalSnapshotQuietThreshold: TimeInterval = 20
     private static let latestBarRefreshInterval: UInt64 = 5_000_000_000
-    private static let oneDayChartSlotDuration: TimeInterval = 5 * 60
+    /// Returning to a 1D chart after this long refetches bars so the time away isn't a gap.
+    private static let oneDayResumeReloadThreshold: TimeInterval = 60
     private static let optimisticConnectionFreshnessThreshold: TimeInterval = 5 * 60
+    private static let easternCalendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/New_York") ?? .current
+        return calendar
+    }()
 
     var selectedRange: AssetChartRange = .oneDay
     var chartMode: AssetChartMode = .line
+    var showsTradeMarkers = true
     var feed: AlpacaMarketDataFeed = .iex
-    var asset: AlpacaAsset?
-    var quote: AlpacaRealtimeQuote?
-    var latestTrade: AlpacaRealtimeTrade?
-    var dailyBar: AlpacaMarketBar?
+    var asset: AlpacaAsset? {
+        didSet { updateCachedAssetMetadata() }
+    }
+    var quote: AlpacaRealtimeQuote? {
+        didSet { parsedQuoteDate = AlpacaDateParser.date(quote?.timestamp) }
+    }
+    var latestTrade: AlpacaRealtimeTrade? {
+        didSet { parsedLatestTradeDate = AlpacaDateParser.date(latestTrade?.timestamp) }
+    }
+    var dailyBar: AlpacaMarketBar? {
+        didSet { parsedDailyBarDate = AlpacaDateParser.date(dailyBar?.timestamp) }
+    }
     var previousDailyBar: AlpacaMarketBar?
     var position: AlpacaPosition?
     var chartRenderModels: AssetChartRenderModels = .empty
+    private(set) var chartTradeMarkers: AssetChartTradeMarkerSet = .empty
     var tradingStatus: AlpacaRealtimeTradingStatus?
     var connectionStatus: AssetRealtimeConnectionStatus = .disconnected
     var latestCoreSessionClose: Double?
-    var sessionProgress: MarketSessionProgress?
+    var sessionProgress: MarketSessionProgress? {
+        didSet { updateCachedSessionMetadata() }
+    }
     var isLoading = false
     var isLoadingChart = false
     var errorMessage: String?
     var lastUpdatedAt: Date?
 
+    // Cached derived properties to avoid repeated parsing/allocations during SwiftUI body passes & 120Hz scrubbing
+    private(set) var displayName: String = AppFormatter.placeholder
+    private(set) var exchangeText: String = AppFormatter.placeholder
+    private(set) var assetClassText: String = AppFormatter.placeholder
+    private(set) var supportsOptions = false
+    private(set) var sessionTimeline: MarketSessionTimeline?
+
+    @ObservationIgnored private var parsedLatestTradeDate: Date?
+    @ObservationIgnored private var parsedQuoteDate: Date?
+    @ObservationIgnored private var parsedDailyBarDate: Date?
+    @ObservationIgnored private var cachedHasActiveSessionProgress = false
+    @ObservationIgnored private var cachedActiveReferenceInterval: MarketSessionInterval?
+
     @ObservationIgnored private weak var service: (any AssetDetailServicing)?
     @ObservationIgnored private var streamDisposeBag = DisposeBag()
-    @ObservationIgnored private var snapshotDisposeBag = DisposeBag()
-    @ObservationIgnored private var supplementalSnapshotDisposeBag = DisposeBag()
-    @ObservationIgnored private let snapshotRequests = PublishSubject<AssetDetailSnapshotRequest>()
-    @ObservationIgnored private let supplementalSnapshotRequests = PublishSubject<AssetDetailSupplementalSnapshotRequest>()
-    @ObservationIgnored private var chartRenderTask: Task<Void, Never>?
-    @ObservationIgnored private var cachedSnapshotTask: Task<Void, Never>?
+    @ObservationIgnored private var snapshotLoadTask: Task<Void, Never>?
+    @ObservationIgnored private var supplementalRefreshLoopTask: Task<Void, Never>?
+    @ObservationIgnored private var supplementalFetchTask: Task<Void, Never>?
     @ObservationIgnored private var latestBarRefreshTask: Task<Void, Never>?
+    @ObservationIgnored private var immediateLatestBarTask: Task<Void, Never>?
     @ObservationIgnored private var positionLoadTask: Task<Void, Never>?
+    @ObservationIgnored private var tradeExecutionsLoadTask: Task<Void, Never>?
+    @ObservationIgnored private var tradeExecutions: [AssetTradeExecution] = []
+    @ObservationIgnored private var hasLoadedTradeExecutions = false
+    @ObservationIgnored private var chartRenderTask: Task<Void, Never>?
+    @ObservationIgnored private var snapshotRequestID = 0
     @ObservationIgnored private var chartRenderRevision = 0
     @ObservationIgnored private var snapshotContentRevision = 0
     @ObservationIgnored private var shouldResyncOnLive = false
-    @ObservationIgnored private var bars: [AlpacaMarketBar] = []
+    /// Range whose freshly fetched snapshot bars are still being rendered off-main.
+    /// Realtime updates during that window are deferred instead of cancelling the render,
+    /// otherwise the downloaded bars would be dropped.
+    @ObservationIgnored private var pendingSnapshotRenderRange: AssetChartRange?
+    @ObservationIgnored private var deferredRealtimeBars: [AlpacaMarketBar] = []
+    @ObservationIgnored private var hasDeferredRealtimeChartUpdate = false
+    /// Set by `stop()` when a range load or render was cut off, so `start()` redoes it.
+    @ObservationIgnored private var needsSnapshotReloadOnResume = false
+    @ObservationIgnored private var stoppedAt: Date?
+    @ObservationIgnored private var barSeries = AssetDetailBarSeries()
     @ObservationIgnored private var latestOvernightBar: AlpacaMarketBar?
-    @ObservationIgnored private var overnightSupplementBars: [AlpacaMarketBar] = []
     @ObservationIgnored private var chartBaselines: [AssetChartRange: Double] = [:]
-    @ObservationIgnored private var chartCache: [AssetChartCacheKey: AssetChartCacheEntry] = [:]
+    @ObservationIgnored private var chartCache: [AssetChartRange: AssetChartCacheEntry] = [:]
     @ObservationIgnored private var boundStreamFeed: AlpacaMarketDataFeed?
     @ObservationIgnored private let realtimeScheduler = SerialDispatchQueueScheduler(qos: .userInitiated)
 
@@ -56,22 +98,10 @@ final class AssetDetailStore {
         self.symbol = symbol.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
     }
 
-    var displayName: String {
-        AppFormatter.displayText(asset?.name?.displayAssetName)
-    }
-
-    var exchangeText: String {
-        AppFormatter.displayText(asset?.exchange)
-    }
-
-    var assetClassText: String {
-        asset?.assetClass?
-            .replacingOccurrences(of: "_", with: " ")
-            .uppercased() ?? AppFormatter.placeholder
-    }
+    // MARK: - Derived Price & Session State
 
     var currentPrice: Double? {
-        if hasActiveSessionProgress || hasRecentMarketData,
+        if cachedHasActiveSessionProgress || hasRecentMarketData,
            let latestTradePrice = latestTrade?.price {
             return latestTradePrice
         }
@@ -80,7 +110,7 @@ final class AssetDetailStore {
             return completedExtendedTradingPrice.price
         }
 
-        return dailyBar?.close ?? bars.last?.close ?? latestTrade?.price
+        return dailyBar?.close ?? barSeries.latestClose ?? latestTrade?.price
     }
 
     var coreSessionPrice: Double? {
@@ -139,13 +169,13 @@ final class AssetDetailStore {
     }
 
     var activeExtendedSession: AssetExtendedTradingSession? {
-        guard let activeExtendedSession = activeReferenceInterval()?.session.extendedTradingSession,
+        guard let activeSession = cachedActiveReferenceInterval?.session.extendedTradingSession,
               let eventDate = lastEventDate,
-              Self.extendedTradingSession(for: eventDate) == activeExtendedSession else {
+              Self.extendedTradingSession(for: eventDate) == activeSession else {
             return nil
         }
 
-        return activeExtendedSession
+        return activeSession
     }
 
     var completedExtendedSession: AssetExtendedTradingSession? {
@@ -190,12 +220,12 @@ final class AssetDetailStore {
     }
 
     private var completedExtendedTradingPrice: (session: AssetExtendedTradingSession, price: Double)? {
-        guard !hasActiveSessionProgress,
+        guard !cachedHasActiveSessionProgress,
               let sessionProgress,
               let latestTradePrice = latestTrade?.price,
               Self.hasValidMarketPrice(latestTradePrice),
-              let latestTradeDate = AlpacaDateParser.date(latestTrade?.timestamp),
-              let interval = completedExtendedInterval(containing: latestTradeDate, in: sessionProgress),
+              let latestTradeDate = parsedLatestTradeDate,
+              let interval = AssetIntradaySessionMapper.completedExtendedInterval(containing: latestTradeDate, in: sessionProgress),
               let session = interval.session.extendedTradingSession else {
             return nil
         }
@@ -232,10 +262,7 @@ final class AssetDetailStore {
     }
 
     var lastEventDate: Date? {
-        AlpacaDateParser.date(latestTrade?.timestamp)
-            ?? AlpacaDateParser.date(quote?.timestamp)
-            ?? AlpacaDateParser.date(dailyBar?.timestamp)
-            ?? lastUpdatedAt
+        parsedLatestTradeDate ?? parsedQuoteDate ?? parsedDailyBarDate ?? lastUpdatedAt
     }
 
     var hasMarketData: Bool {
@@ -291,84 +318,291 @@ final class AssetDetailStore {
         shareChartRenderModel.points.count > 1 && !isLoadingChart
     }
 
+    var effectiveChartMode: AssetChartMode {
+        selectedRange == .oneDay ? .line : chartMode
+    }
+
+    // MARK: - Lifecycle
+
     func start(service: any AssetDetailServicing) {
         self.service = service
-        bindSnapshotPipeline(service: service)
-        bindSupplementalSnapshotPipeline(service: service)
+        startSupplementalRefreshLoop(service: service)
         startLatestBarRefreshLoop(service: service)
-        reload(service: service)
+
+        if asset != nil {
+            // Re-appearing after push navigation (e.g. returning from TradeView):
+            // resume live stream and refresh position + supplemental quote without resetting UI.
+            if boundStreamFeed != feed {
+                bindStream(service: service)
+            }
+            loadOpenPosition(service: service)
+            let isOneDayStale = selectedRange == .oneDay
+                && (stoppedAt.map { Date().timeIntervalSince($0) > Self.oneDayResumeReloadThreshold } ?? false)
+            if needsSnapshotReloadOnResume || isOneDayStale {
+                needsSnapshotReloadOnResume = false
+                startSnapshotLoad(
+                    service: service,
+                    range: selectedRange,
+                    feed: feed,
+                    showsBlockingLoading: false
+                )
+            } else {
+                triggerSupplementalSnapshotRefresh(forced: true)
+            }
+            stoppedAt = nil
+        } else {
+            reload(service: service)
+        }
     }
 
     func stop() {
+        if isLoadingChart || pendingSnapshotRenderRange != nil {
+            needsSnapshotReloadOnResume = true
+        }
+        stoppedAt = Date()
+        clearPendingSnapshotRender()
         streamDisposeBag = DisposeBag()
-        snapshotDisposeBag = DisposeBag()
-        supplementalSnapshotDisposeBag = DisposeBag()
+        snapshotLoadTask?.cancel()
+        snapshotLoadTask = nil
+        supplementalRefreshLoopTask?.cancel()
+        supplementalRefreshLoopTask = nil
+        supplementalFetchTask?.cancel()
+        supplementalFetchTask = nil
         latestBarRefreshTask?.cancel()
         latestBarRefreshTask = nil
-        cachedSnapshotTask?.cancel()
-        cachedSnapshotTask = nil
+        immediateLatestBarTask?.cancel()
+        immediateLatestBarTask = nil
         positionLoadTask?.cancel()
         positionLoadTask = nil
+        tradeExecutionsLoadTask?.cancel()
+        tradeExecutionsLoadTask = nil
         chartRenderTask?.cancel()
         chartRenderTask = nil
         chartRenderRevision += 1
+        snapshotRequestID += 1
         boundStreamFeed = nil
         connectionStatus = .disconnected
     }
 
     func reload(service: (any AssetDetailServicing)? = nil) {
-        let service = service ?? self.service
-        guard let service else {
+        let resolvedService = service ?? self.service
+        guard let resolvedService else {
             return
         }
 
-        self.service = service
-        loadCachedSnapshot(service: service, range: selectedRange, feed: feed)
-        snapshotRequests.onNext(
-            AssetDetailSnapshotRequest(
-                symbol: symbol,
-                range: selectedRange,
-                feed: feed,
-                showsBlockingLoading: asset == nil
-            )
+        self.service = resolvedService
+        startSnapshotLoad(
+            service: resolvedService,
+            range: selectedRange,
+            feed: feed,
+            showsBlockingLoading: asset == nil
         )
-        loadOpenPosition(service: service)
+        loadOpenPosition(service: resolvedService)
+        if showsTradeMarkers && selectedRange != .oneDay {
+            loadTradeExecutions(service: resolvedService, forceRefresh: true)
+        } else {
+            hasLoadedTradeExecutions = false
+        }
     }
 
-    private func loadOpenPosition(service: any AssetDetailServicing) {
-        positionLoadTask?.cancel()
+    /// Async pull-to-refresh entry point so SwiftUI `.refreshable` stays active until refresh completes.
+    func refresh(service: (any AssetDetailServicing)? = nil) async {
+        let resolvedService = service ?? self.service
+        guard let resolvedService else {
+            return
+        }
+
+        self.service = resolvedService
+        startSnapshotLoad(
+            service: resolvedService,
+            range: selectedRange,
+            feed: feed,
+            showsBlockingLoading: asset == nil
+        )
+        loadOpenPosition(service: resolvedService)
+        if showsTradeMarkers && selectedRange != .oneDay {
+            loadTradeExecutions(service: resolvedService, forceRefresh: true)
+        } else {
+            hasLoadedTradeExecutions = false
+        }
+
+        if let snapshotLoadTask {
+            await snapshotLoadTask.value
+        }
+        if let positionLoadTask {
+            await positionLoadTask.value
+        }
+    }
+
+    // MARK: - Trade Markers
+
+    func setShowsTradeMarkers(_ enabled: Bool) {
+        guard showsTradeMarkers != enabled else {
+            if enabled, selectedRange != .oneDay, !hasLoadedTradeExecutions, let service {
+                loadTradeExecutions(service: service, forceRefresh: false)
+            }
+            return
+        }
+
+        showsTradeMarkers = enabled
+        guard enabled else {
+            tradeExecutionsLoadTask?.cancel()
+            tradeExecutionsLoadTask = nil
+            chartTradeMarkers = .empty
+            return
+        }
+
+        guard selectedRange != .oneDay else {
+            chartTradeMarkers = .empty
+            return
+        }
+
+        if hasLoadedTradeExecutions {
+            recomputeChartTradeMarkers()
+        } else if let service {
+            loadTradeExecutions(service: service, forceRefresh: false)
+        }
+    }
+
+    func invalidateTradeExecutions() {
+        hasLoadedTradeExecutions = false
+        if showsTradeMarkers, selectedRange != .oneDay, let service {
+            loadTradeExecutions(service: service, forceRefresh: true)
+        }
+    }
+
+    func tradeMarkers(for point: AssetChartPoint) -> [FinancialChartTradeMarker] {
+        guard showsTradeMarkers, selectedRange != .oneDay else {
+            return []
+        }
+        return chartTradeMarkers.markers(for: point)
+    }
+
+    private func loadTradeExecutions(service: any AssetDetailServicing, forceRefresh: Bool) {
+        guard showsTradeMarkers else {
+            return
+        }
+
+        if !forceRefresh, tradeExecutionsLoadTask != nil {
+            return
+        }
+
+        tradeExecutionsLoadTask?.cancel()
         let requestedSymbol = symbol
-        positionLoadTask = Task { @MainActor [weak self, weak service] in
+        let afterDate = AssetTradeMarkerMapper.historyStartDate()
+        tradeExecutionsLoadTask = Task { @MainActor [weak self, weak service] in
+            defer {
+                if let self, !Task.isCancelled {
+                    self.tradeExecutionsLoadTask = nil
+                }
+            }
             guard let self, let service else {
                 return
             }
 
             do {
-                let loadedPosition = try await service.fetchOpenPosition(symbol: requestedSymbol)
-                guard !Task.isCancelled, self.symbol == requestedSymbol else {
+                let orders = try await service.fetchSymbolOrders(
+                    symbol: requestedSymbol,
+                    after: afterDate,
+                    forceRefresh: forceRefresh
+                )
+                try Task.checkCancellation()
+                guard self.symbol == requestedSymbol else {
                     return
                 }
 
-                self.position = loadedPosition
+                let parsed = await Task.detached(priority: .utility) {
+                    AssetTradeMarkerMapper.executions(from: orders, symbol: requestedSymbol)
+                }.value
+                try Task.checkCancellation()
+                guard self.symbol == requestedSymbol else {
+                    return
+                }
+
+                self.tradeExecutions = parsed
+                self.hasLoadedTradeExecutions = true
+                self.recomputeChartTradeMarkers()
             } catch where error.isRequestCancellation {
                 return
             } catch {
-                guard !Task.isCancelled, self.symbol == requestedSymbol else {
-                    return
-                }
-
-                self.position = nil
+                // Non-blocking: trade markers are optional overlays and must never disrupt the price chart.
+                return
             }
         }
     }
 
-    private func loadCachedSnapshot(
-        service: any AssetDetailServicing,
-        range: AssetChartRange,
-        feed: AlpacaMarketDataFeed
-    ) {
-        // Cache lookup removed — Store now fetches directly via fetchAssetDetailSnapshot.
-        // Preserved as no-op to avoid changing reload() and selectRange() call sites.
+    private func recomputeChartTradeMarkers() {
+        guard showsTradeMarkers, selectedRange != .oneDay, !tradeExecutions.isEmpty else {
+            if !chartTradeMarkers.isEmpty {
+                chartTradeMarkers = .empty
+            }
+            return
+        }
+
+        let activePoints = chartRenderModels.model(for: effectiveChartMode).financialPoints
+        guard !activePoints.isEmpty else {
+            if !chartTradeMarkers.isEmpty {
+                chartTradeMarkers = .empty
+            }
+            return
+        }
+
+        let nextMarkers = AssetTradeMarkerMapper.map(
+            executions: tradeExecutions,
+            onto: activePoints,
+            range: selectedRange
+        )
+        if chartTradeMarkers != nextMarkers {
+            chartTradeMarkers = nextMarkers
+        }
+    }
+
+    // MARK: - User Interactions
+
+    func selectRange(_ range: AssetChartRange) {
+        guard selectedRange != range else {
+            return
+        }
+
+        selectedRange = range
+        if range == .oneDay {
+            chartTradeMarkers = .empty
+        } else if showsTradeMarkers, !hasLoadedTradeExecutions, let service {
+            loadTradeExecutions(service: service, forceRefresh: false)
+        }
+
+        if applyCachedChart(for: range) {
+            // Cancel any in-flight range fetch so a slower previous request cannot overwrite this cached range.
+            snapshotLoadTask?.cancel()
+            snapshotLoadTask = nil
+            snapshotRequestID += 1
+            isLoadingChart = false
+            errorMessage = nil
+            recomputeChartTradeMarkers()
+            return
+        }
+
+        isLoadingChart = true
+        guard let service else {
+            return
+        }
+
+        startSnapshotLoad(
+            service: service,
+            range: range,
+            feed: feed,
+            showsBlockingLoading: false
+        )
+    }
+
+    func selectChartMode(_ mode: AssetChartMode) {
+        guard chartMode != mode else {
+            return
+        }
+
+        // O(1) instant mode toggle: `chartRenderModels` already holds both `.line` and `.candles`
+        // sharing the exact same precomputed point arrays & digest.
+        chartMode = mode
     }
 
     func waitForShareableChartData(maxAttempts: Int = 80) async -> Bool {
@@ -403,53 +637,27 @@ final class AssetDetailStore {
         return hasShareableChartData
     }
 
-    func selectRange(_ range: AssetChartRange) {
-        guard selectedRange != range else {
-            return
-        }
+    // MARK: - Cached Metadata Helpers
 
-        selectedRange = range
-        if let service {
-            loadCachedSnapshot(service: service, range: range, feed: feed)
-        }
-        if applyCachedChart(for: range) {
-            isLoadingChart = false
-            errorMessage = nil
-            return
-        }
-
-        isLoadingChart = true
-        snapshotRequests.onNext(
-            AssetDetailSnapshotRequest(
-                symbol: symbol,
-                range: range,
-                feed: feed,
-                showsBlockingLoading: false
-            )
-        )
+    private func updateCachedAssetMetadata() {
+        displayName = AppFormatter.displayText(asset?.name?.displayAssetName)
+        exchangeText = AppFormatter.displayText(asset?.exchange)
+        assetClassText = asset?.assetClass?
+            .replacingOccurrences(of: "_", with: " ")
+            .uppercased() ?? AppFormatter.placeholder
+        supportsOptions = asset?.attributes?.contains("has_options") == true
     }
 
-    func selectChartMode(_ mode: AssetChartMode) {
-        guard chartMode != mode else {
-            return
+    private func updateCachedSessionMetadata() {
+        sessionTimeline = MarketSessionTimeline(progress: sessionProgress)
+        cachedActiveReferenceInterval = AssetIntradaySessionMapper.activeReferenceInterval(in: sessionProgress)
+        if let sessionProgress {
+            cachedHasActiveSessionProgress = sessionProgress.intervals.contains { interval in
+                interval.contains(sessionProgress.referenceDate)
+            }
+        } else {
+            cachedHasActiveSessionProgress = false
         }
-
-        chartMode = mode
-        guard selectedRange != .oneDay else {
-            return
-        }
-
-        if applyCachedChart(for: selectedRange) {
-            isLoadingChart = false
-            errorMessage = nil
-            return
-        }
-
-        updateChartRenderModels(showsLoading: true)
-    }
-
-    var effectiveChartMode: AssetChartMode {
-        selectedRange == .oneDay ? .line : chartMode
     }
 
     private var shareChartRenderModel: AssetChartRenderModel {
@@ -458,65 +666,260 @@ final class AssetDetailStore {
         return lineModel.points.isEmpty ? fallbackModel : lineModel
     }
 
-    private func bindSnapshotPipeline(service: any AssetDetailServicing) {
-        snapshotDisposeBag = DisposeBag()
+    // MARK: - Snapshot & Position Loading
 
-        snapshotRequests
-            .observe(on: MainScheduler.instance)
-            .do(onNext: { [weak self] request in
-                self?.beginSnapshotLoad(request)
-            })
-            .flatMapLatest { [weak service] request -> Observable<AssetDetailSnapshotLoadResult> in
-                guard let service else {
-                    return .empty()
-                }
+    private func startSnapshotLoad(
+        service: any AssetDetailServicing,
+        range: AssetChartRange,
+        feed requestedFeed: AlpacaMarketDataFeed,
+        showsBlockingLoading: Bool
+    ) {
+        snapshotLoadTask?.cancel()
+        snapshotRequestID += 1
+        let requestID = snapshotRequestID
 
-                return assetDetailSnapshotLoad(service: service, request: request)
-            }
-            .observe(on: MainScheduler.instance)
-            .subscribe(onNext: { [weak self] result in
-                self?.apply(result)
-            })
-            .disposed(by: snapshotDisposeBag)
-    }
-
-    private func bindSupplementalSnapshotPipeline(service: any AssetDetailServicing) {
-        supplementalSnapshotDisposeBag = DisposeBag()
-
-        let scheduledRefreshes = Observable<Int>
-            .interval(.seconds(Int(Self.supplementalSnapshotRefreshInterval / 1_000_000_000)), scheduler: MainScheduler.instance)
-            .map { _ in AssetDetailSupplementalSnapshotRequest.scheduled }
-
-        Observable
-            .merge(scheduledRefreshes, supplementalSnapshotRequests.asObservable())
-            .observe(on: MainScheduler.instance)
-            .flatMapFirst { [weak self, weak service] request -> Observable<AssetDetailSupplementalSnapshotResult> in
-                guard let self, let service else {
-                    return .empty()
-                }
-
-                guard self.shouldFetchSupplementalSnapshot(for: request) else {
-                    return .just(.skipped)
-                }
-
-                return assetDetailSupplementalSnapshotLoad(
-                    service: service,
-                    symbol: self.symbol,
-                    feed: self.feed
-                )
-            }
-            .observe(on: MainScheduler.instance)
-            .subscribe(onNext: { [weak self] result in
-                self?.apply(result)
-            })
-            .disposed(by: supplementalSnapshotDisposeBag)
-    }
-
-    private func beginSnapshotLoad(_ request: AssetDetailSnapshotRequest) {
-        isLoading = request.showsBlockingLoading
+        isLoading = showsBlockingLoading
         isLoadingChart = true
         errorMessage = nil
+
+        let requestedSymbol = symbol
+
+        snapshotLoadTask = Task { @MainActor [weak self, weak service] in
+            guard let self, let service else {
+                return
+            }
+
+            // On cold start, fire an early lightweight snapshot in parallel to populate price/L1 immediately.
+            let earlySnapshotTask: Task<Void, Never>? = showsBlockingLoading
+                ? Task { @MainActor [weak self, weak service] in
+                    guard let self, let service else { return }
+                    do {
+                        guard let earlySnapshot = try await service.fetchAssetSnapshot(
+                            symbol: requestedSymbol,
+                            feed: requestedFeed
+                        ) else {
+                            return
+                        }
+                        guard !Task.isCancelled,
+                              self.snapshotRequestID == requestID,
+                              self.selectedRange == range,
+                              self.isLoading else {
+                            return
+                        }
+                        self.apply(earlySnapshot)
+                        if self.hasMarketData {
+                            self.isLoading = false
+                            self.lastUpdatedAt = Date()
+                        }
+                    } catch {
+                        return
+                    }
+                }
+                : nil
+
+            defer {
+                earlySnapshotTask?.cancel()
+            }
+
+            do {
+                let snapshot = try await service.fetchAssetDetailSnapshot(
+                    symbol: requestedSymbol,
+                    range: range,
+                    feed: requestedFeed
+                )
+                guard !Task.isCancelled, self.snapshotRequestID == requestID else {
+                    return
+                }
+                guard self.selectedRange == snapshot.range else {
+                    return
+                }
+
+                earlySnapshotTask?.cancel()
+                self.apply(snapshot)
+                self.isLoading = false
+                self.errorMessage = nil
+            } catch where error.isRequestCancellation {
+                return
+            } catch {
+                guard !Task.isCancelled, self.snapshotRequestID == requestID else {
+                    return
+                }
+                guard self.selectedRange == range else {
+                    return
+                }
+
+                self.isLoading = false
+                self.isLoadingChart = false
+                self.applyBlockingSnapshotFailure(error)
+            }
+        }
     }
+
+    private func loadOpenPosition(service: any AssetDetailServicing) {
+        positionLoadTask?.cancel()
+        let requestedSymbol = symbol
+        positionLoadTask = Task { @MainActor [weak self, weak service] in
+            guard let self, let service else {
+                return
+            }
+
+            do {
+                // `AlpacaClient.fetchOpenPosition` returns `nil` on HTTP 404 (no position).
+                let loadedPosition = try await service.fetchOpenPosition(symbol: requestedSymbol)
+                guard !Task.isCancelled, self.symbol == requestedSymbol else {
+                    return
+                }
+
+                self.position = loadedPosition
+            } catch where error.isRequestCancellation {
+                return
+            } catch {
+                // Keep any previously loaded position on transient network failure instead of wiping UI.
+                return
+            }
+        }
+    }
+
+    // MARK: - Supplemental & Latest Bar Polling
+
+    private func startSupplementalRefreshLoop(service: any AssetDetailServicing) {
+        supplementalRefreshLoopTask?.cancel()
+        supplementalRefreshLoopTask = Task { @MainActor [weak self, weak service] in
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(nanoseconds: Self.supplementalSnapshotRefreshInterval)
+                } catch {
+                    return
+                }
+
+                guard let self, service != nil, !Task.isCancelled else {
+                    return
+                }
+
+                self.triggerSupplementalSnapshotRefresh(forced: false)
+            }
+        }
+    }
+
+    private func triggerSupplementalSnapshotRefresh(forced: Bool) {
+        guard let service else {
+            return
+        }
+
+        // Coalesce like `flatMapFirst`: skip if a supplemental refresh is already running.
+        guard supplementalFetchTask == nil else {
+            return
+        }
+
+        if !forced {
+            guard shouldRunSupplementalSnapshotRefresh else {
+                return
+            }
+            if let lastUpdatedAt,
+               Date().timeIntervalSince(lastUpdatedAt) < Self.supplementalSnapshotQuietThreshold {
+                return
+            }
+        }
+
+        let requestedSymbol = symbol
+        let requestedFeed = feed
+
+        supplementalFetchTask = Task { @MainActor [weak self, weak service] in
+            defer {
+                // A cancelled task finishing late must not clear its replacement.
+                if !Task.isCancelled {
+                    self?.supplementalFetchTask = nil
+                }
+            }
+            guard let self, let service else {
+                return
+            }
+
+            do {
+                let resolvedSnapshot = try await service.fetchResolvedAssetSnapshot(
+                    symbol: requestedSymbol,
+                    feed: requestedFeed
+                )
+                guard !Task.isCancelled, self.feed == requestedFeed else {
+                    return
+                }
+                self.apply(resolvedSnapshot)
+            } catch where error.isRequestCancellation {
+                return
+            } catch {
+                guard !Task.isCancelled, self.feed == requestedFeed else {
+                    return
+                }
+                self.applySupplementalSnapshotFailure(error)
+            }
+        }
+    }
+
+    private var shouldRunSupplementalSnapshotRefresh: Bool {
+        feed == .overnight || cachedHasActiveSessionProgress
+    }
+
+    private func startLatestBarRefreshLoop(service: any AssetDetailServicing) {
+        latestBarRefreshTask?.cancel()
+        latestBarRefreshTask = Task { @MainActor [weak self, weak service] in
+            while !Task.isCancelled {
+                guard let self, let service else {
+                    return
+                }
+
+                await self.refreshLatestBarIfNeeded(service: service)
+                do {
+                    try await Task.sleep(nanoseconds: Self.latestBarRefreshInterval)
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+
+    private func refreshLatestBarSoon() {
+        guard shouldPollLatestBar, let service else {
+            return
+        }
+
+        immediateLatestBarTask?.cancel()
+        immediateLatestBarTask = Task { @MainActor [weak self, weak service] in
+            guard let self, let service else {
+                return
+            }
+
+            await self.refreshLatestBarIfNeeded(service: service)
+            if !Task.isCancelled {
+                self.immediateLatestBarTask = nil
+            }
+        }
+    }
+
+    private func refreshLatestBarIfNeeded(service: any AssetDetailServicing) async {
+        guard shouldPollLatestBar else {
+            return
+        }
+
+        let requestedFeed = feed
+        do {
+            let latestBar = try await service.fetchLatestStockBar(symbol: symbol, feed: requestedFeed)
+            guard !Task.isCancelled, feed == requestedFeed, selectedRange == .oneDay else {
+                return
+            }
+
+            applyLatestBar(latestBar, feed: requestedFeed)
+        } catch where error.isRequestCancellation {
+            return
+        } catch {
+            return
+        }
+    }
+
+    private var shouldPollLatestBar: Bool {
+        selectedRange == .oneDay && cachedHasActiveSessionProgress
+    }
+
+    // MARK: - Realtime WebSocket Stream
 
     private func bindStream(service: any AssetDetailServicing) {
         streamDisposeBag = DisposeBag()
@@ -532,25 +935,27 @@ final class AssetDetailStore {
                 symbol: streamSymbol,
                 scheduler: realtimeScheduler
             )
-                .observe(on: MainScheduler.instance)
-                .subscribe(
-                    onNext: { [weak self] batch in
-                        Task { @MainActor in
-                            self?.apply(batch)
-                        }
-                    },
-                    onError: { [weak self] error in
-                        Task { @MainActor in
-                            self?.connectionStatus = .failed(error.localizedDescription)
-                        }
+            .observe(on: MainScheduler.instance)
+            .subscribe(
+                onNext: { [weak self] batch in
+                    Task { @MainActor in
+                        self?.apply(batch)
                     }
-                )
-                .disposed(by: streamDisposeBag)
+                },
+                onError: { [weak self] error in
+                    Task { @MainActor in
+                        self?.connectionStatus = .failed(error.localizedDescription)
+                    }
+                }
+            )
+            .disposed(by: streamDisposeBag)
         } catch {
             boundStreamFeed = nil
             connectionStatus = .failed(error.localizedDescription)
         }
     }
+
+    // MARK: - State Application
 
     private func apply(_ snapshot: AssetDetailSnapshot) {
         snapshotContentRevision += 1
@@ -561,68 +966,18 @@ final class AssetDetailStore {
         selectedRange = snapshot.range
         apply(snapshot.stockSnapshot)
         latestOvernightBar = snapshot.feed == .overnight ? snapshot.latestBar : nil
-        resetOvernightSupplementBars(feed: snapshot.feed, latestBar: snapshot.latestBar)
         setChartBaseline(snapshot.chartBaseline, for: snapshot.range)
-        setChartBars(Self.normalizedBars(snapshot.bars), for: snapshot.range)
-        if snapshot.range == .oneDay {
-            latestCoreSessionClose = bars.last?.close ?? latestCoreSessionClose ?? snapshot.stockSnapshot?.dailyBar?.close
-            if snapshot.feed == .overnight {
-                recordLatestOvernightChartBar()
-            } else {
-                mergeSupplementalLatestBar(snapshot.latestBar, updatesChart: true)
-            }
-        }
+        scheduleSnapshotBarRender(
+            rawBars: snapshot.bars,
+            range: snapshot.range,
+            feed: snapshot.feed,
+            latestBar: snapshot.latestBar
+        )
         if let service, previousFeed != feed || boundStreamFeed != feed {
             bindStream(service: service)
         }
         lastUpdatedAt = Date()
         refreshLatestBarSoon()
-    }
-
-    private func apply(_ result: AssetDetailSnapshotLoadResult) {
-        switch result {
-        case .marketData(let snapshot, let request):
-            guard selectedRange == request.range, isLoading else {
-                return
-            }
-
-            apply(snapshot)
-            if hasMarketData {
-                isLoading = false
-                lastUpdatedAt = Date()
-            }
-        case .success(let snapshot):
-            apply(snapshot)
-            isLoading = false
-            errorMessage = nil
-        case .failure(let error, let request):
-            guard selectedRange == request.range else {
-                return
-            }
-
-            isLoading = false
-            isLoadingChart = false
-            applyBlockingSnapshotFailure(error)
-        }
-    }
-
-    private func apply(_ result: AssetDetailSupplementalSnapshotResult) {
-        switch result {
-        case .success(let snapshot, let requestedFeed):
-            guard feed == requestedFeed else {
-                return
-            }
-
-            apply(snapshot)
-        case .failure(let error, let requestedFeed):
-            guard feed == requestedFeed else {
-                return
-            }
-
-            applySupplementalSnapshotFailure(error)
-        case .skipped:
-            break
-        }
     }
 
     private func apply(_ snapshot: AlpacaStockSnapshot?) {
@@ -674,26 +1029,40 @@ final class AssetDetailStore {
 
         if selectedRange == .oneDay {
             var didChangeChart = false
+
             if let trade = batch.latestTrade,
                Self.hasValidMarketPrice(trade.price),
                latestTrade != trade {
+                let priceChanged = latestTrade?.price != trade.price || latestTrade?.timestamp != trade.timestamp
                 latestTrade = trade
-                didChangeChart = true
+                if priceChanged {
+                    didChangeChart = true
+                }
             }
 
-            if let quote = batch.latestQuote,
-               Self.hasValidQuotePrice(quote),
-               self.quote != quote {
-                self.quote = quote
-                didChangeChart = true
+            if let incomingQuote = batch.latestQuote,
+               Self.hasValidQuotePrice(incomingQuote),
+               quote != incomingQuote {
+                let previousMid = AssetIntradaySessionMapper.chartQuotePrice(quote)
+                let nextMid = AssetIntradaySessionMapper.chartQuotePrice(incomingQuote)
+                quote = incomingQuote
+                if quoteAffectsChart(previousMid: previousMid, nextMid: nextMid) {
+                    didChangeChart = true
+                }
             }
 
             for bar in batch.bars {
-                didChangeChart = merge(bar, updatesChart: false) || didChangeChart
+                if isSnapshotRenderPendingForSelectedRange {
+                    deferredRealtimeBars.append(bar)
+                }
+                if barSeries.merge(bar) {
+                    didChangeChart = true
+                }
             }
+
             if didChangeChart {
+                latestCoreSessionClose = barSeries.latestClose ?? latestCoreSessionClose
                 updateChartRenderModels()
-                latestCoreSessionClose = bars.last?.close ?? latestCoreSessionClose
             }
         } else {
             if let trade = batch.latestTrade,
@@ -702,10 +1071,10 @@ final class AssetDetailStore {
                 latestTrade = trade
             }
 
-            if let quote = batch.latestQuote,
-               Self.hasValidQuotePrice(quote),
-               self.quote != quote {
-                self.quote = quote
+            if let incomingQuote = batch.latestQuote,
+               Self.hasValidQuotePrice(incomingQuote),
+               quote != incomingQuote {
+                quote = incomingQuote
             }
         }
 
@@ -723,6 +1092,24 @@ final class AssetDetailStore {
         }
     }
 
+    /// Avoids triggering expensive 1D chart rebuilds when only bid/ask size flickers
+    /// or when a newer trade already anchors the chart price.
+    private func quoteAffectsChart(previousMid: Double?, nextMid: Double?) -> Bool {
+        guard previousMid != nextMid else {
+            return false
+        }
+        if feed == .overnight {
+            return true
+        }
+        guard let quoteDate = parsedQuoteDate else {
+            return false
+        }
+        if let tradeDate = parsedLatestTradeDate, tradeDate >= quoteDate {
+            return false
+        }
+        return true
+    }
+
     private func applyConnectionStatus(_ status: AssetRealtimeConnectionStatus) {
         if case .reconnecting = status {
             shouldResyncOnLive = true
@@ -731,32 +1118,8 @@ final class AssetDetailStore {
         connectionStatus = status
         if status == .live, shouldResyncOnLive {
             shouldResyncOnLive = false
-            resyncSnapshot()
+            triggerSupplementalSnapshotRefresh(forced: true)
         }
-    }
-
-    private func resyncSnapshot() {
-        supplementalSnapshotRequests.onNext(.forced)
-    }
-
-    private var shouldRunSupplementalSnapshotRefresh: Bool {
-        feed == .overnight || hasActiveSessionProgress
-    }
-
-    private func shouldFetchSupplementalSnapshot(for request: AssetDetailSupplementalSnapshotRequest) -> Bool {
-        if request == .forced {
-            return true
-        }
-
-        guard shouldRunSupplementalSnapshotRefresh else {
-            return false
-        }
-
-        guard let lastUpdatedAt else {
-            return true
-        }
-
-        return Date().timeIntervalSince(lastUpdatedAt) >= Self.supplementalSnapshotQuietThreshold
     }
 
     private func apply(_ resolvedSnapshot: AlpacaResolvedStockSnapshot) {
@@ -765,16 +1128,17 @@ final class AssetDetailStore {
         apply(resolvedSnapshot.snapshot)
         latestOvernightBar = resolvedSnapshot.feed == .overnight ? resolvedSnapshot.latestBar : nil
         var didMergeLatestBar = false
+
         if resolvedSnapshot.feed == .overnight {
-            mergeOvernightSupplementBar(resolvedSnapshot.latestBar)
-            recordLatestOvernightChartBar()
+            if selectedRange == .oneDay {
+                barSeries.mergeOvernightSupplementBar(resolvedSnapshot.latestBar)
+                recordLatestOvernightChartBar()
+            }
         } else {
-            overnightSupplementBars = []
-            didMergeLatestBar = mergeSupplementalLatestBar(
-                resolvedSnapshot.latestBar,
-                updatesChart: false
-            )
+            barSeries.resetOvernightSupplementBars()
+            didMergeLatestBar = mergeSupplementalLatestBar(resolvedSnapshot.latestBar)
         }
+
         if resolvedSnapshot.snapshot != nil || resolvedSnapshot.latestBar != nil {
             snapshotContentRevision += 1
             if didMergeLatestBar || resolvedSnapshot.feed == .overnight {
@@ -782,67 +1146,53 @@ final class AssetDetailStore {
             }
             lastUpdatedAt = Date()
         }
+
         if let service, previousFeed != feed {
             bindStream(service: service)
         }
     }
 
-    private func startLatestBarRefreshLoop(service: any AssetDetailServicing) {
-        latestBarRefreshTask?.cancel()
-        latestBarRefreshTask = Task { @MainActor [weak self, weak service] in
-            while !Task.isCancelled {
-                guard let self, let service else {
-                    return
-                }
-
-                await self.refreshLatestBarIfNeeded(service: service)
-                do {
-                    try await Task.sleep(nanoseconds: Self.latestBarRefreshInterval)
-                } catch {
-                    return
-                }
-            }
-        }
-    }
-
-    private func refreshLatestBarIfNeeded(service: any AssetDetailServicing) async {
-        guard shouldPollLatestBar else {
-            return
-        }
-
-        let requestedFeed = feed
-        do {
-            let latestBar = try await service.fetchLatestStockBar(symbol: symbol, feed: requestedFeed)
-            guard feed == requestedFeed, selectedRange == .oneDay else {
-                return
-            }
-
-            applyLatestBar(latestBar, feed: requestedFeed)
-        } catch where error.isRequestCancellation {
-            return
-        } catch {
-            return
-        }
-    }
-
-    private var shouldPollLatestBar: Bool {
-        selectedRange == .oneDay && hasActiveSessionProgress
-    }
-
-    private func refreshLatestBarSoon() {
+    private func applyLatestBar(_ bar: AlpacaMarketBar?, feed requestedFeed: AlpacaMarketDataFeed) {
         guard selectedRange == .oneDay,
-              hasActiveSessionProgress,
-              let service else {
+              feed == requestedFeed,
+              let bar,
+              Self.hasValidMarketPrice(bar.close) else {
             return
         }
 
-        Task { @MainActor [weak self, weak service] in
-            guard let self, let service else {
-                return
-            }
-
-            await self.refreshLatestBarIfNeeded(service: service)
+        let didChangeChart: Bool
+        if requestedFeed == .overnight {
+            let previousLatestBar = latestOvernightBar
+            latestOvernightBar = bar
+            let merged = barSeries.mergeOvernightSupplementBar(bar)
+            didChangeChart = merged || previousLatestBar != bar
+        } else {
+            didChangeChart = mergeSupplementalLatestBar(bar)
         }
+
+        if didChangeChart {
+            latestCoreSessionClose = barSeries.latestClose ?? latestCoreSessionClose
+            updateChartRenderModels()
+            lastUpdatedAt = Date()
+        }
+    }
+
+    @discardableResult
+    private func mergeSupplementalLatestBar(_ bar: AlpacaMarketBar?) -> Bool {
+        guard selectedRange == .oneDay,
+              let bar,
+              Self.hasValidMarketPrice(bar.close) else {
+            return false
+        }
+
+        if isSnapshotRenderPendingForSelectedRange {
+            deferredRealtimeBars.append(bar)
+        }
+        let didChange = barSeries.merge(bar)
+        if didChange {
+            latestCoreSessionClose = barSeries.latestClose ?? latestCoreSessionClose
+        }
+        return didChange
     }
 
     private func applyBlockingSnapshotFailure(_ error: Error) {
@@ -867,212 +1217,226 @@ final class AssetDetailStore {
         APIErrorDisplayMessage.message(for: error, locale: service?.preferredLocale ?? AppLocale.current)
     }
 
-    private func applyLatestBar(_ bar: AlpacaMarketBar?, feed requestedFeed: AlpacaMarketDataFeed) {
-        guard selectedRange == .oneDay,
-              feed == requestedFeed,
-              let bar,
-              Self.hasValidMarketPrice(bar.close) else {
-            return
-        }
+    // MARK: - Off-Main-Thread Chart Rendering & Caching
 
-        let didChangeChart: Bool
-        if requestedFeed == .overnight {
-            let previousLatestBar = latestOvernightBar
-            latestOvernightBar = bar
-            mergeOvernightSupplementBar(bar)
-            didChangeChart = previousLatestBar != bar
-        } else {
-            didChangeChart = mergeSupplementalLatestBar(bar, updatesChart: false)
-        }
-
-        if didChangeChart {
-            updateChartRenderModels()
-            latestCoreSessionClose = bars.last?.close ?? latestCoreSessionClose
-            lastUpdatedAt = Date()
-        }
-    }
-
-    @discardableResult
-    private func mergeSupplementalLatestBar(_ bar: AlpacaMarketBar?, updatesChart: Bool) -> Bool {
-        guard selectedRange == .oneDay,
-              let bar,
-              Self.hasValidMarketPrice(bar.close) else {
-            return false
-        }
-
-        return merge(bar, updatesChart: updatesChart)
-    }
-
-    @discardableResult
-    private func merge(_ bar: AlpacaMarketBar, updatesChart: Bool = true) -> Bool {
-        guard let timestamp = bar.timestamp,
-              let date = AlpacaDateParser.date(timestamp) else {
-            appendUnordered(bar)
-            if updatesChart {
-                updateChartRenderModels()
-            }
-            return true
-        }
-
-        if let last = bars.last, last.timestamp == timestamp {
-            guard last != bar else {
-                return false
-            }
-            bars[bars.count - 1] = bar
-        } else if let lastDate = AlpacaDateParser.date(bars.last?.timestamp), date > lastDate {
-            bars.append(bar)
-        } else if let index = bars.firstIndex(where: { $0.timestamp == timestamp }) {
-            guard bars[index] != bar else {
-                return false
-            }
-            bars[index] = bar
-        } else {
-            let insertIndex = insertionIndex(for: date)
-            bars.insert(bar, at: insertIndex)
-        }
-
-        trimBarsIfNeeded()
-        latestCoreSessionClose = bars.last?.close ?? latestCoreSessionClose
-        if updatesChart {
-            updateChartRenderModels()
-        }
-        return true
-    }
-
-    private func appendUnordered(_ bar: AlpacaMarketBar) {
-        bars.append(bar)
-        bars = Self.normalizedBars(bars)
-        trimBarsIfNeeded()
-    }
-
-    private func trimBarsIfNeeded() {
-        if bars.count > 900 {
-            bars.removeFirst(bars.count - 900)
-        }
-    }
-
-    private func updateChartRenderModels(showsLoading: Bool = false) {
-        scheduleChartRender(
-            for: selectedRange,
-            mode: effectiveChartMode,
-            sourceBars: bars,
-            renderInput: chartRenderInput(from: bars, for: selectedRange),
-            showsLoading: showsLoading
-        )
-    }
-
-    private func setChartBars(_ newBars: [AlpacaMarketBar], for range: AssetChartRange) {
-        guard selectedRange == range else {
-            scheduleChartRender(
-                for: range,
-                mode: .line,
-                sourceBars: newBars,
-                renderInput: chartRenderInput(from: newBars, for: range),
-                showsLoading: false
-            )
-            return
-        }
-
-        bars = newBars
-        scheduleChartRender(
-            for: range,
-            mode: effectiveChartMode,
-            sourceBars: newBars,
-            renderInput: chartRenderInput(from: newBars, for: range),
-            showsLoading: true
-        )
-    }
-
-    @discardableResult
-    private func applyCachedChart(for range: AssetChartRange) -> Bool {
-        guard shouldCacheChart(for: range) else {
-            return false
-        }
-
-        let cacheKey = AssetChartCacheKey(range: range, mode: effectiveChartMode)
-        guard let cached = chartCache[cacheKey] else {
-            return false
-        }
-
-        chartRenderRevision += 1
-        chartRenderTask?.cancel()
-        bars = cached.bars
-        chartRenderModels = cached.renderModels
-        if range == .oneDay {
-            latestCoreSessionClose = bars.last?.close ?? latestCoreSessionClose
-        }
-        return true
-    }
-
-    private func scheduleChartRender(
-        for range: AssetChartRange,
-        mode: AssetChartMode,
-        sourceBars: [AlpacaMarketBar],
-        renderInput: AssetChartRenderInput,
-        showsLoading: Bool
+    /// Normalizes raw snapshot bars, merges supplemental/overnight bars, maps intraday session slots,
+    /// and builds chart render models completely off `@MainActor`.
+    private func scheduleSnapshotBarRender(
+        rawBars: [AlpacaMarketBar],
+        range: AssetChartRange,
+        feed snapshotFeed: AlpacaMarketDataFeed,
+        latestBar: AlpacaMarketBar?
     ) {
         chartRenderRevision += 1
         let revision = chartRenderRevision
         chartRenderTask?.cancel()
+
+        if selectedRange == range {
+            isLoadingChart = true
+        }
+        clearPendingSnapshotRender()
+        pendingSnapshotRenderRange = range
+
+        let baseline = chartBaselines[range]
+        let context = makeIntradaySessionContext(overnightEntries: [])
+        let fallbackCoreClose = latestCoreSessionClose ?? dailyBar?.close
+
+        chartRenderTask = Task { @MainActor [weak self] in
+            let output = await Task.detached(priority: .userInitiated) { () -> (series: AssetDetailBarSeries, models: AssetChartRenderModels, coreClose: Double?) in
+                var nextSeries = AssetDetailBarSeries.normalized(from: rawBars)
+                var resolvedCoreClose = fallbackCoreClose
+
+                if range == .oneDay {
+                    resolvedCoreClose = nextSeries.latestClose ?? resolvedCoreClose
+                    if snapshotFeed == .overnight {
+                        nextSeries.resetOvernightSupplementBars(with: latestBar)
+                        let overnightContext = AssetIntradaySessionContext(
+                            symbol: context.symbol,
+                            feed: context.feed,
+                            sessionProgress: context.sessionProgress,
+                            latestTrade: context.latestTrade,
+                            quote: context.quote,
+                            latestOvernightBar: context.latestOvernightBar,
+                            overnightSupplementEntries: nextSeries.overnightSupplementEntries,
+                            previousClose: context.previousClose,
+                            dayOpen: context.dayOpen,
+                            latestCoreSessionClose: resolvedCoreClose,
+                            currentPrice: context.currentPrice
+                        )
+                        if let synthesized = AssetIntradaySessionMapper.latestOvernightChartBar(
+                            referenceBar: nextSeries.latestEntry?.bar,
+                            context: overnightContext
+                        ) {
+                            nextSeries.mergeOvernightSupplementBar(synthesized)
+                        }
+                    } else if let latestBar, AssetIntradaySessionMapper.hasValidMarketPrice(latestBar.close) {
+                        nextSeries.merge(latestBar)
+                        resolvedCoreClose = nextSeries.latestClose ?? resolvedCoreClose
+                    }
+                }
+
+                let finalContext = AssetIntradaySessionContext(
+                    symbol: context.symbol,
+                    feed: context.feed,
+                    sessionProgress: context.sessionProgress,
+                    latestTrade: context.latestTrade,
+                    quote: context.quote,
+                    latestOvernightBar: context.latestOvernightBar,
+                    overnightSupplementEntries: nextSeries.overnightSupplementEntries,
+                    previousClose: context.previousClose,
+                    dayOpen: context.dayOpen,
+                    latestCoreSessionClose: resolvedCoreClose,
+                    currentPrice: context.currentPrice
+                )
+
+                let renderInput = AssetIntradaySessionMapper.makeRenderInput(
+                    fromParsedBars: nextSeries.entries,
+                    range: range,
+                    priceChangeBaseline: baseline,
+                    context: finalContext
+                )
+                let models = AssetChartPreprocessor.makeRenderModels(
+                    from: renderInput.bars,
+                    xDomain: renderInput.xDomain,
+                    priceChangeBaseline: renderInput.priceChangeBaseline,
+                    mode: .line
+                )
+                return (nextSeries, models, resolvedCoreClose)
+            }.value
+
+            guard let self, !Task.isCancelled, revision == self.chartRenderRevision else {
+                return
+            }
+
+            if self.shouldCacheChart(for: range) {
+                self.chartCache[range] = AssetChartCacheEntry(
+                    barSeries: output.series,
+                    renderModels: output.models
+                )
+            } else {
+                self.chartCache.removeValue(forKey: range)
+            }
+
+            let deferredBars = self.deferredRealtimeBars
+            let hadDeferredUpdate = self.hasDeferredRealtimeChartUpdate
+            self.clearPendingSnapshotRender()
+
+            if self.selectedRange == range {
+                self.barSeries = output.series
+                if range == .oneDay, let coreClose = output.coreClose {
+                    self.latestCoreSessionClose = coreClose
+                }
+                self.chartRenderModels = output.models
+                self.isLoadingChart = false
+                self.recomputeChartTradeMarkers()
+
+                if hadDeferredUpdate, range == .oneDay {
+                    // Replay realtime updates that arrived while the snapshot was rendering.
+                    for bar in deferredBars {
+                        self.barSeries.merge(bar)
+                    }
+                    if self.feed == .overnight, let latestOvernightBar = self.latestOvernightBar {
+                        self.barSeries.mergeOvernightSupplementBar(latestOvernightBar)
+                    }
+                    self.latestCoreSessionClose = self.barSeries.latestClose ?? self.latestCoreSessionClose
+                    self.updateChartRenderModels()
+                }
+            }
+        }
+    }
+
+    private func clearPendingSnapshotRender() {
+        pendingSnapshotRenderRange = nil
+        deferredRealtimeBars.removeAll()
+        hasDeferredRealtimeChartUpdate = false
+    }
+
+    private var isSnapshotRenderPendingForSelectedRange: Bool {
+        pendingSnapshotRenderRange == selectedRange
+    }
+
+    private func updateChartRenderModels(showsLoading: Bool = false) {
+        if isSnapshotRenderPendingForSelectedRange {
+            // Don't cancel the in-flight snapshot render; it replays this update when it lands.
+            hasDeferredRealtimeChartUpdate = true
+            return
+        }
+
+        let range = selectedRange
+        let currentSeries = barSeries
+        let baseline = chartBaselines[range]
+        let context = makeIntradaySessionContext(overnightEntries: currentSeries.overnightSupplementEntries)
+
+        chartRenderRevision += 1
+        let revision = chartRenderRevision
+        chartRenderTask?.cancel()
+
         if showsLoading {
             isLoadingChart = true
         }
 
-        chartRenderTask = Task { [weak self, renderInput] in
+        chartRenderTask = Task { @MainActor [weak self] in
             let result = await Task.detached(priority: .userInitiated) {
-                AssetChartPreprocessor.makeRenderModels(
+                let renderInput = AssetIntradaySessionMapper.makeRenderInput(
+                    fromParsedBars: currentSeries.entries,
+                    range: range,
+                    priceChangeBaseline: baseline,
+                    context: context
+                )
+                return AssetChartPreprocessor.makeRenderModels(
                     from: renderInput.bars,
                     xDomain: renderInput.xDomain,
                     priceChangeBaseline: renderInput.priceChangeBaseline,
-                    mode: mode
+                    mode: .line
                 )
             }.value
 
-            guard let self else { return }
-            guard !Task.isCancelled else { return }
-            guard revision == self.chartRenderRevision else { return }
+            guard let self, !Task.isCancelled, revision == self.chartRenderRevision else {
+                return
+            }
 
-            let cacheKey = AssetChartCacheKey(range: range, mode: mode)
             if self.shouldCacheChart(for: range) {
-                self.chartCache[cacheKey] = AssetChartCacheEntry(
-                    bars: sourceBars,
+                self.chartCache[range] = AssetChartCacheEntry(
+                    barSeries: currentSeries,
                     renderModels: result
                 )
             } else {
-                self.chartCache.removeValue(forKey: cacheKey)
+                self.chartCache.removeValue(forKey: range)
             }
 
-            if self.selectedRange == range, self.effectiveChartMode == mode {
+            if self.selectedRange == range {
                 self.chartRenderModels = result
                 self.isLoadingChart = false
+                self.recomputeChartTradeMarkers()
             }
         }
     }
 
-    private func shouldCacheChart(for range: AssetChartRange) -> Bool {
-        !(range == .oneDay && hasActiveSessionProgress)
-    }
-
-    private var hasActiveSessionProgress: Bool {
-        guard let sessionProgress else {
+    @discardableResult
+    private func applyCachedChart(for range: AssetChartRange) -> Bool {
+        guard shouldCacheChart(for: range),
+              let cached = chartCache[range] else {
             return false
         }
 
-        return sessionProgress.intervals.contains { interval in
-            interval.contains(sessionProgress.referenceDate)
+        chartRenderRevision += 1
+        chartRenderTask?.cancel()
+        clearPendingSnapshotRender()
+        barSeries = cached.barSeries
+        chartRenderModels = cached.renderModels
+        if range == .oneDay {
+            latestCoreSessionClose = barSeries.latestClose ?? latestCoreSessionClose
         }
+        return true
     }
 
-    private func chartRenderInput(from sourceBars: [AlpacaMarketBar], for range: AssetChartRange) -> AssetChartRenderInput {
-        AssetIntradaySessionMapper.makeRenderInput(
-            from: sourceBars,
-            range: range,
-            priceChangeBaseline: chartBaselines[range],
-            context: intradaySessionContext
-        )
+    private func shouldCacheChart(for range: AssetChartRange) -> Bool {
+        !(range == .oneDay && cachedHasActiveSessionProgress)
     }
 
-    private var intradaySessionContext: AssetIntradaySessionContext {
+    private func makeIntradaySessionContext(
+        overnightEntries: [AssetParsedMarketBar]
+    ) -> AssetIntradaySessionContext {
         AssetIntradaySessionContext(
             symbol: symbol,
             feed: feed,
@@ -1080,11 +1444,25 @@ final class AssetDetailStore {
             latestTrade: latestTrade,
             quote: quote,
             latestOvernightBar: latestOvernightBar,
-            overnightSupplementBars: overnightSupplementBars,
+            overnightSupplementEntries: overnightEntries,
             previousClose: previousClose,
             dayOpen: dayOpen,
             latestCoreSessionClose: latestCoreSessionClose,
             currentPrice: currentPrice
+        )
+    }
+
+    private func recordLatestOvernightChartBar() {
+        guard feed == .overnight, selectedRange == .oneDay else {
+            return
+        }
+
+        let context = makeIntradaySessionContext(overnightEntries: barSeries.overnightSupplementEntries)
+        barSeries.mergeOvernightSupplementBar(
+            AssetIntradaySessionMapper.latestOvernightChartBar(
+                referenceBar: barSeries.latestEntry?.bar,
+                context: context
+            )
         )
     }
 
@@ -1106,84 +1484,6 @@ final class AssetDetailStore {
         }
     }
 
-    private func activeReferenceInterval() -> MarketSessionInterval? {
-        AssetIntradaySessionMapper.activeReferenceInterval(in: sessionProgress)
-    }
-
-    private func completedExtendedInterval(
-        containing date: Date,
-        in progress: MarketSessionProgress
-    ) -> MarketSessionInterval? {
-        AssetIntradaySessionMapper.completedExtendedInterval(containing: date, in: progress)
-    }
-
-    private func resetOvernightSupplementBars(feed: AlpacaMarketDataFeed, latestBar: AlpacaMarketBar?) {
-        overnightSupplementBars = []
-        guard feed == .overnight else {
-            return
-        }
-
-        mergeOvernightSupplementBar(latestBar)
-    }
-
-    private func recordLatestOvernightChartBar() {
-        guard feed == .overnight, selectedRange == .oneDay else {
-            return
-        }
-
-        mergeOvernightSupplementBar(
-            AssetIntradaySessionMapper.latestOvernightChartBar(
-                referenceBar: bars.last,
-                context: intradaySessionContext
-            )
-        )
-    }
-
-    private func mergeOvernightSupplementBar(_ bar: AlpacaMarketBar?) {
-        guard let bar,
-              feed == .overnight,
-              selectedRange == .oneDay,
-              let barKey = AssetIntradaySessionMapper.minuteKey(for: bar) else {
-            return
-        }
-
-        if let index = overnightSupplementBars.firstIndex(where: { AssetIntradaySessionMapper.minuteKey(for: $0) == barKey }) {
-            let currentDate = AlpacaDateParser.date(overnightSupplementBars[index].timestamp)
-            let candidateDate = AlpacaDateParser.date(bar.timestamp)
-            if currentDate == nil || candidateDate == nil || candidateDate! >= currentDate! {
-                overnightSupplementBars[index] = bar
-            }
-        } else {
-            overnightSupplementBars.append(bar)
-        }
-
-        overnightSupplementBars = AssetIntradaySessionMapper.normalizedBars(
-            overnightSupplementBars,
-            maxCount: AssetIntradaySessionMapper.maxOvernightSupplementBars
-        )
-    }
-
-    private func insertionIndex(for date: Date) -> Int {
-        var lowerBound = 0
-        var upperBound = bars.count
-
-        while lowerBound < upperBound {
-            let midpoint = (lowerBound + upperBound) / 2
-            let midpointDate = AlpacaDateParser.date(bars[midpoint].timestamp) ?? .distantPast
-            if midpointDate <= date {
-                lowerBound = midpoint + 1
-            } else {
-                upperBound = midpoint
-            }
-        }
-
-        return lowerBound
-    }
-
-    private static func normalizedBars(_ bars: [AlpacaMarketBar]) -> [AlpacaMarketBar] {
-        AssetIntradaySessionMapper.normalizedBars(bars)
-    }
-
     private static func hasValidMarketPrice(_ price: Double?) -> Bool {
         AssetIntradaySessionMapper.hasValidMarketPrice(price)
     }
@@ -1197,10 +1497,7 @@ final class AssetDetailStore {
     }
 
     private static func extendedTradingSession(for date: Date) -> AssetExtendedTradingSession? {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "America/New_York") ?? .current
-
-        let components = calendar.dateComponents([.hour, .minute], from: date)
+        let components = easternCalendar.dateComponents([.hour, .minute], from: date)
         guard let hour = components.hour, let minute = components.minute else {
             return nil
         }
@@ -1219,257 +1516,12 @@ final class AssetDetailStore {
     }
 }
 
-private struct AssetChartCacheKey: Hashable {
-    let range: AssetChartRange
-    let mode: AssetChartMode
-}
-
 private struct AssetChartCacheEntry {
-    let bars: [AlpacaMarketBar]
+    let barSeries: AssetDetailBarSeries
     let renderModels: AssetChartRenderModels
 }
 
-private struct AssetDetailSnapshotRequest: Sendable {
-    let symbol: String
-    let range: AssetChartRange
-    let feed: AlpacaMarketDataFeed
-    let showsBlockingLoading: Bool
-}
-
-private enum AssetDetailSnapshotLoadResult {
-    case marketData(AlpacaStockSnapshot, request: AssetDetailSnapshotRequest)
-    case success(AssetDetailSnapshot)
-    case failure(Error, request: AssetDetailSnapshotRequest)
-}
-
-private enum AssetDetailSupplementalSnapshotRequest: Equatable {
-    case scheduled
-    case forced
-}
-
-private enum AssetDetailSupplementalSnapshotResult {
-    case success(AlpacaResolvedStockSnapshot, requestedFeed: AlpacaMarketDataFeed)
-    case failure(Error, requestedFeed: AlpacaMarketDataFeed)
-    case skipped
-}
-
-// @unchecked Sendable: immutable observer; onNext only called on MainActor
-private final class AssetDetailSnapshotLoadObserverBox: @unchecked Sendable {
-    private let observer: AnyObserver<AssetDetailSnapshotLoadResult>
-
-    init(_ observer: AnyObserver<AssetDetailSnapshotLoadResult>) {
-        self.observer = observer
-    }
-
-    @MainActor
-    func onNext(_ result: AssetDetailSnapshotLoadResult) {
-        observer.onNext(result)
-    }
-}
-
-// @unchecked Sendable: immutable observer; onNext only called on MainActor
-private final class AssetDetailSupplementalSnapshotObserverBox: @unchecked Sendable {
-    private let observer: AnyObserver<AssetDetailSupplementalSnapshotResult>
-
-    init(_ observer: AnyObserver<AssetDetailSupplementalSnapshotResult>) {
-        self.observer = observer
-    }
-
-    @MainActor
-    func onNext(_ result: AssetDetailSupplementalSnapshotResult) {
-        observer.onNext(result)
-    }
-}
-
-@MainActor
-private func assetDetailSnapshotLoad(
-    service: any AssetDetailServicing,
-    request: AssetDetailSnapshotRequest
-) -> Observable<AssetDetailSnapshotLoadResult> {
-    Observable.create { observer in
-        let observerBox = AssetDetailSnapshotLoadObserverBox(observer)
-        let earlySnapshotTask: Task<Void, Never>? = request.showsBlockingLoading
-            ? Task { @MainActor in
-                let service = service
-                do {
-                    guard let snapshot = try await service.fetchAssetSnapshot(
-                        symbol: request.symbol,
-                        feed: request.feed
-                    ) else {
-                        return
-                    }
-
-                    try Task.checkCancellation()
-                    observerBox.onNext(.marketData(snapshot, request: request))
-                } catch {
-                    return
-                }
-            }
-            : nil
-        let task = Task { @MainActor in
-            let service = service
-            do {
-                let snapshot = try await service.fetchAssetDetailSnapshot(
-                    symbol: request.symbol,
-                    range: request.range,
-                    feed: request.feed
-                )
-                try Task.checkCancellation()
-                observerBox.onNext(.success(snapshot))
-            } catch where error.isRequestCancellation {
-                return
-            } catch {
-                guard !Task.isCancelled else {
-                    return
-                }
-
-                observerBox.onNext(.failure(error, request: request))
-            }
-        }
-
-        return Disposables.create {
-            earlySnapshotTask?.cancel()
-            task.cancel()
-        }
-    }
-}
-
-@MainActor
-private func assetDetailSupplementalSnapshotLoad(
-    service: any AssetDetailServicing,
-    symbol: String,
-    feed: AlpacaMarketDataFeed
-) -> Observable<AssetDetailSupplementalSnapshotResult> {
-    Observable.create { observer in
-        let observerBox = AssetDetailSupplementalSnapshotObserverBox(observer)
-        let task = Task { @MainActor in
-            let service = service
-            do {
-                let snapshot = try await service.fetchResolvedAssetSnapshot(symbol: symbol, feed: feed)
-                try Task.checkCancellation()
-                observerBox.onNext(.success(snapshot, requestedFeed: feed))
-            } catch where error.isRequestCancellation {
-                return
-            } catch {
-                guard !Task.isCancelled else {
-                    return
-                }
-
-                observerBox.onNext(.failure(error, requestedFeed: feed))
-            }
-        }
-
-        return Disposables.create {
-            task.cancel()
-        }
-    }
-}
-
-private struct AssetRealtimeBatch {
-    var connectionStatus: AssetRealtimeConnectionStatus?
-    var latestTrade: AlpacaRealtimeTrade?
-    var latestQuote: AlpacaRealtimeQuote?
-    var dailyBar: AlpacaRealtimeBar?
-    var tradingStatus: AlpacaRealtimeTradingStatus?
-    var bars: [AlpacaMarketBar] = []
-
-    var hasMarketData: Bool {
-        latestTrade != nil
-            || latestQuote != nil
-            || dailyBar != nil
-            || tradingStatus != nil
-            || !bars.isEmpty
-    }
-
-    init?(events: [AssetRealtimeEvent], symbol: String) {
-        guard !events.isEmpty else {
-            return nil
-        }
-
-        let symbol = symbol.uppercased()
-        var barsByTimestamp: [String: AlpacaMarketBar] = [:]
-        var untimedBars: [AlpacaMarketBar] = []
-
-        for event in events {
-            switch event {
-            case .connection(let status):
-                connectionStatus = status
-            case .trade(let trade):
-                guard trade.symbol == symbol else { continue }
-                latestTrade = trade
-            case .quote(let quote):
-                guard quote.symbol == symbol else { continue }
-                latestQuote = quote
-            case .minuteBar(let bar), .updatedBar(let bar):
-                guard bar.symbol == symbol else { continue }
-                if let timestamp = bar.marketBar.timestamp {
-                    barsByTimestamp[timestamp] = bar.marketBar
-                } else {
-                    untimedBars.append(bar.marketBar)
-                }
-            case .dailyBar(let bar):
-                guard bar.symbol == symbol else { continue }
-                dailyBar = bar
-            case .status(let status):
-                guard status.symbol == symbol else { continue }
-                tradingStatus = status
-            }
-        }
-
-        bars = Array(barsByTimestamp.values) + untimedBars
-        if connectionStatus == nil, !hasMarketData {
-            return nil
-        }
-    }
-}
-
-private func assetRealtimeBatches(
-    from source: Observable<AssetRealtimeEvent>,
-    symbol: String,
-    scheduler: SerialDispatchQueueScheduler
-) -> Observable<AssetRealtimeBatch> {
-    source
-        .observe(on: scheduler)
-        .buffer(timeSpan: .milliseconds(250), count: 128, scheduler: scheduler)
-        .compactMap { events in
-            AssetRealtimeBatch(events: events, symbol: symbol)
-        }
-}
-
-enum AssetExtendedTradingSession: Equatable, Sendable {
-    case preMarket
-    case afterHours
-    case overnight
-
-    var title: String {
-        switch self {
-        case .preMarket:
-            "Pre-market"
-        case .afterHours:
-            "After-hours"
-        case .overnight:
-            "Overnight"
-        }
-    }
-
-    var completedTitle: String {
-        switch self {
-        case .preMarket:
-            "Last pre-market"
-        case .afterHours:
-            "Last after-hours"
-        case .overnight:
-            "Last overnight"
-        }
-    }
-}
-
 private extension String {
-    var nilIfEmpty: String? {
-        let value = trimmingCharacters(in: .whitespacesAndNewlines)
-        return value.isEmpty ? nil : value
-    }
-
     var displayAssetName: String {
         let value = trimmingCharacters(in: .whitespacesAndNewlines)
         let suffix = " Common Stock"
